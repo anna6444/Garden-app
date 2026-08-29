@@ -38,7 +38,7 @@
   </style>
 </head>
 <body>
-  <!-- 登录 -->
+  <!-- 登录界面 -->
   <div id="loginScreen" class="screen">
     <h2 style="text-align:center; margin:30px 0 10px;">🌱 种植小花园</h2>
     <p style="text-align:center; color:#777;">和爸爸妈妈一起种出美丽的花园吧！</p>
@@ -274,9 +274,10 @@
     </div>
   </div>
 
+  <!-- 引入 Supabase SDK（确保地址正确） -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // ====== 替换成你自己的 Supabase 配置 ======
+    // ====== Supabase 配置（请确认是你的实际值） ======
     const SUPABASE_URL = 'https://mubucjoyklpxoobgjyva.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -320,7 +321,7 @@
       return '种子';
     }
 
-    // 处理顶部标签切换
+    // 处理顶部标签切换（已放在正确位置）
     document.addEventListener('click', function(e) {
       if (e.target.classList.contains('tab')) {
         const parentTab = e.target.getAttribute('data-parenttab');
@@ -344,7 +345,7 @@
     async function login() {
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) alert('登录失败：' + error.message);
     }
 
@@ -512,8 +513,8 @@
       const container = document.getElementById('longTermTaskList');
       container.innerHTML = data.map(t => `
         <div class="card" style="padding:8px; margin:5px 0;">
-          ${t.title} (${t.assigneeRole === 'child' ? '孩子' : '家长t'}) ⭐${t.stars}
-          <.idbutton class="btn} btn-danger" onclick="deleteTemplate('${')">删除</button>
+          ${t.title} (${t.assigneeRole === 'child' ? '孩子' : '家长'}) ⭐${t.stars}
+          <button class="btn btn-danger" onclick="deleteTemplate('${t.id}')">删除</button>
         </div>`).join('');
     }
 
@@ -642,9 +643,9 @@
     }
 
     async function approveChildTask(taskId) {
-      const { data: taskSnap } = await supabaseClient.from('tasks').select('*').eq('id', taskId).URLsingle();
-      if (!taskSnap)) return;
-      if (taskSnap.photo {
+      const { data: taskSnap } = await supabaseClient.from('tasks').select('*').eq('id', taskId).single();
+      if (!taskSnap) return;
+      if (taskSnap.photoURL) {
         const fileName = taskSnap.photoURL.split('/').pop();
         await supabaseClient.storage.from('homework').remove([fileName]);
       }
