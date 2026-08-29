@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
@@ -35,26 +35,6 @@
     @media (max-width:500px) { .grid-2 { grid-template-columns:1fr; } }
     .progress-bar { height:10px; background:#e0e0e0; border-radius:5px; overflow:hidden; }
     .progress-fill { height:100%; background:#7cb342; border-radius:5px; transition:width 0.3s; }
-    // 处理顶部标签切换
-document.addEventListener('click', function(e) {
-  if (e.target.classList.contains('tab')) {
-    const parentTab = e.target.getAttribute('data-parenttab');
-    const childTab = e.target.getAttribute('data-childtab');
-    if (parentTab) {
-      document.querySelectorAll('.tab[data-parenttab]').forEach(t => t.classList.remove('active'));
-      e.target.classList.add('active');
-      document.querySelectorAll('.parent-tab-content').forEach(c => c.classList.add('hidden'));
-      const targetId = 'parent' + parentTab.charAt(0).toUpperCase() + parentTab.slice(1) + 'Tab';
-      document.getElementById(targetId).classList.remove('hidden');
-    } else if (childTab) {
-      document.querySelectorAll('.tab[data-childtab]').forEach(t => t.classList.remove('active'));
-      e.target.classList.add('active');
-      document.querySelectorAll('.child-tab-content').forEach(c => c.classList.add('hidden'));
-      const targetId = 'child' + childTab.charAt(0).toUpperCase() + childTab.slice(1) + 'Tab';
-      document.getElementById(targetId).classList.remove('hidden');
-    }
-  }
-});
   </style>
 </head>
 <body>
@@ -296,11 +276,10 @@ document.addEventListener('click', function(e) {
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-  
+    // ====== 替换成你自己的 Supabase 配置 ======
     const SUPABASE_URL = 'https://mubucjoyklpxoobgjyva.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k';
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentUser = null;
     let currentUserData = null;
@@ -340,6 +319,27 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
       if (growthLevel >= 1) return '发芽';
       return '种子';
     }
+
+    // 处理顶部标签切换
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('tab')) {
+        const parentTab = e.target.getAttribute('data-parenttab');
+        const childTab = e.target.getAttribute('data-childtab');
+        if (parentTab) {
+          document.querySelectorAll('.tab[data-parenttab]').forEach(t => t.classList.remove('active'));
+          e.target.classList.add('active');
+          document.querySelectorAll('.parent-tab-content').forEach(c => c.classList.add('hidden'));
+          const targetId = 'parent' + parentTab.charAt(0).toUpperCase() + parentTab.slice(1) + 'Tab';
+          document.getElementById(targetId).classList.remove('hidden');
+        } else if (childTab) {
+          document.querySelectorAll('.tab[data-childtab]').forEach(t => t.classList.remove('active'));
+          e.target.classList.add('active');
+          document.querySelectorAll('.child-tab-content').forEach(c => c.classList.add('hidden'));
+          const targetId = 'child' + childTab.charAt(0).toUpperCase() + childTab.slice(1) + 'Tab';
+          document.getElementById(targetId).classList.remove('hidden');
+        }
+      }
+    });
 
     async function login() {
       const email = document.getElementById('loginEmail').value;
@@ -512,8 +512,8 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
       const container = document.getElementById('longTermTaskList');
       container.innerHTML = data.map(t => `
         <div class="card" style="padding:8px; margin:5px 0;">
-          ${t.title} (${t.assigneeRole === 'child' ? '孩子' : '家长'}) ⭐${t.stars}
-          <button class="btn btn-danger" onclick="deleteTemplate('${t.id}')">删除</button>
+          ${t.title} (${t.assigneeRole === 'child' ? '孩子' : '家长t'}) ⭐${t.stars}
+          <.idbutton class="btn} btn-danger" onclick="deleteTemplate('${')">删除</button>
         </div>`).join('');
     }
 
@@ -642,9 +642,9 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
     }
 
     async function approveChildTask(taskId) {
-      const { data: taskSnap } = await supabaseClient.from('tasks').select('*').eq('id', taskId).single();
-      if (!taskSnap) return;
-      if (taskSnap.photoURL) {
+      const { data: taskSnap } = await supabaseClient.from('tasks').select('*').eq('id', taskId).URLsingle();
+      if (!taskSnap)) return;
+      if (taskSnap.photo {
         const fileName = taskSnap.photoURL.split('/').pop();
         await supabaseClient.storage.from('homework').remove([fileName]);
       }
