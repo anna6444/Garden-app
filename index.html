@@ -35,6 +35,26 @@
     @media (max-width:500px) { .grid-2 { grid-template-columns:1fr; } }
     .progress-bar { height:10px; background:#e0e0e0; border-radius:5px; overflow:hidden; }
     .progress-fill { height:100%; background:#7cb342; border-radius:5px; transition:width 0.3s; }
+    // 处理顶部标签切换
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('tab')) {
+    const parentTab = e.target.getAttribute('data-parenttab');
+    const childTab = e.target.getAttribute('data-childtab');
+    if (parentTab) {
+      document.querySelectorAll('.tab[data-parenttab]').forEach(t => t.classList.remove('active'));
+      e.target.classList.add('active');
+      document.querySelectorAll('.parent-tab-content').forEach(c => c.classList.add('hidden'));
+      const targetId = 'parent' + parentTab.charAt(0).toUpperCase() + parentTab.slice(1) + 'Tab';
+      document.getElementById(targetId).classList.remove('hidden');
+    } else if (childTab) {
+      document.querySelectorAll('.tab[data-childtab]').forEach(t => t.classList.remove('active'));
+      e.target.classList.add('active');
+      document.querySelectorAll('.child-tab-content').forEach(c => c.classList.add('hidden'));
+      const targetId = 'child' + childTab.charAt(0).toUpperCase() + childTab.slice(1) + 'Tab';
+      document.getElementById(targetId).classList.remove('hidden');
+    }
+  }
+});
   </style>
 </head>
 <body>
