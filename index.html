@@ -38,7 +38,6 @@
   </style>
 </head>
 <body>
-  <!-- 登录界面 -->
   <div id="loginScreen" class="screen">
     <h2 style="text-align:center; margin:30px 0 10px;">🌱 种植小花园</h2>
     <p style="text-align:center; color:#777;">和爸爸妈妈一起种出美丽的花园吧！</p>
@@ -49,7 +48,6 @@
     </div>
   </div>
 
-  <!-- 家长端 -->
   <div id="parentScreen" class="screen hidden">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h2>👨‍👧 家长花园</h2>
@@ -72,10 +70,10 @@
       <div class="card">
         <h3>资源</h3>
         <div class="resource-icons">
-          <span class="resource-icon">💧 <span id="parentWater">0</span></span>
-          <span class="resource-icon">☀️ <span id="parentSun">0</span></span>
-          <span class="resource-icon">🧪 <span id="parentFertilizer">0</span></span>
-          <span class="resource-icon">⭐ <span id="parentStars">0</span></span>
+          <span>💧 <span id="parentWater">0</span></span>
+          <span>☀️ <span id="parentSun">0</span></span>
+          <span>🧪 <span id="parentFertilizer">0</span></span>
+          <span>⭐ <span id="parentStars">0</span></span>
         </div>
         <div class="grid-2">
           <button class="btn" onclick="useResource('water')">浇水</button>
@@ -91,8 +89,8 @@
 
     <div id="parentTasksTab" class="parent-tab-content hidden">
       <div class="card">
-        <h3>设置长期任务（每日自动重复）</h3>
-        <input id="longTermTaskTitle" placeholder="任务标题，例如：每天练琴">
+        <h3>设置长期任务</h3>
+        <input id="longTermTaskTitle" placeholder="任务标题">
         <select id="longTermTaskAssignee">
           <option value="child">孩子</option>
           <option value="parent">家长</option>
@@ -108,7 +106,7 @@
         <div id="longTermTaskList"></div>
       </div>
       <div class="card">
-        <h3>布置每日任务（手动）</h3>
+        <h3>布置每日任务</h3>
         <input id="childTaskTitle" placeholder="任务标题">
         <textarea id="childTaskDesc" placeholder="任务说明"></textarea>
         <select id="childTaskType">
@@ -122,7 +120,7 @@
       <div class="card">
         <h3>我的任务（家长）</h3>
         <div id="parentOwnTaskList"></div>
-        <button class="btn btn-info" onclick="addParentSelfTask()">添加家长任务（手动）</button>
+        <button class="btn btn-info" onclick="addParentSelfTask()">添加家长任务</button>
       </div>
       <div class="card">
         <h3>孩子任务进度</h3>
@@ -144,21 +142,16 @@
     <div id="parentWeeklyTab" class="parent-tab-content hidden">
       <div class="card">
         <h3>每周结算</h3>
-        <p>周六点击下方按钮重置任务和植物</p>
         <button class="btn btn-danger" onclick="resetWeek()">重置本周</button>
-        <div id="weeklyResult"></div>
       </div>
     </div>
 
     <div id="parentListsTab" class="parent-tab-content hidden">
       <div class="card">
-        <h3>我的心愿清单</h3>
+        <h3>心愿/惩罚</h3>
         <input id="parentWishInput" placeholder="写下心愿">
         <button class="btn" onclick="addWish('parent')">添加心愿</button>
         <ul id="parentWishList"></ul>
-      </div>
-      <div class="card">
-        <h3>我的惩罚清单</h3>
         <input id="parentPunishInput" placeholder="惩罚任务">
         <button class="btn" onclick="addPunish('parent')">添加惩罚</button>
         <ul id="parentPunishList"></ul>
@@ -169,15 +162,12 @@
       <div class="card">
         <h3>孩子信息</h3>
         <p>⭐ 孩子星星：<span id="childStarsDisplay">0</span></p>
-        <div class="grid-2">
-          <button class="btn btn-warning" onclick="deductStar('child','乱发脾气')">扣星：乱发脾气</button>
-          <button class="btn btn-warning" onclick="deductStar('child','口头约定未做到')">扣星：未遵守约定</button>
-        </div>
+        <button class="btn btn-warning" onclick="deductStar('child','乱发脾气')">扣星：乱发脾气</button>
+        <button class="btn btn-warning" onclick="deductStar('child','口头约定未做到')">扣星：未遵守约定</button>
       </div>
     </div>
   </div>
 
-  <!-- 孩子端 -->
   <div id="childScreen" class="screen hidden">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h2>🌱 我的小花园</h2>
@@ -200,10 +190,10 @@
       <div class="card">
         <h3>资源</h3>
         <div class="resource-icons">
-          <span class="resource-icon">💧 <span id="childWater">0</span></span>
-          <span class="resource-icon">☀️ <span id="childSun">0</span></span>
-          <span class="resource-icon">🧪 <span id="childFertilizer">0</span></span>
-          <span class="resource-icon">⭐ <span id="childStars">0</span></span>
+          <span>💧 <span id="childWater">0</span></span>
+          <span>☀️ <span id="childSun">0</span></span>
+          <span>🧪 <span id="childFertilizer">0</span></span>
+          <span>⭐ <span id="childStars">0</span></span>
         </div>
         <div class="grid-2">
           <button class="btn" onclick="useResource('water')">浇水</button>
@@ -223,7 +213,7 @@
         <div id="childTaskList"></div>
       </div>
       <div class="card">
-        <h3>家长的任务（我可以发奖励）</h3>
+        <h3>家长的任务</h3>
         <div id="parentTaskListForChild"></div>
       </div>
     </div>
@@ -248,19 +238,13 @@
 
     <div id="childListsTab" class="child-tab-content hidden">
       <div class="card">
-        <h3>我的心愿清单</h3>
+        <h3>心愿/惩罚</h3>
         <input id="childWishInput" placeholder="写下心愿">
         <button class="btn" onclick="addWish('child')">添加心愿</button>
         <ul id="childWishList"></ul>
-      </div>
-      <div class="card">
-        <h3>我的惩罚清单</h3>
         <input id="childPunishInput" placeholder="惩罚任务">
         <button class="btn" onclick="addPunish('child')">添加惩罚</button>
         <ul id="childPunishList"></ul>
-      </div>
-      <div class="card">
-        <h3>扣家长星星</h3>
         <button class="btn btn-warning" onclick="deductStar('parent','乱发脾气')">扣家长：乱发脾气</button>
         <button class="btn btn-warning" onclick="deductStar('parent','口头约定未做到')">扣家长：未遵守约定</button>
       </div>
@@ -274,18 +258,15 @@
     </div>
   </div>
 
-  <!-- 引入 Supabase SDK（确保地址正确） -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // ====== Supabase 配置（请确认是你的实际值） ======
     const SUPABASE_URL = 'https://mubucjoyklpxoobgjyva.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_i2OAqehmZrCgqEYtQJsuvA_v2SdhPMH';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentUser = null;
     let currentUserData = null;
     let childUserId = null;
-    let currentRole = null;
     let parentUserId = null;
 
     const plantTypes = {
@@ -321,7 +302,6 @@
       return '种子';
     }
 
-    // 处理顶部标签切换（已放在正确位置）
     document.addEventListener('click', function(e) {
       if (e.target.classList.contains('tab')) {
         const parentTab = e.target.getAttribute('data-parenttab');
@@ -330,14 +310,12 @@
           document.querySelectorAll('.tab[data-parenttab]').forEach(t => t.classList.remove('active'));
           e.target.classList.add('active');
           document.querySelectorAll('.parent-tab-content').forEach(c => c.classList.add('hidden'));
-          const targetId = 'parent' + parentTab.charAt(0).toUpperCase() + parentTab.slice(1) + 'Tab';
-          document.getElementById(targetId).classList.remove('hidden');
+          document.getElementById('parent' + parentTab.charAt(0).toUpperCase() + parentTab.slice(1) + 'Tab').classList.remove('hidden');
         } else if (childTab) {
           document.querySelectorAll('.tab[data-childtab]').forEach(t => t.classList.remove('active'));
           e.target.classList.add('active');
           document.querySelectorAll('.child-tab-content').forEach(c => c.classList.add('hidden'));
-          const targetId = 'child' + childTab.charAt(0).toUpperCase() + childTab.slice(1) + 'Tab';
-          document.getElementById(targetId).classList.remove('hidden');
+          document.getElementById('child' + childTab.charAt(0).toUpperCase() + childTab.slice(1) + 'Tab').classList.remove('hidden');
         }
       }
     });
@@ -364,77 +342,42 @@
     });
 
     async function loadUserData() {
-      const { data: userSnap, error } = await supabaseClient
-        .from('users')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
+      const { data: userSnap, error } = await supabaseClient.from('users').select('*').eq('id', currentUser.id).single();
       if (error || !userSnap) {
-        alert('用户数据不存在，请检查数据库');
+        alert('用户数据不存在');
         await supabaseClient.auth.signOut();
         return;
       }
       currentUserData = userSnap;
-      currentRole = userSnap.role;
-      if (currentRole === 'parent') {
+      if (userSnap.role === 'parent') {
         show('parentScreen');
-        const { data: childSnap } = await supabaseClient
-          .from('users')
-          .select('*')
-          .eq('role', 'child')
-          .eq('parentId', currentUser.id)
-          .single();
+        const { data: childSnap } = await supabaseClient.from('users').select('*').eq('role','child').eq('parentId', currentUser.id).single();
         if (childSnap) childUserId = childSnap.id;
         loadParentData();
       } else {
         show('childScreen');
-        const { data: parentSnap } = await supabaseClient
-          .from('users')
-          .select('*')
-          .eq('role', 'parent')
-          .single();
+        const { data: parentSnap } = await supabaseClient.from('users').select('*').eq('role','parent').single();
         if (parentSnap) parentUserId = parentSnap.id;
         loadChildData();
       }
     }
 
     async function loadParentData() {
-      supabaseClient
-        .from('users')
-        .on('*', payload => {
-          if (payload.new.id === currentUser.id) updateParentUI(payload.new);
-        })
-        .subscribe();
-
-      supabaseClient
-        .from('task_templates')
-        .on('*', payload => {
-          loadTemplates();
-        })
-        .subscribe();
-
+      supabaseClient.from('users').on('*', payload => {
+        if (payload.new.id === currentUser.id) updateParentUI(payload.new);
+      }).subscribe();
+      supabaseClient.from('task_templates').on('*', payload => loadTemplates()).subscribe();
       if (childUserId) {
-        supabaseClient
-          .from('tasks')
-          .on('*', payload => {
-            if (payload.new.assigneeId === childUserId) loadChildTasksForParent();
-          })
-          .subscribe();
-        supabaseClient
-          .from('users')
-          .on('*', payload => {
-            if (payload.new.id === childUserId) document.getElementById('childStarsDisplay').textContent = payload.new.stars || 0;
-          })
-          .subscribe();
+        supabaseClient.from('tasks').on('*', payload => {
+          if (payload.new.assigneeId === childUserId) loadChildTasksForParent();
+        }).subscribe();
+        supabaseClient.from('users').on('*', payload => {
+          if (payload.new.id === childUserId) document.getElementById('childStarsDisplay').textContent = payload.new.stars || 0;
+        }).subscribe();
       }
-
-      supabaseClient
-        .from('tasks')
-        .on('*', payload => {
-          if (payload.new.assigneeId === currentUser.id) loadParentOwnTasks();
-        })
-        .subscribe();
-
+      supabaseClient.from('tasks').on('*', payload => {
+        if (payload.new.assigneeId === currentUser.id) loadParentOwnTasks();
+      }).subscribe();
       loadTemplates();
       loadChildTasksForParent();
       loadParentOwnTasks();
@@ -466,17 +409,10 @@
     }
 
     function choosePlant(role, plantType) {
-      supabaseClient
-        .from('users')
-        .update({
-          plantType, growthLevel:0, water:0, sun:0, fertilizer:0, hasBug:false,
-          lastWatered:null, lastSun:null, lastFertilized:null
-        })
-        .eq('id', currentUser.id)
-        .then(({ error }) => {
-          if (error) alert('操作失败');
-          else alert('植物已种下！');
-        });
+      supabaseClient.from('users').update({ plantType, growthLevel:0, water:0, sun:0, fertilizer:0, hasBug:false, lastWatered:null, lastSun:null, lastFertilized:null }).eq('id', currentUser.id).then(({ error }) => {
+        if (error) alert('操作失败');
+        else alert('植物已种下！');
+      });
     }
 
     async function addLongTermTask() {
@@ -486,73 +422,29 @@
       const stars = parseInt(document.getElementById('longTermTaskStars').value) || 1;
       if (!title) { alert('请输入标题'); return; }
       const assigneeId = assignee === 'child' ? childUserId : currentUser.id;
-      const { error } = await supabaseClient
-        .from('task_templates')
-        .insert([{
-          creatorId: currentUser.id,
-          assigneeId,
-          assigneeRole: assignee,
-          title, type, stars,
-          isRecurring: true,
-          created_at: new Date()
-        }]);
+      const { error } = await supabaseClient.from('task_templates').insert([{ creatorId: currentUser.id, assigneeId, assigneeRole: assignee, title, type, stars, isRecurring: true, created_at: new Date() }]);
       if (error) alert('添加失败');
-      else {
-        document.getElementById('longTermTaskTitle').value = '';
-        alert('长期任务已添加');
-        generateTodayRecurringTasks();
-      }
+      else { document.getElementById('longTermTaskTitle').value = ''; alert('长期任务已添加'); generateTodayRecurringTasks(); }
     }
 
     async function loadTemplates() {
-      const { data, error } = await supabaseClient
-        .from('task_templates')
-        .select('*')
-        .eq('creatorId', currentUser.id);
+      const { data, error } = await supabaseClient.from('task_templates').select('*').eq('creatorId', currentUser.id);
       if (error) return;
-      const container = document.getElementById('longTermTaskList');
-      container.innerHTML = data.map(t => `
-        <div class="card" style="padding:8px; margin:5px 0;">
-          ${t.title} (${t.assigneeRole === 'child' ? '孩子' : '家长'}) ⭐${t.stars}
-          <button class="btn btn-danger" onclick="deleteTemplate('${t.id}')">删除</button>
-        </div>`).join('');
+      document.getElementById('longTermTaskList').innerHTML = data.map(t => `<div class="card" style="padding:8px;margin:5px 0;">${t.title} (${t.assigneeRole==='child'?'孩子':'家长'}) ⭐${t.stars} <button class="btn btn-danger" onclick="deleteTemplate('${t.id}')">删除</button></div>`).join('');
     }
 
     async function deleteTemplate(templateId) {
-      if (confirm('删除此长期任务？')) {
-        await supabaseClient.from('task_templates').delete().eq('id', templateId);
-      }
+      if (confirm('删除此长期任务？')) await supabaseClient.from('task_templates').delete().eq('id', templateId);
     }
 
     async function generateTodayRecurringTasks() {
       const today = new Date().toDateString();
-      const { data: templates, error } = await supabaseClient
-        .from('task_templates')
-        .select('*')
-        .eq('creatorId', currentUser.id);
-      if (error) return;
+      const { data: templates } = await supabaseClient.from('task_templates').select('*').eq('creatorId', currentUser.id);
+      if (!templates) return;
       for (const tpl of templates) {
-        const { data: existing } = await supabaseClient
-          .from('tasks')
-          .select('id')
-          .eq('assigneeId', tpl.assigneeId)
-          .eq('templateId', tpl.id)
-          .eq('createdDate', today)
-          .single();
+        const { data: existing } = await supabaseClient.from('tasks').select('id').eq('assigneeId', tpl.assigneeId).eq('templateId', tpl.id).eq('createdDate', today).single();
         if (!existing) {
-          await supabaseClient.from('tasks').insert([{
-            assigneeId: tpl.assigneeId,
-            creatorId: currentUser.id,
-            title: tpl.title,
-            type: tpl.type,
-            rewardStars: tpl.stars,
-            status: 'pending',
-            created_at: new Date(),
-            createdDate: today,
-            templateId: tpl.id,
-            isRecurring: true,
-            photoURL: ''
-          }]);
+          await supabaseClient.from('tasks').insert([{ assigneeId: tpl.assigneeId, creatorId: currentUser.id, title: tpl.title, type: tpl.type, rewardStars: tpl.stars, status:'pending', created_at:new Date(), createdDate:today, templateId:tpl.id, isRecurring:true, photoURL:'' }]);
         }
       }
     }
@@ -564,18 +456,9 @@
       const type = document.getElementById('childTaskType').value;
       const stars = parseInt(document.getElementById('childTaskStars').value) || 1;
       if (!title) { alert('请输入任务标题'); return; }
-      const { error } = await supabaseClient.from('tasks').insert([{
-        assigneeId: childUserId,
-        creatorId: currentUser.id,
-        title, desc, type, rewardStars: stars,
-        status: 'pending', created_at: new Date(), createdDate: new Date().toDateString(),
-        isRecurring: false, photoURL: ''
-      }]);
+      const { error } = await supabaseClient.from('tasks').insert([{ assigneeId: childUserId, creatorId: currentUser.id, title, desc, type, rewardStars: stars, status:'pending', created_at:new Date(), createdDate:new Date().toDateString(), isRecurring:false, photoURL:'' }]);
       if (error) alert('布置失败');
-      else {
-        document.getElementById('childTaskTitle').value = '';
-        document.getElementById('childTaskDesc').value = '';
-      }
+      else { document.getElementById('childTaskTitle').value=''; document.getElementById('childTaskDesc').value=''; }
     }
 
     async function addParentSelfTask() {
@@ -584,37 +467,17 @@
       const chosen = typeMap[type] || '检查作业';
       const title = prompt('任务标题', chosen);
       if (!title) return;
-      const { error } = await supabaseClient.from('tasks').insert([{
-        assigneeId: currentUser.id,
-        creatorId: currentUser.id,
-        title, desc:'', type: chosen, rewardStars: 2,
-        status: 'pending', created_at: new Date(), createdDate: new Date().toDateString(),
-        isRecurring: false, photoURL: ''
-      }]);
+      const { error } = await supabaseClient.from('tasks').insert([{ assigneeId: currentUser.id, creatorId: currentUser.id, title, desc:'', type: chosen, rewardStars: 2, status:'pending', created_at:new Date(), createdDate:new Date().toDateString(), isRecurring:false, photoURL:'' }]);
       if (error) alert('添加失败');
     }
 
     function loadParentOwnTasks() {
-      supabaseClient
-        .from('tasks')
-        .select('*')
-        .eq('assigneeId', currentUser.id)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (error) return;
-          const container = document.getElementById('parentOwnTaskList');
-          if (data.length === 0) {
-            container.innerHTML = '<p>暂无任务</p>';
-            return;
-          }
-          container.innerHTML = data.map(t => `
-            <div class="card" style="padding:10px;">
-              <strong>${t.title}</strong> (⭐${t.rewardStars})
-              <span class="badge ${t.status}">${t.status === 'approved' ? '已完成' : t.status === 'pending' ? '待完成' : '待孩子发奖'}</span>
-              ${t.status === 'pending' ? `<button class="btn btn-info" onclick="completeParentTask('${t.id}')">标记完成</button>` : ''}
-              ${t.status === 'completed' ? `<span>等待孩子发奖...</span>` : ''}
-            </div>`).join('');
-        });
+      supabaseClient.from('tasks').select('*').eq('assigneeId', currentUser.id).order('created_at', { ascending: false }).then(({ data, error }) => {
+        if (error) return;
+        const container = document.getElementById('parentOwnTaskList');
+        if (data.length === 0) { container.innerHTML = '<p>暂无任务</p>'; return; }
+        container.innerHTML = data.map(t => `<div class="card" style="padding:10px;"><strong>${t.title}</strong> (⭐${t.rewardStars}) <span class="badge ${t.status}">${t.status==='approved'?'已完成':t.status==='pending'?'待完成':'待孩子发奖'}</span> ${t.status==='pending'?`<button class="btn btn-info" onclick="completeParentTask('${t.id}')">标记完成</button>`:''} ${t.status==='completed'?'<span>等待孩子发奖...</span>':''}</div>`).join('');
+      });
     }
 
     async function completeParentTask(taskId) {
@@ -623,32 +486,16 @@
 
     function loadChildTasksForParent() {
       if (!childUserId) return;
-      supabaseClient
-        .from('tasks')
-        .select('*')
-        .eq('assigneeId', childUserId)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (error) return;
-          const container = document.getElementById('childTaskListForParent');
-          container.innerHTML = data.map(t => `
-            <div class="card" style="padding:10px;">
-              <strong>${t.title}</strong> (⭐${t.rewardStars})
-              <span class="badge ${t.status}">${t.status === 'approved' ? '已完成' : t.status === 'submitted' ? '待审核' : t.status === 'rejected' ? '已打回' : '待完成'}</span>
-              ${t.photoURL ? `<img class="task-photo" src="${t.photoURL}">` : ''}
-              ${t.status === 'submitted' ? `<button class="btn" onclick="approveChildTask('${t.id}')">通过</button>
-              <button class="btn btn-danger" onclick="rejectChildTask('${t.id}')">打回</button>` : ''}
-            </div>`).join('');
-        });
+      supabaseClient.from('tasks').select('*').eq('assigneeId', childUserId).order('created_at', { ascending: false }).then(({ data, error }) => {
+        if (error) return;
+        document.getElementById('childTaskListForParent').innerHTML = data.map(t => `<div class="card" style="padding:10px;"><strong>${t.title}</strong> (⭐${t.rewardStars}) <span class="badge ${t.status}">${t.status==='approved'?'已完成':t.status==='submitted'?'待审核':t.status==='rejected'?'已打回':'待完成'}</span> ${t.photoURL?`<img class="task-photo" src="${t.photoURL}">`:''} ${t.status==='submitted'?`<button class="btn" onclick="approveChildTask('${t.id}')">通过</button><button class="btn btn-danger" onclick="rejectChildTask('${t.id}')">打回</button>`:''}</div>`).join('');
+      });
     }
 
     async function approveChildTask(taskId) {
       const { data: taskSnap } = await supabaseClient.from('tasks').select('*').eq('id', taskId).single();
       if (!taskSnap) return;
-      if (taskSnap.photoURL) {
-        const fileName = taskSnap.photoURL.split('/').pop();
-        await supabaseClient.storage.from('homework').remove([fileName]);
-      }
+      if (taskSnap.photoURL) { const fileName = taskSnap.photoURL.split('/').pop(); await supabaseClient.storage.from('homework').remove([fileName]); }
       await supabaseClient.from('tasks').update({ status: 'approved', photoURL: '' }).eq('id', taskId);
       await supabaseClient.rpc('increment_stars', { user_id: taskSnap.assigneeId, amount: taskSnap.rewardStars });
       await supabaseClient.rpc('increment_stars', { user_id: currentUser.id, amount: 1 });
@@ -658,46 +505,20 @@
     async function rejectChildTask(taskId) {
       const { data: taskSnap } = await supabaseClient.from('tasks').select('*').eq('id', taskId).single();
       if (!taskSnap) return;
-      if (taskSnap.photoURL) {
-        const fileName = taskSnap.photoURL.split('/').pop();
-        await supabaseClient.storage.from('homework').remove([fileName]);
-      }
+      if (taskSnap.photoURL) { const fileName = taskSnap.photoURL.split('/').pop(); await supabaseClient.storage.from('homework').remove([fileName]); }
       await supabaseClient.from('tasks').update({ status: 'rejected', photoURL: '' }).eq('id', taskId);
       alert('已打回');
     }
 
     async function loadChildData() {
-      supabaseClient
-        .from('users')
-        .on('*', payload => {
-          if (payload.new.id === currentUser.id) updateChildUI(payload.new);
-        })
-        .subscribe();
-
-      supabaseClient
-        .from('tasks')
-        .on('*', payload => {
-          if (payload.new.assigneeId === currentUser.id) loadChildTasks();
-        })
-        .subscribe();
-
+      supabaseClient.from('users').on('*', payload => { if (payload.new.id === currentUser.id) updateChildUI(payload.new); }).subscribe();
+      supabaseClient.from('tasks').on('*', payload => { if (payload.new.assigneeId === currentUser.id) loadChildTasks(); }).subscribe();
       if (parentUserId) {
-        supabaseClient
-          .from('tasks')
-          .on('*', payload => {
-            if (payload.new.assigneeId === parentUserId) loadParentTasksForChild();
-          })
-          .subscribe();
-        supabaseClient
-          .from('users')
-          .on('*', payload => {
-            if (payload.new.id === parentUserId) renderParentPlantView(payload.new);
-          })
-          .subscribe();
+        supabaseClient.from('tasks').on('*', payload => { if (payload.new.assigneeId === parentUserId) loadParentTasksForChild(); }).subscribe();
+        supabaseClient.from('users').on('*', payload => { if (payload.new.id === parentUserId) renderParentPlantView(payload.new); }).subscribe();
         const { data: parentData } = await supabaseClient.from('users').select('*').eq('id', parentUserId).single();
         if (parentData) renderParentPlantView(parentData);
       }
-
       loadChildTasks();
       loadParentTasksForChild();
     }
@@ -713,69 +534,28 @@
         const emoji = getPlantEmoji(data.plantType, growth);
         const stageName = getPlantStageName(growth);
         let bugHtml = data.hasBug ? '<div class="bug">🐛</div>' : '';
-        plantArea.innerHTML = `<div class="plant-stage">${emoji} ${bugHtml}</div>
-          <p>${plantTypes[data.plantType].name} - ${stageName} (${growth}/7)</p>
-          <div class="progress-bar"><div class="progress-fill" style="width:${(growth/7)*100}%"></div></div>`;
+        plantArea.innerHTML = `<div class="plant-stage">${emoji} ${bugHtml}</div><p>${plantTypes[data.plantType].name} - ${stageName} (${growth}/7)</p><div class="progress-bar"><div class="progress-fill" style="width:${(growth/7)*100}%"></div></div>`;
         if (data.hasBug) showSpeech('child', '有虫子！快用肥料赶走！');
         else if (data.water === 0 || data.sun === 0 || data.fertilizer === 0) showSpeech('child', '我需要资源，去商城兑换吧！');
         else showSpeech('child', '状态很好！');
       } else {
-        plantArea.innerHTML = '<p>请选择植物开始种植：</p><div class="grid-2">' +
-          Object.keys(plantTypes).map(key => `<button class="btn" onclick="choosePlant('child','${key}')">${plantTypes[key].emoji} ${plantTypes[key].name}</button>`).join('') +
-          '</div>';
+        plantArea.innerHTML = '<p>请选择植物开始种植：</p><div class="grid-2">' + Object.keys(plantTypes).map(key => `<button class="btn" onclick="choosePlant('child','${key}')">${plantTypes[key].emoji} ${plantTypes[key].name}</button>`).join('') + '</div>';
       }
     }
 
     function loadChildTasks() {
-      supabaseClient
-        .from('tasks')
-        .select('*')
-        .eq('assigneeId', currentUser.id)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (error) return;
-          const container = document.getElementById('childTaskList');
-          if (data.length === 0) {
-            container.innerHTML = '<p>暂无任务</p>';
-            return;
-          }
-          container.innerHTML = data.map(t => `
-            <div class="card" style="padding:10px;">
-              <strong>${t.title}</strong> (⭐${t.rewardStars})
-              <span class="badge ${t.status}">${t.status === 'approved' ? '已完成' : t.status === 'submitted' ? '待审核' : t.status === 'rejected' ? '已打回' : '待完成'}</span>
-              ${t.desc ? `<p>${t.desc}</p>` : ''}
-              ${t.status === 'approved' ? '<p>🎉 太棒了！</p>' : ''}
-              ${(t.status === 'pending' || t.status === 'rejected') ? `
-                <input type="file" accept="image/*" id="file-${t.id}">
-                <button class="btn" onclick="submitChildTask('${t.id}')">上传作业照片</button>
-              ` : ''}
-              ${t.photoURL ? `<img class="task-photo" src="${t.photoURL}">` : ''}
-              ${t.status === 'submitted' ? '<p>已提交，提醒家长检查哦！</p>' : ''}
-            </div>`).join('');
-        });
+      supabaseClient.from('tasks').select('*').eq('assigneeId', currentUser.id).order('created_at', { ascending: false }).then(({ data, error }) => {
+        if (error) return;
+        document.getElementById('childTaskList').innerHTML = data.map(t => `<div class="card" style="padding:10px;"><strong>${t.title}</strong> (⭐${t.rewardStars}) <span class="badge ${t.status}">${t.status==='approved'?'已完成':t.status==='submitted'?'待审核':t.status==='rejected'?'已打回':'待完成'}</span> ${t.description?`<p>${t.description}</p>`:''} ${t.status==='approved'?'<p>🎉 太棒了！</p>':''} ${(t.status==='pending'||t.status==='rejected')?`<input type="file" accept="image/*" id="file-${t.id}"><button class="btn" onclick="submitChildTask('${t.id}')">上传作业照片</button>`:''} ${t.photoURL?`<img class="task-photo" src="${t.photoURL}">`:''} ${t.status==='submitted'?'<p>已提交，提醒家长检查哦！</p>':''}</div>`).join('');
+      });
     }
 
     function loadParentTasksForChild() {
       if (!parentUserId) return;
-      supabaseClient
-        .from('tasks')
-        .select('*')
-        .eq('assigneeId', parentUserId)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (error) return;
-          const container = document.getElementById('parentTaskListForChild');
-          if (data.length === 0) {
-            container.innerHTML = '<p>家长没有任务</p>';
-            return;
-          }
-          container.innerHTML = data.map(t => `
-            <div class="card" style="padding:10px;">
-              <strong>${t.title}</strong> (⭐${t.rewardStars})
-              <span class="badge ${t.status}">${t.status === 'approved' ? '已完成' : t.status === 'completed' ? '待发奖' : '进行中'}</span>
-              ${t.status === 'completed' ? `<button class="btn" onclick="rewardParentTask('${t.id}')">发放奖励</button>` : ''}
-            </div>`).join('');
-        });
+      supabaseClient.from('tasks').select('*').eq('assigneeId', parentUserId).order('created_at', { ascending: false }).then(({ data, error }) => {
+        if (error) return;
+        document.getElementById('parentTaskListForChild').innerHTML = data.map(t => `<div class="card" style="padding:10px;"><strong>${t.title}</strong> (⭐${t.rewardStars}) <span class="badge ${t.status}">${t.status==='approved'?'已完成':t.status==='completed'?'待发奖':'进行中'}</span> ${t.status==='completed'?`<button class="btn" onclick="rewardParentTask('${t.id}')">发放奖励</button>`:''}</div>`).join('');
+      });
     }
 
     async function rewardParentTask(taskId) {
@@ -790,8 +570,7 @@
       const container = document.getElementById('parentPlantView');
       if (parentData.plantType) {
         const emoji = getPlantEmoji(parentData.plantType, parentData.growthLevel || 0);
-        container.innerHTML = `<div class="plant-stage">${emoji}</div>
-          <p>${plantTypes[parentData.plantType].name} - ${getPlantStageName(parentData.growthLevel)}</p>`;
+        container.innerHTML = `<div class="plant-stage">${emoji}</div><p>${plantTypes[parentData.plantType].name} - ${getPlantStageName(parentData.growthLevel)}</p>`;
       } else {
         container.innerHTML = '<p>家长还没有植物</p>';
       }
@@ -812,9 +591,8 @@
 
     async function exchangeResource(resource) {
       const userId = currentUser.id;
-      const { data: userData, error } = await supabaseClient.from('users').select('stars').eq('id', userId).single();
-      if (error || !userData) return;
-      if ((userData.stars || 0) < 1) { alert('星星不够'); return; }
+      const { data: userData } = await supabaseClient.from('users').select('stars').eq('id', userId).single();
+      if (!userData || (userData.stars||0) < 1) { alert('星星不够'); return; }
       await supabaseClient.rpc('increment_stars', { user_id: userId, amount: -1 });
       await supabaseClient.rpc('increment_field', { user_id: userId, field: resource, amount: 1 });
       alert('兑换成功');
@@ -822,96 +600,84 @@
 
     async function useResource(resource) {
       const userId = currentUser.id;
-      const { data: userData, error } = await supabaseClient.from('users').select('*').eq('id', userId).single();
-      if (error || !userData) return;
+      const { data: userData } = await supabaseClient.from('users').select('*').eq('id', userId).single();
+      if (!userData) return;
       if (!userData.plantType) { alert('请先选择植物'); return; }
-      if ((userData[resource] || 0) < 1) { alert('资源不足'); return; }
+      if ((userData[resource]||0) < 1) { alert('资源不足'); return; }
       const today = new Date().toDateString();
       const lastUseKey = 'last' + resource.charAt(0).toUpperCase() + resource.slice(1);
       if (userData[lastUseKey] === today) { alert('今天已经使用过该资源'); return; }
-      const updateObj = {
-        [resource]: userData[resource] - 1,
-        [lastUseKey]: today
-      };
-      const waterUsed = (resource === 'water') ? today : userData.lastWatered;
-      const sunUsed = (resource === 'sun') ? today : userData.lastSun;
-      const fertUsed = (resource === 'fertilizer') ? today : userData.lastFertilized;
-      if (waterUsed === today && sunUsed === today && fertUsed === today) {
+      const updateObj = { [resource]: userData[resource] - 1, [lastUseKey]: today };
+      const waterUsed = (resource==='water') ? today : userData.lastWatered;
+      const sunUsed = (resource==='sun') ? today : userData.lastSun;
+      const fertUsed = (resource==='fertilizer') ? today : userData.lastFertilized;
+      if (waterUsed===today && sunUsed===today && fertUsed===today) {
         updateObj.growthLevel = userData.growthLevel + 1;
         updateObj.hasBug = false;
-        updateObj.lastWatered = null;
-        updateObj.lastSun = null;
-        updateObj.lastFertilized = null;
+        updateObj.lastWatered = null; updateObj.lastSun = null; updateObj.lastFertilized = null;
       }
-      const { error: updateError } = await supabaseClient.from('users').update(updateObj).eq('id', userId);
-      if (updateError) alert('操作失败');
-      else alert('使用成功');
+      await supabaseClient.from('users').update(updateObj).eq('id', userId);
+      alert('使用成功');
     }
 
     async function deductStar(targetRole, reason) {
       let targetId;
-      if (targetRole === 'child') targetId = childUserId;
-      else if (targetRole === 'parent') targetId = parentUserId;
+      if (targetRole==='child') targetId = childUserId;
+      else if (targetRole==='parent') targetId = parentUserId;
       if (!targetId) { alert('未找到目标用户'); return; }
       await supabaseClient.rpc('increment_stars', { user_id: targetId, amount: -1 });
       alert(`已扣星：${reason}`);
     }
 
     async function addWish(role) {
-      const input = document.getElementById(role === 'parent' ? 'parentWishInput' : 'childWishInput');
+      const input = document.getElementById(role==='parent'?'parentWishInput':'childWishInput');
       const text = input.value.trim();
       if (!text) return;
       const { data: userData } = await supabaseClient.from('users').select('wishes').eq('id', currentUser.id).single();
       const wishes = userData?.wishes || [];
       wishes.push(text);
       await supabaseClient.from('users').update({ wishes }).eq('id', currentUser.id);
-      input.value = '';
+      input.value='';
       loadWishList(role);
     }
 
     async function addPunish(role) {
-      const input = document.getElementById(role === 'parent' ? 'parentPunishInput' : 'childPunishInput');
+      const input = document.getElementById(role==='parent'?'parentPunishInput':'childPunishInput');
       const text = input.value.trim();
       if (!text) return;
       const { data: userData } = await supabaseClient.from('users').select('punishments').eq('id', currentUser.id).single();
       const punishments = userData?.punishments || [];
       punishments.push(text);
       await supabaseClient.from('users').update({ punishments }).eq('id', currentUser.id);
-      input.value = '';
+      input.value='';
       loadPunishList(role);
     }
 
     function loadWishList(role) {
-      const userId = currentUser.id;
-      supabaseClient.from('users').select('wishes').eq('id', userId).single().then(({ data }) => {
+      supabaseClient.from('users').select('wishes').eq('id', currentUser.id).single().then(({data}) => {
         const wishes = data?.wishes || [];
-        const ul = document.getElementById(role === 'parent' ? 'parentWishList' : 'childWishList');
-        ul.innerHTML = wishes.map(w => `<li>${w} <button class="btn btn-danger" onclick="removeWish('${role}','${w}')">删除</button></li>`).join('');
+        document.getElementById(role==='parent'?'parentWishList':'childWishList').innerHTML = wishes.map(w=>`<li>${w} <button class="btn btn-danger" onclick="removeWish('${role}','${w}')">删除</button></li>`).join('');
       });
     }
 
     function loadPunishList(role) {
-      const userId = currentUser.id;
-      supabaseClient.from('users').select('punishments').eq('id', userId).single().then(({ data }) => {
+      supabaseClient.from('users').select('punishments').eq('id', currentUser.id).single().then(({data}) => {
         const punishments = data?.punishments || [];
-        const ul = document.getElementById(role === 'parent' ? 'parentPunishList' : 'childPunishList');
-        ul.innerHTML = punishments.map(p => `<li>${p} <button class="btn btn-danger" onclick="removePunish('${role}','${p}')">删除</button></li>`).join('');
+        document.getElementById(role==='parent'?'parentPunishList':'childPunishList').innerHTML = punishments.map(p=>`<li>${p} <button class="btn btn-danger" onclick="removePunish('${role}','${p}')">删除</button></li>`).join('');
       });
     }
 
     function removeWish(role, text) {
-      const userId = currentUser.id;
-      supabaseClient.from('users').select('wishes').eq('id', userId).single().then(({ data }) => {
-        const wishes = data.wishes.filter(w => w !== text);
-        supabaseClient.from('users').update({ wishes }).eq('id', userId).then(() => loadWishList(role));
+      supabaseClient.from('users').select('wishes').eq('id', currentUser.id).single().then(({data}) => {
+        const wishes = data.wishes.filter(w=>w!==text);
+        supabaseClient.from('users').update({ wishes }).eq('id', currentUser.id).then(()=>loadWishList(role));
       });
     }
 
     function removePunish(role, text) {
-      const userId = currentUser.id;
-      supabaseClient.from('users').select('punishments').eq('id', userId).single().then(({ data }) => {
-        const punishments = data.punishments.filter(p => p !== text);
-        supabaseClient.from('users').update({ punishments }).eq('id', userId).then(() => loadPunishList(role));
+      supabaseClient.from('users').select('punishments').eq('id', currentUser.id).single().then(({data}) => {
+        const punishments = data.punishments.filter(p=>p!==text);
+        supabaseClient.from('users').update({ punishments }).eq('id', currentUser.id).then(()=>loadPunishList(role));
       });
     }
 
@@ -921,10 +687,7 @@
       const { data: users } = await supabaseClient.from('users').select('id');
       if (users) {
         for (const u of users) {
-          await supabaseClient.from('users').update({
-            growthLevel: 0, water: 0, sun: 0, fertilizer: 0, hasBug: false,
-            lastWatered: null, lastSun: null, lastFertilized: null, plantType: ''
-          }).eq('id', u.id);
+          await supabaseClient.from('users').update({ growthLevel:0, water:0, sun:0, fertilizer:0, hasBug:false, lastWatered:null, lastSun:null, lastFertilized:null, plantType:'' }).eq('id', u.id);
         }
       }
       alert('本周已重置');
