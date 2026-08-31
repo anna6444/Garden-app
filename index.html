@@ -387,27 +387,7 @@
     }
 
     async function loadParentData() {
-      supabaseClient.from('users').on('*', payload => {
-        if (payload.new.id === currentUser.id) updateParentUI(payload.new);
-      }).subscribe();
-
-      supabaseClient.from('task_templates').on('*', payload => {
-        loadTemplates();
-      }).subscribe();
-
-      if (childUserId) {
-        supabaseClient.from('tasks').on('*', payload => {
-          if (payload.new.assigneeId === childUserId) loadChildTasksForParent();
-        }).subscribe();
-        supabaseClient.from('users').on('*', payload => {
-          if (payload.new.id === childUserId) document.getElementById('childStarsDisplay').textContent = payload.new.stars || 0;
-        }).subscribe();
-      }
-
-      supabaseClient.from('tasks').on('*', payload => {
-        if (payload.new.assigneeId === currentUser.id) loadParentOwnTasks();
-      }).subscribe();
-
+ 
       loadTemplates();
       loadChildTasksForParent();
       loadParentOwnTasks();
@@ -621,24 +601,7 @@
 
 
     async function loadChildData() {
-      supabaseClient.from('users').on('*', payload => {
-        if (payload.new.id === currentUser.id) updateChildUI(payload.new);
-      }).subscribe();
 
-      supabaseClient.from('tasks').on('*', payload => {
-        if (payload.new.assigneeId === currentUser.id) loadChildTasks();
-      }).subscribe();
-
-      if (parentUserId) {
-        supabaseClient.from('tasks').on('*', payload => {
-          if (payload.new.assigneeId === parentUserId) loadParentTasksForChild();
-        }).subscribe();
-        supabaseClient.from('users').on('*', payload => {
-          if (payload.new.id === parentUserId) renderParentPlantView(payload.new);
-        }).subscribe();
-        const { data: parentData } = await supabaseClient.from('users').select('*').eq('id', parentUserId).single();
-        if (parentData) renderParentPlantView(parentData);
-      }
 
       loadChildTasks();
       loadParentTasksForChild();
