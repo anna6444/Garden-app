@@ -16,11 +16,6 @@
     input, textarea, select { width:100%; padding:10px; margin:5px 0; border:2px solid #c5e1a5; border-radius:12px; font-size:15px; }
     .card { background:#fff; border-radius:20px; padding:15px; margin:10px 0; box-shadow:0 3px 10px rgba(0,0,0,0.08); }
     .plant-stage { font-size:80px; text-align:center; }
-    .badge { display:inline-block; padding:3px 8px; border-radius:10px; font-size:12px; }
-    .pending { background:#fff3cd; color:#856404; }
-    .submitted { background:#cce5ff; color:#004085; }
-    .approved { background:#d4edda; color:#155724; }
-    .rejected { background:#f8d7da; color:#721c24; }
     .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     @media (max-width:500px) { .grid-2 { grid-template-columns:1fr; } }
   </style>
@@ -55,7 +50,7 @@
       </div>
     </div>
 
-    <!-- 任务区域 -->
+    <!-- 任务发布区域 -->
     <div class="card">
       <h3>设置长期任务</h3>
       <input id="longTermTaskTitle" placeholder="任务标题">
@@ -87,45 +82,17 @@
       <button class="btn" onclick="createChildTask()">布置任务</button>
     </div>
 
+    <!-- 家长自己的任务 -->
     <div class="card">
       <h3>我的任务（家长）</h3>
       <div id="parentOwnTaskList"></div>
       <button class="btn btn-info" onclick="addParentSelfTask()">添加家长任务</button>
     </div>
 
+    <!-- 孩子任务进度 -->
     <div class="card">
       <h3>孩子任务进度</h3>
       <div id="childTaskListForParent"></div>
-    </div>
-
-    <!-- 商城、扣星、心愿等 -->
-    <div class="card">
-      <h3>商城</h3>
-      <button class="btn" onclick="exchangeResource('water')">💧 1水 = 1⭐</button>
-      <button class="btn" onclick="exchangeResource('sun')">☀️ 1阳光 = 1⭐</button>
-      <button class="btn" onclick="exchangeResource('fertilizer')">🧪 1肥料 = 1⭐</button>
-    </div>
-
-    <div class="card">
-      <h3>孩子管理</h3>
-      <p>⭐ 孩子星星：<span id="childStarsDisplay">0</span></p>
-      <button class="btn btn-warning" onclick="deductStar('child','乱发脾气')">扣星：乱发脾气</button>
-      <button class="btn btn-warning" onclick="deductStar('child','口头约定未做到')">扣星：未遵守约定</button>
-    </div>
-
-    <div class="card">
-      <h3>心愿/惩罚</h3>
-      <input id="parentWishInput" placeholder="写下心愿">
-      <button class="btn" onclick="addWish('parent')">添加心愿</button>
-      <ul id="parentWishList"></ul>
-      <input id="parentPunishInput" placeholder="惩罚任务">
-      <button class="btn" onclick="addPunish('parent')">添加惩罚</button>
-      <ul id="parentPunishList"></ul>
-    </div>
-
-    <div class="card">
-      <h3>每周结算</h3>
-      <button class="btn btn-danger" onclick="resetWeek()">重置本周</button>
     </div>
   </div>
 
@@ -155,30 +122,6 @@
     <div class="card">
       <h3>家长的任务</h3>
       <div id="parentTaskListForChild"></div>
-    </div>
-
-    <div class="card">
-      <h3>商城</h3>
-      <button class="btn" onclick="exchangeResource('water')">💧 1水 = 1⭐</button>
-      <button class="btn" onclick="exchangeResource('sun')">☀️ 1阳光 = 1⭐</button>
-      <button class="btn" onclick="exchangeResource('fertilizer')">🧪 1肥料 = 1⭐</button>
-    </div>
-
-    <div class="card">
-      <h3>心愿/惩罚</h3>
-      <input id="childWishInput" placeholder="写下心愿">
-      <button class="btn" onclick="addWish('child')">添加心愿</button>
-      <ul id="childWishList"></ul>
-      <input id="childPunishInput" placeholder="惩罚任务">
-      <button class="btn" onclick="addPunish('child')">添加惩罚</button>
-      <ul id="childPunishList"></ul>
-      <button class="btn btn-warning" onclick="deductStar('parent','乱发脾气')">扣家长：乱发脾气</button>
-      <button class="btn btn-warning" onclick="deductStar('parent','口头约定未做到')">扣家长：未遵守约定</button>
-    </div>
-
-    <div class="card">
-      <h3>家长的植物</h3>
-      <div id="parentPlantView"></div>
     </div>
   </div>
 
@@ -374,19 +317,11 @@
           container.innerHTML = data.map(t => `<div class="card"><strong>${t.title}</strong> ⭐${t.rewardStars} ${t.status}</div>`).join('');
         });
       }
-      supabaseClient.from('users').select('*').eq('id', parentUserId).single().then(({ data }) => {
-        const container = document.getElementById('parentPlantView');
-        if (data && data.plantType) {
-          const emoji = plantTypes[data.plantType]?.stages[Math.min(Math.floor(data.growthLevel||0),5)] || '🌱';
-          container.innerHTML = `<div class="plant-stage">${emoji}</div><p>${plantTypes[data.plantType].name}</p>`;
-        } else {
-          container.innerHTML = '<p>家长还没有植物</p>';
-        }
-      });
     }
 
-    async function exchangeResource(resource) { alert('商城功能暂未开放'); }
+    // 暂未开放的功能（保留按钮但提示）
     async function useResource(resource) { alert('资源功能暂未开放'); }
+    async function exchangeResource(resource) { alert('商城功能暂未开放'); }
     async function deductStar(targetRole, reason) { alert('扣星功能暂未开放'); }
     async function addWish(role) { alert('心愿功能暂未开放'); }
     async function addPunish(role) { alert('惩罚功能暂未开放'); }
