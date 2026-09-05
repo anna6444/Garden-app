@@ -3,140 +3,342 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🌱种植小花园</title>
-  <!-- 更换国内可用CDN -->
+  <title>🌱 种植小花园</title>
   <script src="https://unpkg.com/vue@3.4.33/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2.45.1/dist/umd/supabase.min.js"></script>
-  <script src="https://unpkg.com/tailwindcss@3.4.10/dist/tailwind.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .plant-svg{width:100%;max-width:260px;margin:0 auto;display:block;}
-    .preview-modal{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99;display:flex;align-items:center;justify-content:center;padding:12px;}
-    .img-full{max-width:95vw;max-height:95vh;cursor:zoom-in;}
+    .plant-svg{width:100%;max-width:220px;margin:0 auto;display:block;}
+    .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99;display:flex;align-items:center;justify-content:center;padding:16px;}
+    .img-fullscreen{position:fixed;inset:0;z-index:100;background:#000;display:flex;align-items:center;justify-content:center;overflow:auto;}
+    .img-fullscreen img{max-width:95%;max-height:95%;touch-action:manipulation;}
   </style>
 </head>
 <body>
 <div id="app" class="bg-green-50 min-h-screen">
-  <!-- 登录页面 -->
-  <div v-if="!isLogin" class="flex flex-col items-center justify-center min-h-screen p-4">
-    <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-      <h1 class="text-2xl font-bold text-center text-green-700 mb-8">🌱 种植小花园</h1>
-      <div class="mb-5">
-        <label class="block mb-2 text-base">账号</label>
-        <input v-model="loginForm.username" class="w-full border border-gray-300 rounded-lg px-4 py-3 text-base" placeholder="parent / child">
+  <!-- 登录页 -->
+  <div v-if="!loginInfo.role" class="min-h-screen flex flex-col items-center justify-center p-6">
+    <h1 class="text-2xl font-bold text-green-700 mb-8">🌱 种植小花园</h1>
+    <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm">
+      <div class="mb-4">
+        <label class="block text-sm mb-1">角色</label>
+        <select v-model="loginInfo.role" class="w-full border rounded-lg p-3">
+          <option value="">请选择</option>
+          <option value="parent">家长</option>
+          <option value="child">孩子</option>
+        </select>
       </div>
-      <div class="mb-8">
-        <label class="block mb-2 text-base">密码</label>
-        <input v-model="loginForm.password" type="password" class="w-full border border-gray-300 rounded-lg px-4 py-3 text-base">
+      <div class="mb-6">
+        <label class="block text-sm mb-1">密码</label>
+        <input v-model="loginInfo.pwd" type="password" class="w-full border rounded-lg p-3" placeholder="输入密码">
       </div>
-      <div class="flex gap-4">
-        <button @click="doLogin" class="flex-1 bg-green-600 text-white py-4 rounded-xl text-lg font-bold">确认</button>
-        <button @click="loginForm={username:'',password:''}" class="bg-gray-200 px-5 py-2 rounded-lg text-sm">取消</button>
+      <div class="flex gap-3">
+        <button @click="doLogin" class="flex-1 bg-green-600 text-white py-4 rounded-xl text-lg font-medium">确认</button>
+        <button @click="loginInfo={role:'',pwd:''}" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-xl">取消</button>
       </div>
-      <p v-if="loginErr" class="text-red-500 mt-4 text-center">{{loginErr}}</p>
+      <div v-if="loginErr" class="mt-4 text-red-500 text-sm">{{loginErr}}</div>
     </div>
   </div>
 
-  <!-- 登录后主界面 -->
+  <!-- 主应用 -->
   <div v-else>
-    <header class="bg-green-700 text-white p-3 flex justify-between items-center">
-      <div>🌱种植小花园｜{{userInfo.role==='parent'?'家长端':'孩子端'}}</div>
-      <button @click="logout" class="bg-white/20 px-3 py-1 rounded text-sm">退出</button>
+    <header class="bg-green-700 text-white p-4 flex justify-between items-center">
+      <div>
+        <h2 class="text-lg font-bold">🌱种植小花园</h2>
+        <div class="text-sm">待完成任务：{{pendingTaskCount}} 个</div>
+      </div>
+      <button @click="logout" class="bg-white/20 px-3 py-1 rounded-lg text-sm">退出</button>
     </header>
-    <div class="p-3">
-      <div class="bg-amber-100 p-3 rounded-lg mb-4 text-base">待完成任务：{{pendingTaskCount}} 项</div>
-    </div>
-  </div>
 
-  <!-- 图片全屏弹窗 -->
-  <div v-if="showImageViewer" @click="showImageViewer=false" class="preview-modal">
-    <img :src="previewImageUrl" class="img-full" />
+    <div class="p-4 space-y-6">
+      <!-- 植物区域 -->
+      <section class="bg-white rounded-xl p-4 shadow">
+        <h3 class="font-bold mb-3">🌿我的植物</h3>
+        <div v-if="myPlant.plantId">
+          <div class="plant-svg" v-html="renderPlantSvg(myPlant.plantId,myPlant.level)"></div>
+          <div class="mt-2 text-center text-sm">
+            {{plantList.find(x=>x.id===myPlant.plantId).name}}｜阶段{{myPlant.level}}/{{maxPlantLevel}}
+          </div>
+          <div v-if="!isTodayPlantOperated" class="flex gap-2 mt-3 justify-center flex-wrap">
+            <button @click="plantOperate('water')" class="bg-blue-100 px-3 py-2 rounded-lg">💧浇水</button>
+            <button @click="plantOperate('sun')" class="bg-yellow-100 px-3 py-2 rounded-lg">☀晒太阳</button>
+            <button @click="plantOperate('fertilizer')" class="bg-amber-200 px-3 py-2 rounded-lg">🧪施肥</button>
+          </div>
+          <div v-else class="text-green-600 text-sm mt-2 text-center">✅今日养护已全部完成</div>
+        </div>
+        <button v-else @click="showPlantSelectModal=true" class="w-full border-dashed border-2 border-green-400 py-4 rounded-xl text-green-600">点击选择植物</button>
+      </section>
+
+      <!-- 家长特有：布置任务、心愿惩罚、重置 -->
+      <section v-if="loginInfo.role==='parent'" class="bg-white rounded-xl p-4 shadow space-y-3">
+        <h3 class="font-bold">📝任务管理</h3>
+        <div class="flex gap-2">
+          <input v-model="newTask.title" placeholder="任务名称" class="flex-1 border rounded-lg p-2">
+          <button @click="addTask" class="bg-green-600 text-white px-4 py-2 rounded-lg">新增任务</button>
+        </div>
+        <div class="text-sm text-gray-500">每个任务固定2星：按时完成2星｜超时完成1星｜未完成扣1星</div>
+      </section>
+
+      <!-- 任务列表 -->
+      <section class="bg-white rounded-xl p-4 shadow">
+        <h3 class="font-bold mb-3">📋任务列表</h3>
+        <div v-for="(t,idx) in appData.tasks" :key="idx" class="border-b py-3">
+          <div class="font-medium">{{t.title}}</div>
+          <div class="text-sm text-gray-600">状态：{{taskStatusText(t)}}</div>
+          <div v-if="!t.startTs">
+            <button v-if="loginInfo.role==='child'" @click="startTask(idx)" class="bg-blue-500 text-white px-3 py-1 rounded-lg mt-2 text-sm">开始任务</button>
+          </div>
+          <div v-if="t.startTs && !t.finishTs">
+            <div class="text-sm">已计时：{{formatMs(getTaskRunningMs(t))}}</div>
+            <input v-if="loginInfo.role==='child'" type="file" accept="image/*" @change="onTaskFileSelect($event,idx)" class="mt-2 text-sm">
+            <button v-if="loginInfo.role==='child'" @click="submitTask(idx)" class="bg-green-500 text-white px-3 py-1 rounded-lg mt-2 text-sm">提交完成</button>
+          </div>
+          <div v-if="t.imgUrl">
+            <img :src="t.imgUrl" @click="previewImg=t.imgUrl" class="h-20 mt-2 rounded cursor-pointer object-cover">
+          </div>
+          <!-- 家长审核 -->
+          <div v-if="loginInfo.role==='parent' && t.status==='pendingReview'" class="flex gap-2 mt-2">
+            <button @click="acceptTask(idx)" class="bg-green-600 text-white px-3 py-1 rounded-lg text-sm">审核通过</button>
+            <button @click="rejectTask(idx)" class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm">驳回重传</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 心愿清单 仅家长编辑 -->
+      <section class="bg-white rounded-xl p-4 shadow">
+        <h3 class="font-bold mb-2">✨心愿清单</h3>
+        <div v-for="(item,i) in appData.wishList" :key="i" class="py-1 border-b flex justify-between items-center">
+          <span>{{item.text}}</span>
+          <button v-if="loginInfo.role==='parent'" @click="completeWish(i)" class="bg-green-100 px-2 py-1 rounded text-sm">标记完成</button>
+        </div>
+        <div v-if="loginInfo.role==='parent'" class="flex gap-2 mt-3">
+          <input v-model="newWish" class="flex-1 border rounded-lg p-2 text-sm" placeholder="新增心愿">
+          <button @click="addWish" class="bg-green-600 text-white px-3 py-1 rounded-lg">添加</button>
+        </div>
+      </section>
+
+      <!-- 惩罚清单：孩子只读 -->
+      <section class="bg-white rounded-xl p-4 shadow">
+        <h3 class="font-bold mb-2">⚠惩罚清单</h3>
+        <div v-for="(item,i) in appData.punishList" :key="i" class="py-1 border-b flex justify-between items-center">
+          <span>{{item.text}}</span>
+          <button v-if="loginInfo.role==='parent'" @click="completePunish(i)" class="bg-orange-100 px-2 py-1 rounded text-sm">标记完成</button>
+        </div>
+        <div v-if="loginInfo.role==='parent'" class="flex gap-2 mt-3">
+          <input v-model="newPunish" class="flex-1 border rounded-lg p-2 text-sm" placeholder="新增惩罚">
+          <button @click="addPunish" class="bg-orange-600 text-white px-3 py-1 rounded-lg">添加</button>
+        </div>
+      </section>
+
+      <div v-if="loginInfo.role==='parent'" class="bg-white rounded-xl p-4 shadow">
+        <button @click="weekReset" class="w-full bg-amber-500 text-white py-3 rounded-xl">🔁每周重置（重置任务、解锁植物选择）</button>
+      </div>
+    </div>
+
+    <!-- 植物选择预览弹窗 -->
+    <div v-if="showPlantSelectModal" class="modal-mask" @click.self="showPlantSelectModal=false">
+      <div class="bg-white rounded-xl w-full max-w-md p-5">
+        <h3 class="font-bold text-lg mb-4">选择你的植物</h3>
+        <div class="grid grid-cols-3 gap-3">
+          <div v-for="pl in plantList" :key="pl.id" @click="previewPlantId=pl.id" class="border rounded-lg p-3 text-center cursor-pointer">
+            <div class="plant-svg" v-html="renderPlantSvg(pl.id,1)"></div>
+            <div class="text-sm mt-1">{{pl.name}}</div>
+          </div>
+        </div>
+        <div v-if="previewPlantId" class="mt-4 text-center">
+          <div class="plant-svg" v-html="renderPlantSvg(previewPlantId,3)"></div>
+          <div class="font-medium mt-2">{{plantList.find(x=>x.id===previewPlantId).name}}</div>
+          <div class="flex gap-3 justify-center mt-4">
+            <button @click="showPlantSelectModal=false" class="bg-gray-200 px-4 py-2 rounded-xl">取消</button>
+            <button @click="confirmSelectPlant" class="bg-green-600 text-white px-5 py-2 rounded-xl">确认选择</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片全屏预览 -->
+    <div v-if="previewImg" class="img-fullscreen" @click.self="previewImg=null">
+      <img :src="previewImg" alt="大图">
+      <button @click="previewImg=null" class="absolute top-4 right-4 text-white text-2xl">×</button>
+    </div>
   </div>
 </div>
 
 <script>
-const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
+const {createApp,ref,reactive,computed,onMounted} = Vue;
+const SUPABASE_URL="https://mubucjoyklpxoobgjyva.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
+const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-const USER_ACCOUNT = {
-  parent: { password: "1234", role: "parent" },
-  child: { password: "6666", role: "child" }
-};
-
-const { createApp, ref, reactive, computed } = Vue;
-const { createClient } = supabase;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const plantList=[
+  {id:"flower",name:"小花"},
+  {id:"fruitTree",name:"果树"},
+  {id:"sunflower",name:"向日葵"}
+];
+const maxPlantLevel=7;
 
 createApp({
   setup(){
-    const isLogin = ref(false);
-    const userInfo = ref(null);
-    const loginForm = reactive({username:'',password:''});
-    const loginErr = ref('');
-    const showImageViewer = ref(false);
-    const previewImageUrl = ref('');
-
-    const appGlobalData = reactive({
+    const loginInfo=reactive({role:"",pwd:""});
+    const loginErr=ref("");
+    const appData=reactive({
       tasks:[],
       wishList:[],
       punishList:[],
-      parentPlant:{selected:false,plantId:'',level:0,water:false,sun:false,fertilizer:false},
-      childPlant:{selected:false,plantId:'',level:0,water:false,sun:false,fertilizer:false},
-      star:{parent:0,child:0},
-      weekResetTime:null
+      parentPlant:{plantId:"",level:1,water:false,sun:false,fertilizer:false,lastOperateDay:""},
+      childPlant:{plantId:"",level:1,water:false,sun:false,fertilizer:false,lastOperateDay:""},
+      weekResetTs:0
+    });
+    const newTask=reactive({title:""});
+    const newWish=ref("");
+    const newPunish=ref("");
+    const showPlantSelectModal=ref(false);
+    const previewPlantId=ref("");
+    const previewImg=ref(null);
+
+    const myPlant=computed(()=>loginInfo.role==='parent'?appData.parentPlant:appData.childPlant);
+    const pendingTaskCount=computed(()=>appData.tasks.filter(t=>t.status!=='done').length);
+    const getTodayStr=()=>new Date().toISOString().slice(0,10);
+
+    const isTodayPlantOperated=computed(()=>{
+      const p=myPlant.value;
+      return p.lastOperateDay===getTodayStr() && p.water && p.sun && p.fertilizer;
     });
 
-    const pendingTaskCount = computed(()=>{
-      return appGlobalData.tasks.filter(t=>t.status!=='done').length;
-    })
+    async function loadFromDb(){
+      const {data}=await supabase.from("garden_data").select("*").eq("id",1).single();
+      if(data?.data) Object.assign(appData,data.data);
+    }
+    async function saveToDb(){
+      await supabase.from("garden_data").upsert({id:1,data:appData});
+    }
+
+    onMounted(()=>{
+      loadFromDb();
+      supabase.channel("garden_realtime").on("postgres_changes",{event:"*",schema:"public",table:"garden_data"},payload=>{
+        if(payload.new?.id===1) Object.assign(appData,payload.new.data);
+      }).subscribe();
+    });
 
     function doLogin(){
-      loginErr.value = '';
-      const u = USER_ACCOUNT[loginForm.username.trim()];
-      if(!u){ loginErr.value='账号不存在';return; }
-      if(u.password !== loginForm.password.trim()){ loginErr.value='密码错误';return; }
-      userInfo.value = {role:u.role,name:loginForm.username.trim()};
-      isLogin.value = true;
-      loadDbData();
-      startRealtimeSubscribe();
+      loginErr.value="";
+      if(!loginInfo.role||!loginInfo.pwd){loginErr.value="请选择角色并输入密码";return;}
+      const pwdParent="1234";
+      const pwdChild="6666";
+      if(loginInfo.role==='parent'&&loginInfo.pwd!==pwdParent){loginErr.value="家长密码错误";return;}
+      if(loginInfo.role==='child'&&loginInfo.pwd!==pwdChild){loginErr.value="孩子密码错误";return;}
+    }
+    function logout(){loginInfo.role="";loginInfo.pwd="";}
+
+    function renderPlantSvg(pid,level){
+      const svgMap={
+        flower:`<svg viewBox="0 0 120 160"><rect x="52" y="110" width="16" height="50" fill="#4caf50"/><circle cx="60" cy="70" r="${12+level*3}" fill="#e91e63"/><circle cx="60" cy="70" r="${6+level}" fill="#ffeb3b"/></svg>`,
+        fruitTree:`<svg viewBox="0 0 120 160"><rect x="50" y="90" width="20" height="70" fill="#795548"/><circle cx="60" cy="60" r="${14+level*3}" fill="#4caf50"/></svg>`,
+        sunflower:`<svg viewBox="0 0 120 160"><rect x="54" y="100" width="12" height="60" fill="#4caf50"/><circle cx="60" cy="65" r="${13+level*3}" fill="#ffc107"/><circle cx="60" cy="65" r="${7+level}" fill="#795548"/></svg>`
+      };
+      return svgMap[pid]||svgMap.flower;
     }
 
-    function logout(){
-      isLogin.value=false;
-      userInfo.value=null;
-      loginForm.username='';
-      loginForm.password='';
-    }
-
-    async function loadDbData(){
-      const {data} = await supabase.from('garden_data').select('*').eq('id',1).single();
-      if(data?.data){
-        Object.assign(appGlobalData, data.data);
+    function plantOperate(type){
+      const p=myPlant.value;
+      const today=getTodayStr();
+      if(p.lastOperateDay!==today){
+        p.water=false;p.sun=false;p.fertilizer=false;p.lastOperateDay=today;
       }
+      p[type]=true;
+      if(p.water&&p.sun&&p.fertilizer&&p.level<maxPlantLevel){
+        p.level+=1;
+      }
+      saveToDb();
     }
 
-    async function saveDbData(){
-      await supabase.from('garden_data').upsert({id:1, data:appGlobalData});
+    function confirmSelectPlant(){
+      if(!previewPlantId.value)return;
+      const p=myPlant.value;
+      p.plantId=previewPlantId.value;
+      showPlantSelectModal.value=false;
+      previewPlantId.value="";
+      saveToDb();
     }
 
-    let realtimeChannel = null;
-    function startRealtimeSubscribe(){
-      if(realtimeChannel) realtimeChannel.unsubscribe();
-      realtimeChannel = supabase.channel('garden_realtime')
-        .on('postgres_changes',{event:'*',schema:'public',table:'garden_data'},payload=>{
-          if(payload.new?.id===1 && payload.new.data){
-            Object.assign(appGlobalData, payload.new.data);
-          }
-        }).subscribe();
+    function addTask(){
+      if(!newTask.title.trim())return;
+      appData.tasks.push({
+        title:newTask.title.trim(),
+        startTs:0,finishTs:0,status:"wait",imgUrl:"",starGet:0
+      });
+      newTask.title="";
+      saveToDb();
+    }
+    function startTask(idx){
+      appData.tasks[idx].startTs=Date.now();
+      appData.tasks[idx].status="running";
+      saveToDb();
+    }
+    function getTaskRunningMs(t){
+      if(!t.startTs)return 0;
+      if(t.finishTs)return t.finishTs-t.startTs;
+      return Date.now()-t.startTs;
+    }
+    function formatMs(ms){
+      let s=Math.floor(ms/1000);
+      let m=Math.floor(s/60);s=s%60;
+      return `${m}分${s}秒`;
+    }
+    function onTaskFileSelect(e,idx){
+      const file=e.target.files[0];
+      if(!file)return;
+      const reader=new FileReader();
+      reader.onload=ev=>{appData.tasks[idx].imgUrl=ev.target.result;saveToDb();};
+      reader.readAsDataURL(file);
+    }
+    function submitTask(idx){
+      appData.tasks[idx].finishTs=Date.now();
+      appData.tasks[idx].status="pendingReview";
+      saveToDb();
+    }
+    function acceptTask(idx){
+      const t=appData.tasks[idx];
+      const costTime=getTaskRunningMs(t);
+      const limitTime=30*60*1000;
+      t.starGet=costTime<=limitTime?2:1;
+      t.status="done";
+      t.imgUrl="";
+      saveToDb();
+    }
+    function rejectTask(idx){
+      appData.tasks[idx].status="running";
+      appData.tasks[idx].imgUrl="";
+      saveToDb();
+    }
+    function taskStatusText(t){
+      const map={wait:"待开始",running:"进行中",pendingReview:"等待家长审核",done:"已完成"};
+      return map[t.status]||t.status;
     }
 
-    return {
-      isLogin,userInfo,loginForm,loginErr,
-      doLogin,logout,
-      appGlobalData,pendingTaskCount,
-      showImageViewer,previewImageUrl
+    function addWish(){if(!newWish.value.trim())return;appData.wishList.push({text:newWish.value.trim(),done:false});newWish.value="";saveToDb();}
+    function completeWish(i){appData.wishList[i].done=true;saveToDb();}
+    function addPunish(){if(!newPunish.value.trim())return;appData.punishList.push({text:newPunish.value.trim(),done:false});newPunish.value="";saveToDb();}
+    function completePunish(i){appData.punishList[i].done=true;saveToDb();}
+
+    async function weekReset(){
+      appData.tasks=[];
+      appData.parentPlant={plantId:"",level:1,water:false,sun:false,fertilizer:false,lastOperateDay:""};
+      appData.childPlant={plantId:"",level:1,water:false,sun:false,fertilizer:false,lastOperateDay:""};
+      appData.weekResetTs=Date.now();
+      await saveToDb();
     }
+
+    return{
+      loginInfo,loginErr,appData,newTask,newWish,newPunish,
+      showPlantSelectModal,previewPlantId,previewImg,
+      myPlant,pendingTaskCount,isTodayPlantOperated,plantList,maxPlantLevel,
+      doLogin,logout,renderPlantSvg,plantOperate,confirmSelectPlant,
+      addTask,startTask,getTaskRunningMs,formatMs,onTaskFileSelect,submitTask,acceptTask,rejectTask,taskStatusText,
+      addWish,completeWish,addPunish,completePunish,weekReset
+    };
   }
-}).mount('#app');
+}).mount("#app");
 </script>
 </body>
 </html>
