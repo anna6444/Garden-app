@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🌱种植小花园</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{box-sizing:border-box;}
+.plant-svg{transition:all 0.4s;}
+.popup-mask{background:rgba(0,0,0,0.65);position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;padding:12px;}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 12px #00000018;max-width:640px;width:100%;margin:12px auto;}
+.img-preview-box{max-width:95vw;max-height:85vh;}
+.todo-badge{background:#ef4444;color:white;border-radius:99px;font-size:12px;padding:2px 8px;}
+</style>
+</head>
+<body class="bg-green-50">
+<div id="app"></div>
+<script>
+// Supabase参数，无需修改
+const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
+const { createClient } = window.supabase;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const {createApp} = Vue;
+createApp({
+data(){
+return {
+role:null,
+pwdInput:"",
+showLogin:true,
+loginErr:"",
+dbId:1,
+localData:{
+parentLockedPlant:false,
+childLockedPlant:false,
+parentPlant:null,
+childPlant:null,
+weekResetTs:0,
+parentStar:0,
+childStar:0,
+tasks:[],
+wishList:[],
+punishList:[],
+parentPlantDaily:{water:false,sun:false,fertilizer:false,level:0,lastDay:""},
+childPlantDaily:{water:false,sun:false,fertilizer:false,level:0,lastDay:""}
+},
+previewPlantModal:false,
+previewPlantItem:null,
+imgViewer:{show:false,src:""},
+realtimeChannel:null,
+newTask:{title:"",timeMin:10},
+newWish:"",newPunish:"",
+taskFormModal:false,
+currentTask:null
+}
+},
+computed:{
+todayStr(){
+const d=new Date();
+return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+},
+pendingTaskCount(){
+return this.localData.tasks.filter(t=>t.status==="pending").length;
+}
+},
+mounted(){
+this.loadDb();
+this.startRealtime();
+},
+methods:{
+async loadDb(){
+const {data,error}=await supabase.from("garden_data").select("*").eq("id",this.dbId).single();
+if(error){
+if(error.code==="PGRST116"){
+await supabase.from("garden_data").insert({id:this.dbId,data:this.localData});
+}else{
+console.error(error);
+}
+}else{
+this.localData = JSON.parse(JSON.stringify(data.data));
+}
+},
+async saveDb(){
+await supabase.from("garden_data").upsert({id:this.dbId,data:this.localData});
+},
+startRealtime(){
+this.realtimeChannel = supabase.channel('garden-realtime').on('postgres_changes',{event:'*',schema:'public',table:'garden_data',filter:`id=eq.${this.dbId}`},(payload)=>{
+if(payload.new?.data){
+this.localData = JSON.parse(JSON.stringify(payload.new.data));
+}
+}).subscribe();
+},
+doLogin(){
+if(this.pwdInput==="parent"){
+this.role="parent";this.showLogin=false;this.loginErr="";
+}else if(this.pwdInput==="child"){
+this.role="child";this.showLogin=false;this.loginErr="";
+}else{
+this.loginErr="密码错误，家长：parent，孩子：child";
+}
+},
+logout(){
+this.role=null;this.showLogin=true;this.pwdInput="";
+},
+openPlantPreview(item){
+this.previewPlantItem = item;
+this.previewPlantModal=true;
+},
+async confirmSelectPlant(isParent){
+if(isParent){
+this.localData.parentPlant = this.previewPlantItem;
+this.localData.parentLockedPlant=true;
+}else{
+this.localData.childPlant = this.previewPlantItem;
+this.localData.childLockedPlant=true;
+}
+this.previewPlantModal=false;
+this.previewPlantItem=null;
+await this.saveDb();
+},
+renderPlantSvg(plantKey,level){
+const plants={
+sunflower:{name:"向日葵",stages:[
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 110" stroke="#488a38" stroke-width="6"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 80" stroke="#488a38" stroke-width="6"/><ellipse cx="50" cy="100" rx="16" ry="26" fill="#62b84f"/><ellipse cx="90" cy="100" rx="16" ry="26" fill="#62b84f"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 60" stroke="#488a38" stroke-width="6"/><ellipse cx="48" cy="90" rx="16" ry="26" fill="#62b84f"/><ellipse cx="92" cy="90" rx="16" ry="26" fill="#62b84f"/><circle cx="70" cy="42" r="14" fill="#ffd333"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 45" stroke="#488a38" stroke-width="6"/><ellipse cx="46" cy="82" rx="17" ry="28" fill="#62b84f"/><ellipse cx="94" cy="82" rx="17" ry="28" fill="#62b84f"/><g transform="translate(70,36)">${Array.from({length:12}).map((_,i)=>`<ellipse cx="0" cy="-22" rx="7" ry="14" fill="#ffd333" transform="rotate(${i*30})"/>`).join("")}<circle cx="0" cy="0" r="11" fill="#9c7028"/></g></svg>`
+]},
+peachTree:{name:"桃树",stages:[
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 120" stroke="#7c5438" stroke-width="7"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 95" stroke="#7c5438" stroke-width="7"/><circle cx="70" cy="70" r="22" fill="#73b862"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 75" stroke="#7c5438" stroke-width="7"/><circle cx="70" cy="50" r="32" fill="#73b862"/><circle cx="54" cy="42" r="8" fill="#ff8899"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 65" stroke="#7c5438" stroke-width="7"/><circle cx="70" cy="40" r="38" fill="#73b862"/><circle cx="52" cy="30" r="10" fill="#ff8899"/><circle cx="84" cy="44" r="10" fill="#ff8899"/></svg>`
+]},
+littleFlower:{name:"小雏菊",stages:[
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 115" stroke="#449c36" stroke-width="5"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 90" stroke="#449c36" stroke-width="5"/><ellipse cx="54" cy="102" rx="12" ry="20" fill="#60c04e"/><ellipse cx="86" cy="102" rx="12" ry="20" fill="#60c04e"/></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 72" stroke="#449c36" stroke-width="5"/><ellipse cx="52" cy="92" rx="12" ry="20" fill="#60c04e"/><ellipse cx="88" cy="92" rx="12" ry="20" fill="#60c04e"/><g transform="translate(70,54)">${Array.from({length:10}).map((_,i)=>`<ellipse cx="0" cy="-14" rx="6" ry="12" fill="#fff" transform="rotate(${i*36})"/>`).join("")}<circle cx="0" cy="0" r="7" fill="#ffd02b"/></g></svg>`,
+`<svg width="140" height="180"><circle cx="70" cy="160" r="12" fill="#926b4e"/><path d="M70 150 L70 60" stroke="#449c36" stroke-width="5"/><ellipse cx="50" cy="82" rx="13" ry="21" fill="#60c04e"/><ellipse cx="90" cy="82" rx="13" ry="21" fill="#60c04e"/><g transform="translate(70,42)">${Array.from({length:12}).map((_,i)=>`<ellipse cx="0" cy="-16" rx="7" ry="13" fill="#fff" transform="rotate(${i*30})"/>`).join("")}<circle cx="0" cy="0" r="8" fill="#ffd02b"/></g></svg>`
+]};
+const p = plants[plantKey];
+if(!p) return "";
+const lv = Math.min(level, p.stages.length-1);
+return p.stages[lv];
+},
+openImage(src){
+this.imgViewer.src=src;
+this.imgViewer.show=true;
+},
+// 家长重置整个周期
+async weekReset(){
+this.localData.weekResetTs = Date.now();
+this.localData.parentLockedPlant=false;
+this.localData.childLockedPlant=false;
+this.localData.parentPlantDaily={water:false,sun:false,fertilizer:false,level:0,lastDay:""};
+this.localData.childPlantDaily={water:false,sun:false,fertilizer:false,level:0,lastDay:""};
+this.localData.tasks=[];
+await this.saveDb();
+},
+// 浇水、晒太阳、施肥
+async plantOperate(isParent,type){
+const key = isParent ? "parentPlantDaily":"childPlantDaily";
+const d = this.localData[key];
+if(d.lastDay !== this.todayStr){
+d.water=false;d.sun=false;d.fertilizer=false;d.lastDay=this.todayStr;
+}
+d[type]=true;
+if(d.water && d.sun && d.fertilizer){
+if(d.level<4) d.level+=1;
+}
+await this.saveDb();
+},
+// 家长新增任务
+async addTask(){
+if(!this.newTask.title) return;
+this.localData.tasks.push({
+id:Date.now(),
+title:this.newTask.title,
+timeMin:Number(this.newTask.timeMin),
+status:"pending",
+startTs:null,
+finishTs:null,
+photo:"",
+starGet:0
+});
+this.newTask={title:"",timeMin:10};
+this.taskFormModal=false;
+await this.saveDb();
+},
+//孩子点击开始任务
+async taskStart(task){
+task.startTs = Date.now();
+task.status="running";
+await this.saveDb();
+},
+//孩子提交作业图片
+async taskUploadFinish(task,ev){
+const file = ev.target.files[0];
+if(!file) return;
+const reader=new FileReader();
+reader.onload=async e=>{
+task.photo = e.target.result;
+task.finishTs = Date.now();
+task.status="waitCheck";
+await this.saveDb();
+};
+reader.readAsDataURL(file);
+},
+//家长审核：通过
+async taskApprove(task,isTimeout){
+if(isTimeout){
+task.starGet=1;
+}else{
+task.starGet=2;
+}
+this.localData.childStar += task.starGet;
+task.photo="";
+task.status="done";
+await this.saveDb();
+},
+//家长审核：不通过，退回重传
+async taskReject(task){
+task.photo="";
+task.status="pending";
+await this.saveDb();
+},
+//任务未完成扣星
+async taskNoFinish(task){
+this.localData.childStar = Math.max(0,this.localData.childStar-1);
+task.status="done";
+await this.saveDb();
+},
+//家长新增心愿
+async addWish(){
+if(!this.newWish) return;
+this.localData.wishList.push({id:Date.now(),text:this.newWish,done:false});
+this.newWish="";
+await this.saveDb();
+},
+async wishDone(item){
+item.done=true;
+await this.saveDb();
+},
+async addPunish(){
+if(!this.newPunish) return;
+this.localData.punishList.push({id:Date.now(),text:this.newPunish,done:false});
+this.newPunish="";
+await this.saveDb();
+},
+async punishDone(item){
+item.done=true;
+await this.saveDb();
+}
+}
+},
+template:`
+<div>
+<div v-if="showLogin" class="min-h-screen bg-green-50 flex items-center justify-center p-4">
+<div class="card w-full max-w-sm">
+<h2 class="text-xl font-bold mb-4 text-center">🌱种植小花园</h2>
+<input v-model="pwdInput" placeholder="输入密码 parent / child" class="border w-full p-3 rounded mb-3"/>
+<div class="flex gap-2">
+<button @click="doLogin" class="flex-1 bg-green-600 text-white py-3 rounded text-lg">确认</button>
+<button class="py-1 px-3 bg-gray-200 rounded text-sm">取消</button>
+</div>
+<div class="text-red-500 mt-2 text-sm">{{loginErr}}</div>
+</div>
+</div>
+
+<div v-else>
+<div class="card">
+<div class="flex justify-between items-center">
+<h1 class="text-lg font-bold">🌱种植小花园 {{role==='parent'?'家长端':'孩子端'}}</h1>
+<button @click="logout" class="text-sm bg-gray-200 px-2 py-1 rounded">退出</button>
+</div>
+<div v-if="pendingTaskCount>0" class="mt-2">
+<span class="todo-badge">待完成任务：{{pendingTaskCount}}个</span>
+</div>
+<div class="mt-2">⭐孩子星星：{{localData.childStar}}</div>
+</div>
+
+<div v-if="previewPlantModal" class="popup-mask">
+<div class="card">
+<h3 class="font-bold mb-2">植物预览</h3>
+<div v-html="renderPlantSvg(previewPlantItem,4)"></div>
+<p>{{previewPlantItem==='sunflower'?'向日葵':previewPlantItem==='peachTree'?'桃树':'小雏菊'}}</p>
+<div class="flex gap-3 mt-4">
+<button @click="confirmSelectPlant(true)" v-if="role==='parent'&&!localData.parentLockedPlant" class="bg-green-600 text-white px-4 py-2 rounded">确认选择(家长)</button>
+<button @click="confirmSelectPlant(false)" v-if="role==='child'&&!localData.childLockedPlant" class="bg-green-600 text-white px-4 py-2 rounded">确认选择(孩子)</button>
+<button @click="previewPlantModal=false" class="bg-gray-300 px-4 py-2 rounded">取消</button>
+</div>
+</div>
+</div>
+
+<div v-if="imgViewer.show" class="popup-mask" @click.self="imgViewer.show=false">
+<div class="img-preview-box">
+<img :src="imgViewer.src" class="max-w-full max-h-full rounded shadow"/>
+</div>
+</div>
+
+<div class="card">
+<h3 class="font-bold">可选植物</h3>
+<div class="flex gap-2 flex-wrap mt-2">
+<button @click="openPlantPreview('sunflower')" class="border p-2 rounded">🌻向日葵</button>
+<button @click="openPlantPreview('peachTree')" class="border p-2 rounded">🍑桃树</button>
+<button @click="openPlantPreview('littleFlower')" class="border p-2 rounded">🌼小雏菊</button>
+</div>
+<p class="text-xs mt-1 text-gray-500">选定后锁定，等待家长重置周期才可重选</p>
+</div>
+
+<div class="card">
+<h3 class="font-bold">我的植物</h3>
+<div v-if="role==='parent'">
+<div v-if="localData.parentPlant" v-html="renderPlantSvg(localData.parentPlant,localData.parentPlantDaily.level)"></div>
+<div v-else>尚未选择植物</div>
+<div v-if="localData.parentPlant">
+<div class="flex gap-2 mt-2 flex-wrap">
+<button @click="plantOperate(true,'water')" :class="localData.parentPlantDaily.water?'bg-blue-300':'border p-1 rounded'">💧浇水</button>
+<button @click="plantOperate(true,'sun')" :class="localData.parentPlantDaily.sun?'bg-yellow-300':'border p-1 rounded'">☀晒太阳</button>
+<button @click="plantOperate(true,'fertilizer')" :class="localData.parentPlantDaily.fertilizer?'bg-lime-300':'border p-1 rounded'">🧪施肥</button>
+</div>
+<p class="text-xs mt-1">全部完成才可升级，每日仅升1级</p>
+</div>
+</div>
+<div v-if="role==='child'">
+<div v-if="localData.childPlant" v-html="renderPlantSvg(localData.childPlant,localData.childPlantDaily.level)"></div>
+<div v-else>尚未选择植物</div>
+<div v-if="localData.childPlant">
+<div class="flex gap-2 mt-2 flex-wrap">
+<button @click="plantOperate(false,'water')" :class="localData.childPlantDaily.water?'bg-blue-300':'border p-1 rounded'">💧浇水</button>
+<button @click="plantOperate(false,'sun')" :class="localData.childPlantDaily.sun?'bg-yellow-300':'border p-1 rounded'">☀晒太阳</button>
+<button @click="plantOperate(false,'fertilizer')" :class="localData.childPlantDaily.fertilizer?'bg-lime-300':'border p-1 rounded'">🧪施肥</button>
+</div>
+<p class="text-xs mt-1">全部完成才可升级，每日仅升1级</p>
+</div>
+</div>
+</div>
+
+<!--家长端功能区域-->
+<div v-if="role==='parent'" class="card">
+<h3 class="font-bold">任务管理</h3>
+<button @click="taskFormModal=true" class="bg-green-600 text-white px-3 py-2 rounded mt-2">新增任务</button>
+<button @click="weekReset" class="bg-orange-500 text-white px-3 py-2 rounded mt-2 ml-2">本周重置</button>
+
+<div v-if="taskFormModal" class="popup-mask">
+<div class="card">
+<h4>新建任务</h4>
+<input v-model="newTask.title" placeholder="任务名称" class="w-full border p-2 rounded my-2"/>
+<input v-model.number="newTask.timeMin" type="number" placeholder="限时分钟" class="w-full border p-2 rounded my-2"/>
+<div class="flex gap-2">
+<button @click="addTask" class="bg-green-600 text-white px-3 py-1 rounded">保存</button>
+<button @click="taskFormModal=false" class="bg-gray-300 px-3 py-1 rounded">取消</button>
+</div>
+</div>
+</div>
+
+<div v-for="tk in localData.tasks" :key="tk.id" class="border p-2 mt-2 rounded">
+<div>{{tk.title}}｜限时{{tk.timeMin}}分钟｜状态：{{tk.status}}</div>
+<div v-if="tk.photo">
+<button @click="openImage(tk.photo)" class="text-blue-600">点开查看作业图片（可缩放）</button>
+<div class="flex gap-2 mt-1">
+<button @click="taskApprove(tk,false)" class="bg-green-500 text-white px-2 py-1 rounded">按时通过+2星</button>
+<button @click="taskApprove(tk,true)" class="bg-yellow-500 text-white px-2 py-1 rounded">超时通过+1星</button>
+<button @click="taskReject(tk)" class="bg-red-400 text-white px-2 py-1 rounded">退回重传</button>
+<button @click="taskNoFinish(tk)" class="bg-red-600 text-white px-2 py-1 rounded">未完成扣1星</button>
+</div>
+</div>
+</div>
+
+<div class="mt-4">
+<h4 class="font-bold">心愿清单</h4>
+<div class="flex gap-2 my-2">
+<input v-model="newWish" placeholder="填写心愿" class="flex-1 border p-2 rounded"/>
+<button @click="addWish" class="bg-green-600 text-white px-2 py-1 rounded">添加</button>
+</div>
+<div v-for="w in localData.wishList" :key="w.id" class="flex justify-between border p-1 my-1 rounded">
+<span :class="{lineThrough:w.done}">{{w.text}}</span>
+<button @click="wishDone(w)" v-if="!w.done">标记完成</button>
+</div>
+</div>
+
+<div class="mt-4">
+<h4 class="font-bold">惩罚清单</h4>
+<div class="flex gap-2 my-2">
+<input v-model="newPunish" placeholder="填写惩罚项" class="flex-1 border p-2 rounded"/>
+<button @click="addPunish" class="bg-green-600 text-white px-2 py-1 rounded">添加</button>
+</div>
+<div v-for="p in localData.punishList" :key="p.id" class="flex justify-between border p-1 my-1 rounded">
+<span :class="{lineThrough:p.done}">{{p.text}}</span>
+<button @click="punishDone(p)" v-if="!p.done">标记完成</button>
+</div>
+</div>
+</div>
+
+<!--孩子端功能区域-->
+<div v-if="role==='child'" class="card">
+<h3 class="font-bold">我的任务</h3>
+<div v-for="tk in localData.tasks" :key="tk.id" class="border p-2 mt-2 rounded">
+<div>{{tk.title}}｜限时{{tk.timeMin}}分钟｜{{tk.status}}</div>
+<button v-if="tk.status==='pending'" @click="taskStart(tk)" class="bg-blue-600 text-white px-2 py-1 rounded mt-1">开始任务</button>
+<div v-if="tk.status==='running'">
+<input type="file" accept="image/*" @change="taskUploadFinish(tk,$event)" class="mt-2">
+<p class="text-xs">完成后选择相册图片上传提交</p>
+</div>
+</div>
+
+<div class="mt-4">
+<h4 class="font-bold">心愿清单（只读）</h4>
+<div v-for="w in localData.wishList" :key="w.id" class="border p-1 my-1 rounded">
+<span :class="{lineThrough:w.done}">{{w.text}}</span>
+</div>
+</div>
+<div class="mt-4">
+<h4 class="font-bold">惩罚清单（只读）</h4>
+<div v-for="p in localData.punishList" :key="p.id" class="border p-1 my-1 rounded">
+<span :class="{lineThrough:p.done}">{{p.text}}</span>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+`
+}).mount('#app');
+</script>
+<style>
+.lineThrough{text-decoration:line-through;color:#777;}
+</style>
+</body>
+</html>
