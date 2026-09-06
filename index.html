@@ -24,7 +24,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;m
 // ============已填入你的Supabase配置============
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
-const { createClient } = window.supabase;
+const { createClient } = supabase;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const BUCKET_NAME = "task_imgs";
 
@@ -331,7 +331,6 @@ pansy:[
 `<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 64" stroke="#287028" stroke-width="4"/><ellipse cx="36" cy="84" rx="14" ry="7" fill="#42a242"/><ellipse cx="84" cy="78" rx="14" ry="7" fill="#42a242"/><g fill="#9966dd"><circle cx="60" cy="48" r="11"/><ellipse cx="42" cy="34" rx="10" ry="12"/><ellipse cx="78" cy="34" rx="10" ry="12"/></g></svg>`,
 `<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 56" stroke="#287028" stroke-width="4"/><ellipse cx="32" cy="76" rx="16" ry="8" fill="#42a242"/><ellipse cx="88" cy="70" rx="16" ry="8" fill="#42a242"/><g fill="#aa77ee"><circle cx="60" cy="38" r="13"/><ellipse cx="38" cy="22" rx="12" ry="14"/><ellipse cx="82" cy="22" rx="12" ry="14"/></g></svg>`,
 `<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 48" stroke="#287028" stroke-width="4"/><ellipse cx="28" cy="68" rx="18" ry="9" fill="#42a242"/><ellipse cx="92" cy="62" rx="18" ry="9" fill="#42a242"/><g fill="#bb88ff"><circle cx="60" cy="28" r="15"/><ellipse cx="34" cy="10" rx="14" ry="16"/><ellipse cx="86" cy="10" rx="14" ry="16"/></g></svg>`
-]
 };
 if(!plantId) return "";
 const arr = svgMap[plantId];
