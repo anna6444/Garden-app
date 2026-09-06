@@ -21,11 +21,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;m
 <body>
 <div id="app"></div>
 <script>
-// ============已填入你的Supabase配置============
+// ============Supabase配置============
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
 const { createClient } = supabase;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const BUCKET_NAME = "task_imgs";
 
 new Vue({
@@ -101,11 +101,11 @@ d.setHours(0,0,0,0);
 this.currentWeekStart = d.toISOString();
 },
 async loadAllData(){
-const {data:t}=await supabase.from("tasks").select("*");
-const {data:lt}=await supabase.from("long_tasks").select("*");
-const {data:wr}=await supabase.from("wish_punish").select("*");
-const {data:sr}=await supabase.from("star_log").select("*").order("created_at",{asc:false});
-const {data:pl}=await supabase.from("plants").select("*");
+const {data:t}=await supabaseClient.from("tasks").select("*");
+const {data:lt}=await supabaseClient.from("long_tasks").select("*");
+const {data:wr}=await supabaseClient.from("wish_punish").select("*");
+const {data:sr}=await supabaseClient.from("star_log").select("*").order("created_at",{asc:false});
+const {data:pl}=await supabaseClient.from("plants").select("*");
 this.tasks = t||[];
 this.longTasks = lt||[];
 this.wishList = wr.filter(x=>x.type==="wish");
@@ -125,7 +125,8 @@ this.childGrowth = {level:p.level||0,water:!!p.water,sun:!!p.sun,fertilize:!!p.f
 }
 },
 setupRealtime(){
-supabase.channel('garden_ch').on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>this.loadAllData())
+supabaseClient.channel('garden_ch')
+.on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>this.loadAllData())
 .on('postgres_changes',{event:'*',schema:'public',table:'long_tasks'},()=>this.loadAllData())
 .on('postgres_changes',{event:'*',schema:'public',table:'wish_punish'},()=>this.loadAllData())
 .on('postgres_changes',{event:'*',schema:'public',table:'star_log'},()=>this.loadAllData())
@@ -145,13 +146,13 @@ for(let t of this.tasks){
 if(t.status==="pending"&&t.due_day!==todayStr) continue;
 if(t.status!=="pending") continue;
 await this.deductStar("child",1,"超时22点未完成："+t.title);
-await supabase.from("tasks").update({status:"fail"}).eq("id",t.id);
+await supabaseClient.from("tasks").update({status:"fail"}).eq("id",t.id);
 }
 for(let lt of this.longTasks){
 if(lt.status==="pending"&&lt.due_day!==todayStr) continue;
 if(lt.status!=="pending") continue;
 await this.deductStar("child",1,"长期任务22点未完成："+lt.title);
-await supabase.from("long_tasks").update({status:"fail"}).eq("id",lt.id);
+await supabaseClient.from("long_tasks").update({status:"fail"}).eq("id",lt.id);
 }
 },
 async login(r){
@@ -171,9 +172,9 @@ async confirmSelectPlant(who,plantId){
 let ok = await this.confirmDialog("确认选择【"+this.previewPlantItem.name+"】，选定后本周不能更改，确认吗？");
 if(!ok) return;
 if(who==="parent"){
-await supabase.from("plants").upsert({role:"parent",plant_id:plantId,level:0,water:false,sun:false,fertilize:false,locked:true,week_reset_at:this.currentWeekStart});
+await supabaseClient.from("plants").upsert({role:"parent",plant_id:plantId,level:0,water:false,sun:false,fertilize:false,locked:true,week_reset_at:this.currentWeekStart});
 }else{
-await supabase.from("plants").upsert({role:"child",plant_id:plantId,level:0,water:false,sun:false,fertilize:false,locked:true,week_reset_at:this.currentWeekStart});
+await supabaseClient.from("plants").upsert({role:"child",plant_id:plantId,level:0,water:false,sun:false,fertilize:false,locked:true,week_reset_at:this.currentWeekStart});
 }
 this.showPlantPreview=false;
 await this.loadAllData();
@@ -193,12 +194,12 @@ rec.water=false;rec.sun=false;rec.fertilize=false;
 alert("✅今日三项照料完成！植物升级！");
 }
 let payload = {role:who,level:rec.level,water:rec.water,sun:rec.sun,fertilize:rec.fertilize,locked:rec.locked,week_reset_at:rec.weekResetAt,plant_id:who==="parent"?this.parentPlant:this.childPlant};
-await supabase.from("plants").upsert(payload);
+await supabaseClient.from("plants").upsert(payload);
 await this.loadAllData();
 },
 async addTask(){
 if(!this.newTaskForm.title.trim()) return alert("请输入任务名称");
-await supabase.from(this.newTaskForm.isLong?"long_tasks":"tasks").insert({
+await supabaseClient.from(this.newTaskForm.isLong?"long_tasks":"tasks").insert({
 title:this.newTaskForm.title,
 star_total:Number(this.newTaskForm.starTotal)||2,
 is_long:!!this.newTaskForm.isLong,
@@ -214,25 +215,25 @@ await this.loadAllData();
 async startTask(task,isLong){
 let tid = task.id;
 let tbl = isLong?"long_tasks":"tasks";
-await supabase.from(tbl).update({start_ts:Date.now()}).eq("id",tid);
+await supabaseClient.from(tbl).update({start_ts:Date.now()}).eq("id",tid);
 await this.loadAllData();
 },
 async reSubmitImg(task,isLong){
 let ok = await this.confirmDialog("撤回本次上传，重新提交作业？");
 if(!ok) return;
 let tbl = isLong?"long_tasks":"tasks";
-await supabase.from(tbl).update({img_url:null,status:"pending"}).eq("id",task.id);
+await supabaseClient.from(tbl).update({img_url:null,status:"pending"}).eq("id",task.id);
 await this.loadAllData();
 },
 async uploadFile(e,task,isLong){
 const file = e.target.files[0];
 if(!file) return;
 const fname = Date.now()+"_"+Math.random().toString(36).slice(2)+"."+file.name.split(".").pop();
-const {data,err}=await supabase.storage.from(BUCKET_NAME).upload(fname,file);
+const {data,err}=await supabaseClient.storage.from(BUCKET_NAME).upload(fname,file);
 if(err){alert("上传失败："+err.message);return;}
-const pubUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(fname).data.publicUrl;
+const pubUrl = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(fname).data.publicUrl;
 let tbl = isLong?"long_tasks":"tasks";
-await supabase.from(tbl).update({img_url:pubUrl,status:"submitted"}).eq("id",task.id);
+await supabaseClient.from(tbl).update({img_url:pubUrl,status:"submitted"}).eq("id",task.id);
 e.target.value=null;
 await this.loadAllData();
 },
@@ -250,32 +251,32 @@ else starAdd = Math.floor(Number(task.star_total)/2);
 }
 await this.addStar("child",starAdd,"任务完成："+task.title);
 await this.addStar("parent",starAdd,"孩子完成任务，家长获得等量星星");
-await supabase.from(tbl).update({status:"pass",img_url:null}).eq("id",task.id);
+await supabaseClient.from(tbl).update({status:"pass",img_url:null}).eq("id",task.id);
 }else{
-await supabase.from(tbl).update({status:"reject"}).eq("id",task.id);
+await supabaseClient.from(tbl).update({status:"reject"}).eq("id",task.id);
 }
 await this.loadAllData();
 },
 async deductStar(who,num,desc){
 let ok = await this.confirmDialog("确认扣除"+num+"颗星星："+desc);
 if(!ok) return;
-await supabase.from("star_log").insert({role:who,delta:-num,desc:desc});
+await supabaseClient.from("star_log").insert({role:who,delta:-num,desc:desc});
 alert("✅扣星成功");
 await this.loadAllData();
 },
 async revokeStarLog(item){
 let ok = await this.confirmDialog("撤销这条星星记录？");
 if(!ok) return;
-await supabase.from("star_log").delete().eq("id",item.id);
+await supabaseClient.from("star_log").delete().eq("id",item.id);
 await this.loadAllData();
 },
 async addStar(who,num,desc){
-await supabase.from("star_log").insert({role:who,delta:num,desc:desc});
+await supabaseClient.from("star_log").insert({role:who,delta:num,desc:desc});
 },
 async addWishPunish(type){
 let form = type==="wish"?this.newWishForm:this.newPunishForm;
 if(!form.title.trim()) return alert("请输入内容");
-await supabase.from("wish_punish").insert({type:type,title:form.title,who:form.who,done:false});
+await supabaseClient.from("wish_punish").insert({type:type,title:form.title,who:form.who,done:false});
 if(type==="wish") this.newWishForm={title:"",who:"child"};
 else this.newPunishForm={title:"",who:"child"};
 await this.loadAllData();
@@ -283,17 +284,17 @@ await this.loadAllData();
 async delWishPunish(item){
 let ok = await this.confirmDialog("确定删除该条目？");
 if(!ok) return;
-await supabase.from("wish_punish").delete().eq("id",item.id);
+await supabaseClient.from("wish_punish").delete().eq("id",item.id);
 await this.loadAllData();
 },
 async weeklyReset(){
 let ok = await this.confirmDialog("执行每周重置，植物可以重新选择，确认？");
 if(!ok) return;
 let iso = new Date().toISOString();
-await supabase.from("plants").update({locked:false,level:0,water:false,sun:false,fertilize:false,week_reset_at:iso}).eq("role","parent");
-await supabase.from("plants").update({locked:false,level:0,water:false,sun:false,fertilize:false,week_reset_at:iso}).eq("role","child");
-await supabase.from("tasks").delete().neq("id",0);
-await supabase.from("long_tasks").delete().neq("id",0);
+await supabaseClient.from("plants").update({locked:false,level:0,water:false,sun:false,fertilize:false,week_reset_at:iso}).eq("role","parent");
+await supabaseClient.from("plants").update({locked:false,level:0,water:false,sun:false,fertilize:false,week_reset_at:iso}).eq("role","child");
+await supabaseClient.from("tasks").delete().neq("id",0);
+await supabaseClient.from("long_tasks").delete().neq("id",0);
 await this.loadAllData();
 alert("✅周重置完成");
 },
