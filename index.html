@@ -10,18 +10,26 @@
 <style>
 *{box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:0;background:#f7fff9;}
-.plant-svg{width:100%;max-width:220px;margin:0 auto;display:block;}
+.plant-svg{width:100%;max-width:220px;margin:0 auto;display:block;font-size:48px;}
 .modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99;display:flex;align-items:center;justify-content:center;padding:12px;}
 .modal-wrap{background:#fff;border-radius:12px;width:100%;max-width:420px;max-height:85vh;overflow:auto;padding:16px;}
-.btn{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:14px;margin:4px;}
+.btn{padding:10px 16px;border-radius:10px;border:none;cursor:pointer;font-size:15px;margin:4px;min-height:44px;}
 .btn-primary{background:#22c55e;color:white;}
 .btn-danger{background:#ef4444;color:white;}
 .btn-gray{background:#9ca3af;color:white;}
-.card{background:#fff;border-radius:10px;padding:12px;margin:8px 0;box-shadow:0 1px 3px #00000015;}
+.card{background:#fff;border-radius:10px;padding:14px;margin:10px 0;box-shadow:0 1px 3px #00000015;}
 .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;margin:2px;}
 .tag-parent{background:#bfdbfe;color:#1e40af;}
 .tag-child{background:#fed7aa;color:#92400e;}
 input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin:6px 0;font-size:14px;}
+/* 导航按钮组居中 */
+.nav-btn-group{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:8px;
+  margin:16px 0;
+}
 </style>
 </head>
 <body>
@@ -48,7 +56,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
 
   <div v-else>
     <div class="p-3">
-      <div class="flex justify-between items-center">
+      <div class="flex justify-between items-center mb-2">
         <h1 class="text-lg font-bold">🌱种植小花园</h1>
         <div>
           <span>{{role}}｜星星：{{starCount}}</span>
@@ -56,13 +64,22 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
         </div>
       </div>
 
+      <!--植物卡片，增加切换植物按钮-->
       <div class="card">
         <h3>🌿植物成长</h3>
         <div class="plant-svg text-center text-4xl my-4">{{plantEmoji}}</div>
         <div>成长进度：{{plantProgress}}%</div>
+        <!--植物选择按钮组-->
+        <div class="nav-btn-group mt-3">
+          <button class="btn btn-primary" @click="changePlant('🌱')">种子</button>
+          <button class="btn btn-primary" @click="changePlant('🌿')">幼苗</button>
+          <button class="btn btn-primary" @click="changePlant('🌳')">小树</button>
+          <button class="btn btn-primary" @click="changePlant('🌻')">开花</button>
+        </div>
       </div>
 
-      <div class="flex flex-wrap gap-2 my-3">
+      <!--【导航按钮组，移到植物下方页面中间】-->
+      <div class="nav-btn-group">
         <button class="btn btn-primary" @click="tab='task'">日常任务</button>
         <button class="btn btn-primary" @click="tab='longTask'">长期任务</button>
         <button class="btn btn-primary" @click="tab='wish'">心愿&惩罚</button>
@@ -81,7 +98,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
             <div class="text-sm text-gray-500">{{item.task_desc}}</div>
             <div class="text-sm">奖励星星：{{item.star_num}}</div>
             <div class="text-sm">状态：{{item.status}}</div>
-            <div class="flex flex-wrap">
+            <div class="flex flex-wrap mt-2">
               <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitTask(item)">提交完成</button>
               <button v-if="role==='孩子' && item.status==='待审核'" class="btn btn-gray" @click="reSubmitTask(item)">撤回重提交</button>
               <button v-if="role==='家长' && item.status==='待审核'" class="btn btn-primary" @click="auditTask(item,true)">通过</button>
@@ -103,7 +120,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
             <div class="text-sm text-gray-500">{{item.task_desc}}</div>
             <div class="text-sm">奖励星星：{{item.star_num}}</div>
             <div class="text-sm">状态：{{item.status}}</div>
-            <div class="flex flex-wrap">
+            <div class="flex flex-wrap mt-2">
               <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitLongTask(item)">标记完成</button>
               <button v-if="role==='家长'" class="btn btn-danger" @click="delLongTask(item)">删除</button>
             </div>
@@ -121,7 +138,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
             <div>{{item.content}}</div>
             <div>类型：{{item.type==='wish'?'心愿':'惩罚'}}</div>
             <div>状态：{{item.done?'已生效':'等待植物完全成长'}}</div>
-            <div v-if="role==='家长'">
+            <div v-if="role==='家长'" class="mt-2">
               <button class="btn btn-danger" @click="delWish(item)">删除</button>
             </div>
           </div>
@@ -136,8 +153,10 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <div v-for="item in shopList" :key="item.id" class="card">
             <div>{{item.name}}</div>
             <div>消耗星星：{{item.cost}}</div>
-            <button class="btn btn-primary" @click="exchangeShop(item)">兑换</button>
-            <button class="btn btn-danger" @click="delShop(item)">删除</button>
+            <div class="flex flex-wrap mt-2">
+              <button class="btn btn-primary" @click="exchangeShop(item)">兑换</button>
+              <button class="btn btn-danger" @click="delShop(item)">删除</button>
+            </div>
           </div>
         </div>
       </div>
@@ -149,7 +168,9 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <div v-for="item in starLogList" :key="item.id" class="card">
             <div>{{item.log_desc}}</div>
             <div class="text-sm">{{item.create_at}}</div>
-            <button v-if="role==='家长'" class="btn btn-gray" @click="revokeStarLog(item)">撤销</button>
+            <div class="mt-2">
+              <button v-if="role==='家长'" class="btn btn-gray" @click="revokeStarLog(item)">撤销</button>
+            </div>
           </div>
         </div>
       </div>
@@ -292,6 +313,10 @@ new Vue({
     }
   },
   methods:{
+    //新增：手动切换植物
+    changePlant(emoji){
+      this.plantEmoji = emoji;
+    },
     doLogin(){
       if(this.loginForm.user==='parent' && this.loginForm.pwd==='1234'){
         this.role="家长";
@@ -335,10 +360,10 @@ new Vue({
       const totalStar=this.starCount;
       let p=Math.min(100,Math.floor(totalStar/3));
       this.plantProgress=p;
-      if(p<30) this.plantEmoji="🌱";
-      else if(p<60) this.plantEmoji="🌿";
-      else if(p<90) this.plantEmoji="🌳";
-      else this.plantEmoji="🌻";
+      //自动成长逻辑保留，但是可以手动覆盖
+      if(this.plantEmoji === "🌱" && p>=30) this.plantEmoji="🌿";
+      if(this.plantEmoji === "🌿" && p>=60) this.plantEmoji="🌳";
+      if(this.plantEmoji === "🌳" && p>=90) this.plantEmoji="🌻";
     },
     openAddTask(){
       this.taskForm={owner:"child",title:"",task_desc:"",starNum:1};
