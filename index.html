@@ -11,536 +11,508 @@
 *{box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:0;background:#f7fff9;}
 .plant-svg{width:100%;max-width:220px;margin:0 auto;display:block;}
-.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99;display:flex;align-items:center;justify-content:center;padding:12px;}
-.modal-box{background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:88vh;overflow:auto;padding:20px;}
-.img-preview-popup img{max-width:100%;max-height:85vh;cursor:grab;}
-.btn-lg{padding:14px 20px;font-size:18px;}
-.btn-sm{padding:8px 12px;font-size:14px;}
+.modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99;display:flex;align-items:center;justify-content:center;padding:12px;}
+.modal-wrap{background:#fff;border-radius:12px;width:100%;max-width:420px;max-height:85vh;overflow:auto;padding:16px;}
+.btn{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:14px;margin:4px;}
+.btn-primary{background:#22c55e;color:white;}
+.btn-danger{background:#ef4444;color:white;}
+.btn-gray{background:#9ca3af;color:white;}
+.card{background:#fff;border-radius:10px;padding:12px;margin:8px 0;box-shadow:0 1px 3px #00000015;}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;margin:2px;}
+.tag-parent{background:#bfdbfe;color:#1e40af;}
+.tag-child{background:#fed7aa;color:#92400e;}
+input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin:6px 0;font-size:14px;}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app">
+  <div v-if="!isLogin">
+    <div class="modal-mask">
+      <div class="modal-wrap">
+        <h2 class="text-xl font-bold mb-3">🌱种植小花园 登录</h2>
+        <div>
+          <label>账号</label>
+          <input v-model="loginForm.user" placeholder="输入账号"/>
+        </div>
+        <div>
+          <label>密码</label>
+          <input v-model="loginForm.pwd" type="password" placeholder="输入密码"/>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button class="btn btn-primary" @click="doLogin">确认登录</button>
+        </div>
+        <div class="text-sm text-gray-500 mt-2">家长账号：parent 密码：1234；孩子账号：child 密码：6666</div>
+      </div>
+    </div>
+  </div>
+
+  <div v-else>
+    <div class="p-3">
+      <div class="flex justify-between items-center">
+        <h1 class="text-lg font-bold">🌱种植小花园</h1>
+        <div>
+          <span>{{role}}｜星星：{{starCount}}</span>
+          <button class="btn btn-gray text-sm" @click="logout">退出</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🌿植物成长</h3>
+        <div class="plant-svg text-center text-4xl my-4">{{plantEmoji}}</div>
+        <div>成长进度：{{plantProgress}}%</div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 my-3">
+        <button class="btn btn-primary" @click="tab='task'">日常任务</button>
+        <button class="btn btn-primary" @click="tab='longTask'">长期任务</button>
+        <button class="btn btn-primary" @click="tab='wish'">心愿&惩罚</button>
+        <button v-if="role==='家长'" class="btn btn-primary" @click="tab='shop'">商城</button>
+        <button class="btn btn-primary" @click="tab='starLog'">星星记录</button>
+      </div>
+
+      <!-- 日常任务 -->
+      <div v-if="tab==='task'">
+        <div class="card">
+          <h3>日常任务</h3>
+          <button v-if="role==='家长'" class="btn btn-primary" @click="openAddTask">新增任务</button>
+          <div v-for="item in taskList" :key="item.id" class="card">
+            <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
+            <div>{{item.title}}</div>
+            <div class="text-sm text-gray-500">{{item.desc}}</div>
+            <div class="text-sm">奖励星星：{{item.starNum}}</div>
+            <div class="text-sm">状态：{{item.status}}</div>
+            <div class="flex flex-wrap">
+              <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitTask(item)">提交完成</button>
+              <button v-if="role==='孩子' && item.status==='待审核'" class="btn btn-gray" @click="reSubmitTask(item)">撤回重提交</button>
+              <button v-if="role==='家长' && item.status==='待审核'" class="btn btn-primary" @click="auditTask(item,true)">通过</button>
+              <button v-if="role==='家长' && item.status==='待审核'" class="btn btn-danger" @click="auditTask(item,false)">驳回</button>
+              <button v-if="role==='家长'" class="btn btn-danger" @click="delTask(item)">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!--长期任务-->
+      <div v-if="tab==='longTask'">
+        <div class="card">
+          <h3>长期任务（无计时，22点未完成扣1星）</h3>
+          <button v-if="role==='家长'" class="btn btn-primary" @click="openAddLongTask">新增长期任务</button>
+          <div v-for="item in longTaskList" :key="item.id" class="card">
+            <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
+            <div>{{item.title}}</div>
+            <div class="text-sm text-gray-500">{{item.desc}}</div>
+            <div class="text-sm">奖励星星：{{item.starNum}}</div>
+            <div class="text-sm">状态：{{item.status}}</div>
+            <div class="flex flex-wrap">
+              <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitLongTask(item)">标记完成</button>
+              <button v-if="role==='家长'" class="btn btn-danger" @click="delLongTask(item)">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!--心愿惩罚-->
+      <div v-if="tab==='wish'">
+        <div class="card">
+          <h3>心愿与惩罚</h3>
+          <button v-if="role==='家长'" class="btn btn-primary" @click="openAddWish">新增</button>
+          <div v-for="item in wishList" :key="item.id" class="card">
+            <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
+            <div>{{item.content}}</div>
+            <div>类型：{{item.type==='wish'?'心愿':'惩罚'}}</div>
+            <div>状态：{{item.done?'已生效':'等待植物完全成长'}}</div>
+            <div v-if="role==='家长'">
+              <button class="btn btn-danger" @click="delWish(item)">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!--商城 仅家长-->
+      <div v-if="tab==='shop' && role==='家长'">
+        <div class="card">
+          <h3>商城兑换</h3>
+          <button class="btn btn-primary" @click="openAddShop">新增商品</button>
+          <div v-for="item in shopList" :key="item.id" class="card">
+            <div>{{item.name}}</div>
+            <div>消耗星星：{{item.cost}}</div>
+            <button class="btn btn-primary" @click="exchangeShop(item)">兑换</button>
+            <button class="btn btn-danger" @click="delShop(item)">删除</button>
+          </div>
+        </div>
+      </div>
+
+      <!--星星记录-->
+      <div v-if="tab==='starLog'">
+        <div class="card">
+          <h3>星星记录</h3>
+          <div v-for="item in starLogList" :key="item.id" class="card">
+            <div>{{item.log_desc}}</div>
+            <div class="text-sm">{{item.create_at}}</div>
+            <button v-if="role==='家长'" class="btn btn-gray" @click="revokeStarLog(item)">撤销</button>
+          </div>
+        </div>
+      </div>
+
+      <!--弹窗：新增普通任务-->
+      <div v-if="showAddTask" class="modal-mask" @click.self="showAddTask=false">
+        <div class="modal-wrap">
+          <h3>新增日常任务</h3>
+          <label>归属</label>
+          <select v-model="taskForm.owner">
+            <option value="parent">家长</option>
+            <option value="child">孩子</option>
+          </select>
+          <label>任务名称</label>
+          <input v-model="taskForm.title"/>
+          <label>描述</label>
+          <textarea v-model="taskForm.desc"></textarea>
+          <label>完成奖励星星</label>
+          <input type="number" v-model.number="taskForm.starNum"/>
+          <div class="flex gap-2 mt-3">
+            <button class="btn btn-primary" @click="saveTask">保存</button>
+            <button class="btn btn-gray" @click="showAddTask=false">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!--弹窗新增长期任务-->
+      <div v-if="showAddLongTask" class="modal-mask" @click.self="showAddLongTask=false">
+        <div class="modal-wrap">
+          <h3>新增长期任务</h3>
+          <label>归属</label>
+          <select v-model="longTaskForm.owner">
+            <option value="parent">家长</option>
+            <option value="child">孩子</option>
+          </select>
+          <label>任务名称</label>
+          <input v-model="longTaskForm.title"/>
+          <label>描述</label>
+          <textarea v-model="longTaskForm.desc"></textarea>
+          <label>完成奖励星星</label>
+          <input type="number" v-model.number="longTaskForm.starNum"/>
+          <div class="flex gap-2 mt-3">
+            <button class="btn btn-primary" @click="saveLongTask">保存</button>
+            <button class="btn btn-gray" @click="showAddLongTask=false">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!--弹窗新增心愿惩罚-->
+      <div v-if="showAddWish" class="modal-mask" @click.self="showAddWish=false">
+        <div class="modal-wrap">
+          <h3>新增心愿/惩罚</h3>
+          <label>归属</label>
+          <select v-model="wishForm.owner">
+            <option value="parent">家长</option>
+            <option value="child">孩子</option>
+          </select>
+          <label>类型</label>
+          <select v-model="wishForm.type">
+            <option value="wish">心愿</option>
+            <option value="punish">惩罚</option>
+          </select>
+          <label>内容</label>
+          <textarea v-model="wishForm.content"></textarea>
+          <div class="flex gap-2 mt-3">
+            <button class="btn btn-primary" @click="saveWish">保存</button>
+            <button class="btn btn-gray" @click="showAddWish=false">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!--弹窗新增商城-->
+      <div v-if="showAddShop" class="modal-mask" @click.self="showAddShop=false">
+        <div class="modal-wrap">
+          <h3>新增商城商品</h3>
+          <label>商品名称</label>
+          <input v-model="shopForm.name"/>
+          <label>消耗星星</label>
+          <input type="number" v-model.number="shopForm.cost"/>
+          <div class="flex gap-2 mt-3">
+            <button class="btn btn-primary" @click="saveShop">保存</button>
+            <button class="btn btn-gray" @click="showAddShop=false">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!--确认弹窗通用-->
+      <div v-if="confirmModal.show" class="modal-mask">
+        <div class="modal-wrap">
+          <div>{{confirmModal.text}}</div>
+          <div class="flex gap-2 mt-3">
+            <button class="btn btn-primary" @click="confirmModal.ok()">确定</button>
+            <button class="btn btn-gray" @click="confirmModal.close()">取消</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <script>
-// ============Supabase配置============
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
-const { createClient } = supabase;
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const BUCKET_NAME = "task_imgs";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 new Vue({
-el:"#app",
-data(){
-return {
-role:null,
-pwdParent:"parent123",
-pwdChild:"child123",
-inputPwd:"",
-showLogin:true,
-showPlantPreview:false,
-previewPlantItem:null,
-showImgViewer:false,
-viewImgUrl:"",
-starRecords:[],
-tasks:[],
-longTasks:[],
-wishList:[],
-punishList:[],
-parentPlant:null,
-childPlant:null,
-plantOptions:[
-{id:"sunflower",name:"向日葵",stages:7},
-{id:"pearTree",name:"梨树",stages:7},
-{id:"pansy",name:"三色堇",stages:7}
-],
-parentGrowth:{level:0,water:false,sun:false,fertilize:false,locked:false,weekResetAt:null},
-childGrowth:{level:0,water:false,sun:false,fertilize:false,locked:false,weekResetAt:null},
-currentWeekStart:null,
-nowTs:Date.now(),
-pendingNightCheckDone:false,
-taskTimerMap:{},
-newTaskForm:{title:"",starTotal:2,isLong:false,durationMin:30},
-newWishForm:{title:"",who:"child"},
-newPunishForm:{title:"",who:"child"},
-showConfirmModal:false,
-confirmText:"",
-confirmResolve:null
-}
-},
-created(){
-this.initWeekCycle();
-this.loadAllData();
-this.setupRealtime();
-setInterval(()=>{
-this.nowTs = Date.now();
-this.checkNight22PointDeduct();
-},1000);
-},
-methods:{
-async confirmDialog(text){
-return new Promise(resolve=>{
-this.confirmText = text;
-this.showConfirmModal = true;
-this.confirmResolve = resolve;
-})
-},
-confirmOk(){
-this.showConfirmModal=false;
-this.confirmResolve(true);
-},
-confirmCancel(){
-this.showConfirmModal=false;
-this.confirmResolve(false);
-},
-initWeekCycle(){
-let d=new Date();
-let day=d.getDay();
-let offset = day===0?0:day;
-d.setDate(d.getDate()-offset);
-d.setHours(0,0,0,0);
-this.currentWeekStart = d.toISOString();
-},
-async loadAllData(){
-const {data:t}=await supabaseClient.from("tasks").select("*");
-const {data:lt}=await supabaseClient.from("long_tasks").select("*");
-const {data:wr}=await supabaseClient.from("wish_punish").select("*");
-const {data:sr}=await supabaseClient.from("star_log").select("*").order("created_at",{asc:false});
-const {data:pl}=await supabaseClient.from("plants").select("*");
-this.tasks = t||[];
-this.longTasks = lt||[];
-this.wishList = wr.filter(x=>x.type==="wish");
-this.punishList = wr.filter(x=>x.type==="punish");
-this.starRecords = sr||[];
-if(pl&&pl.length>0){
-pl.forEach(p=>{
-if(p.role==="parent"){
-this.parentPlant = p.plant_id;
-this.parentGrowth = {level:p.level||0,water:!!p.water,sun:!!p.sun,fertilize:!!p.fertilize,locked:!!p.locked,weekResetAt:p.week_reset_at};
-}
-if(p.role==="child"){
-this.childPlant = p.plant_id;
-this.childGrowth = {level:p.level||0,water:!!p.water,sun:!!p.sun,fertilize:!!p.fertilize,locked:!!p.locked,weekResetAt:p.week_reset_at};
-}
-})
-}
-},
-setupRealtime(){
-supabaseClient.channel('garden_ch')
-.on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>this.loadAllData())
-.on('postgres_changes',{event:'*',schema:'public',table:'long_tasks'},()=>this.loadAllData())
-.on('postgres_changes',{event:'*',schema:'public',table:'wish_punish'},()=>this.loadAllData())
-.on('postgres_changes',{event:'*',schema:'public',table:'star_log'},()=>this.loadAllData())
-.on('postgres_changes',{event:'*',schema:'public',table:'plants'},()=>this.loadAllData()).subscribe();
-},
-checkNight22PointDeduct(){
-let now=new Date(this.nowTs);
-let h=now.getHours(),m=now.getMinutes();
-if(h<22) {this.pendingNightCheckDone=false;return;}
-if(this.pendingNightCheckDone) return;
-this.doNightDeduct();
-this.pendingNightCheckDone=true;
-},
-async doNightDeduct(){
-let todayStr = new Date().toISOString().slice(0,10);
-for(let t of this.tasks){
-if(t.status==="pending"&&t.due_day!==todayStr) continue;
-if(t.status!=="pending") continue;
-await this.deductStar("child",1,"超时22点未完成："+t.title);
-await supabaseClient.from("tasks").update({status:"fail"}).eq("id",t.id);
-}
-for(let lt of this.longTasks){
-if(lt.status==="pending"&&lt.due_day!==todayStr) continue;
-if(lt.status!=="pending") continue;
-await this.deductStar("child",1,"长期任务22点未完成："+lt.title);
-await supabaseClient.from("long_tasks").update({status:"fail"}).eq("id",lt.id);
-}
-},
-async login(r){
-let ok=false;
-if(r==="parent"&&this.inputPwd===this.pwdParent) ok=true;
-if(r==="child"&&this.inputPwd===this.pwdChild) ok=true;
-if(!ok){alert("密码错误");return;}
-this.role=r;
-this.showLogin=false;
-this.inputPwd="";
-},
-openPlantPreview(item){
-this.previewPlantItem=item;
-this.showPlantPreview=true;
-},
-async confirmSelectPlant(who,plantId){
-let ok = await this.confirmDialog("确认选择【"+this.previewPlantItem.name+"】，选定后本周不能更改，确认吗？");
-if(!ok) return;
-if(who==="parent"){
-await supabaseClient.from("plants").upsert({role:"parent",plant_id:plantId,level:0,water:false,sun:false,fertilize:false,locked:true,week_reset_at:this.currentWeekStart});
-}else{
-await supabaseClient.from("plants").upsert({role:"child",plant_id:plantId,level:0,water:false,sun:false,fertilize:false,locked:true,week_reset_at:this.currentWeekStart});
-}
-this.showPlantPreview=false;
-await this.loadAllData();
-},
-async plantOperate(who,op){
-let rec = who==="parent"?{...this.parentGrowth}:{...this.childGrowth};
-if(rec.locked) return alert("植物已锁定，请等家长每周重置");
-let field;
-if(op==="water") field="water";
-if(op==="sun") field="sun";
-if(op==="fertilize") field="fertilize";
-rec[field]=true;
-let allDone = rec.water&&rec.sun&&rec.fertilize;
-if(allDone&&rec.level<6){
-rec.level +=1;
-rec.water=false;rec.sun=false;rec.fertilize=false;
-alert("✅今日三项照料完成！植物升级！");
-}
-let payload = {role:who,level:rec.level,water:rec.water,sun:rec.sun,fertilize:rec.fertilize,locked:rec.locked,week_reset_at:rec.weekResetAt,plant_id:who==="parent"?this.parentPlant:this.childPlant};
-await supabaseClient.from("plants").upsert(payload);
-await this.loadAllData();
-},
-async addTask(){
-if(!this.newTaskForm.title.trim()) return alert("请输入任务名称");
-await supabaseClient.from(this.newTaskForm.isLong?"long_tasks":"tasks").insert({
-title:this.newTaskForm.title,
-star_total:Number(this.newTaskForm.starTotal)||2,
-is_long:!!this.newTaskForm.isLong,
-duration_min:Number(this.newTaskForm.durationMin)||30,
-status:"pending",
-due_day:new Date().toISOString().slice(0,10),
-img_url:null,
-start_ts:null
-});
-this.newTaskForm={title:"",starTotal:2,isLong:false,durationMin:30};
-await this.loadAllData();
-},
-async startTask(task,isLong){
-let tid = task.id;
-let tbl = isLong?"long_tasks":"tasks";
-await supabaseClient.from(tbl).update({start_ts:Date.now()}).eq("id",tid);
-await this.loadAllData();
-},
-async reSubmitImg(task,isLong){
-let ok = await this.confirmDialog("撤回本次上传，重新提交作业？");
-if(!ok) return;
-let tbl = isLong?"long_tasks":"tasks";
-await supabaseClient.from(tbl).update({img_url:null,status:"pending"}).eq("id",task.id);
-await this.loadAllData();
-},
-async uploadFile(e,task,isLong){
-const file = e.target.files[0];
-if(!file) return;
-const fname = Date.now()+"_"+Math.random().toString(36).slice(2)+"."+file.name.split(".").pop();
-const {data,err}=await supabaseClient.storage.from(BUCKET_NAME).upload(fname,file);
-if(err){alert("上传失败："+err.message);return;}
-const pubUrl = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(fname).data.publicUrl;
-let tbl = isLong?"long_tasks":"tasks";
-await supabaseClient.from(tbl).update({img_url:pubUrl,status:"submitted"}).eq("id",task.id);
-e.target.value=null;
-await this.loadAllData();
-},
-async parentCheckTask(task,isLong,pass){
-let tbl = isLong?"long_tasks":"tasks";
-let starAdd=0;
-if(pass){
-if(!task.start_ts||isLong){
-starAdd = Number(task.star_total);
-}else{
-let costMs = Date.now()-task.start_ts;
-let limitMs = Number(task.duration_min)*60*1000;
-if(costMs <= limitMs) starAdd = Number(task.star_total);
-else starAdd = Math.floor(Number(task.star_total)/2);
-}
-await this.addStar("child",starAdd,"任务完成："+task.title);
-await this.addStar("parent",starAdd,"孩子完成任务，家长获得等量星星");
-await supabaseClient.from(tbl).update({status:"pass",img_url:null}).eq("id",task.id);
-}else{
-await supabaseClient.from(tbl).update({status:"reject"}).eq("id",task.id);
-}
-await this.loadAllData();
-},
-async deductStar(who,num,desc){
-let ok = await this.confirmDialog("确认扣除"+num+"颗星星："+desc);
-if(!ok) return;
-await supabaseClient.from("star_log").insert({role:who,delta:-num,desc:desc});
-alert("✅扣星成功");
-await this.loadAllData();
-},
-async revokeStarLog(item){
-let ok = await this.confirmDialog("撤销这条星星记录？");
-if(!ok) return;
-await supabaseClient.from("star_log").delete().eq("id",item.id);
-await this.loadAllData();
-},
-async addStar(who,num,desc){
-await supabaseClient.from("star_log").insert({role:who,delta:num,desc:desc});
-},
-async addWishPunish(type){
-let form = type==="wish"?this.newWishForm:this.newPunishForm;
-if(!form.title.trim()) return alert("请输入内容");
-await supabaseClient.from("wish_punish").insert({type:type,title:form.title,who:form.who,done:false});
-if(type==="wish") this.newWishForm={title:"",who:"child"};
-else this.newPunishForm={title:"",who:"child"};
-await this.loadAllData();
-},
-async delWishPunish(item){
-let ok = await this.confirmDialog("确定删除该条目？");
-if(!ok) return;
-await supabaseClient.from("wish_punish").delete().eq("id",item.id);
-await this.loadAllData();
-},
-async weeklyReset(){
-let ok = await this.confirmDialog("执行每周重置，植物可以重新选择，确认？");
-if(!ok) return;
-let iso = new Date().toISOString();
-await supabaseClient.from("plants").update({locked:false,level:0,water:false,sun:false,fertilize:false,week_reset_at:iso}).eq("role","parent");
-await supabaseClient.from("plants").update({locked:false,level:0,water:false,sun:false,fertilize:false,week_reset_at:iso}).eq("role","child");
-await supabaseClient.from("tasks").delete().neq("id",0);
-await supabaseClient.from("long_tasks").delete().neq("id",0);
-await this.loadAllData();
-alert("✅周重置完成");
-},
-countPending(){
-return this.tasks.filter(t=>t.status==="pending").length + this.longTasks.filter(t=>t.status==="pending").length;
-},
-sumStar(role){
-return this.starRecords.filter(r=>r.role===role).reduce((s,i)=>s+i.delta,0);
-},
-renderPlantSvg(plantId,level){
-const svgMap={
-sunflower:[
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 100" stroke="#287028" stroke-width="4"/><ellipse cx="60" cy="92" rx="8" ry="10" fill="#48a848"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 80" stroke="#287028" stroke-width="4"/><ellipse cx="42" cy="100" rx="12" ry="6" fill="#48a848"/><ellipse cx="78" cy="94" rx="12" ry="6" fill="#48a848"/><circle cx="60" cy="68" r="7" fill="#ffdd22"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 70" stroke="#287028" stroke-width="4"/><ellipse cx="40" cy="92" rx="14" ry="7" fill="#48a848"/><ellipse cx="80" cy="86" rx="14" ry="7" fill="#48a848"/><circle cx="60" cy="56" r="10" fill="#ffcc00"/><g fill="#ffdd44"><circle cx="48" cy="44" r="6"/><circle cx="72" cy="44" r="6"/><circle cx="42" cy="58" r="6"/><circle cx="78" cy="58" r="6"/></g></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 62" stroke="#287028" stroke-width="4"/><ellipse cx="38" cy="88" rx="16" ry="8" fill="#48a848"/><ellipse cx="82" cy="80" rx="16" ry="8" fill="#48a848"/><circle cx="60" cy="48" r="12" fill="#cc9900"/><g fill="#ffdd33"><circle cx="44" cy="34" r="7"/><circle cx="76" cy="34" r="7"/><circle cx="36" cy="48" r="7"/><circle cx="84" cy="48" r="7"/><circle cx="44" cy="62" r="7"/><circle cx="76" cy="62" r="7"/></g></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 54" stroke="#287028" stroke-width="5"/><ellipse cx="34" cy="82" rx="18" ry="9" fill="#48a848"/><ellipse cx="86" cy="74" rx="18" ry="9" fill="#48a848"/><circle cx="60" cy="40" r="14" fill="#b88600"/><g fill="#ffdd22"><circle cx="40" cy="24" r="8"/><circle cx="80" cy="24" r="8"/><circle cx="30" cy="40" r="8"/><circle cx="90" cy="40" r="8"/><circle cx="40" cy="56" r="8"/><circle cx="80" cy="56" r="8"/></g></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 48" stroke="#287028" stroke-width="5"/><ellipse cx="30" cy="76" rx="20" ry="10" fill="#48a848"/><ellipse cx="90" cy="68" rx="20" ry="10" fill="#48a848"/><circle cx="60" cy="32" r="16" fill="#996600"/><g fill="#ffdd22"><circle cx="36" cy="14" r="9"/><circle cx="84" cy="14" r="9"/><circle cx="24" cy="32" r="9"/><circle cx="96" cy="32" r="9"/><circle cx="36" cy="50" r="9"/><circle cx="84" cy="50" r="9"/></g></svg>`
-],
-pearTree:[
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="142" r="12" fill="#9b7b6b"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="142" r="12" fill="#9b7b6b"/><rect x="54" y="110" width="12" height="30" fill="#8c6c50"/><ellipse cx="60" cy="98" rx="10" ry="12" fill="#3a883a"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="142" r="12" fill="#9b7b6b"/><rect x="52" y="100" width="16" height="40" fill="#8c6c50"/><ellipse cx="60" cy="80" rx="22" ry="24" fill="#409940"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="142" r="12" fill="#9b7b6b"/><rect x="50" y="90" width="20" height="50" fill="#8c6c50"/><ellipse cx="60" cy="68" rx="30" ry="32" fill="#48aa48"/><circle cx="46" cy="74" r="6" fill="#cce888"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="142" r="12" fill="#9b7b6b"/><rect x="48" y="82" width="24" height="58" fill="#8c6c50"/><ellipse cx="60" cy="58" rx="36" ry="38" fill="#4cbb4c"/><circle cx="42" cy="64" r="7" fill="#d8ee99"/><circle cx="70" cy="54" r="7" fill="#d8ee99"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="142" r="12" fill="#9b7b6b"/><rect x="46" y="74" width="28" height="66" fill="#8c6c50"/><ellipse cx="60" cy="48" rx="42" ry="44" fill="#52c252"/><circle cx="38" cy="54" r="8" fill="#e2f2aa"/><circle cx="62" cy="40" r="8" fill="#e2f2aa"/><circle cx="82" cy="52" r="8" fill="#e2f2aa"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="142" r="12" fill="#9b7b6b"/><rect x="44" y="66" width="32" height="74" fill="#8c6c50"/><ellipse cx="60" cy="38" rx="48" ry="50" fill="#58cc58"/><circle cx="32" cy="44" r="9" fill="#eaf8bb"/><circle cx="56" cy="28" r="9" fill="#eaf8bb"/><circle cx="80" cy="42" r="9" fill="#eaf8bb"/><circle cx="64" cy="54" r="9" fill="#eaf8bb"/></svg>`
-],
-pansy:[
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 102" stroke="#287028" stroke-width="3"/><ellipse cx="60" cy="94" rx="7" ry="9" fill="#42a242"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 84" stroke="#287028" stroke-width="3"/><ellipse cx="44" cy="100" rx="10" ry="5" fill="#42a242"/><ellipse cx="76" cy="96" rx="10" ry="5" fill="#42a242"/><circle cx="60" cy="72" r="6" fill="#7744bb"/></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 74" stroke="#287028" stroke-width="3"/><ellipse cx="40" cy="92" rx="12" ry="6" fill="#42a242"/><ellipse cx="80" cy="86" rx="12" ry="6" fill="#42a242"/><g fill="#8855cc"><circle cx="60" cy="60" r="9"/><ellipse cx="46" cy="48" rx="8" ry="10"/><ellipse cx="74" cy="48" rx="8" ry="10"/></g></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 64" stroke="#287028" stroke-width="4"/><ellipse cx="36" cy="84" rx="14" ry="7" fill="#42a242"/><ellipse cx="84" cy="78" rx="14" ry="7" fill="#42a242"/><g fill="#9966dd"><circle cx="60" cy="48" r="11"/><ellipse cx="42" cy="34" rx="10" ry="12"/><ellipse cx="78" cy="34" rx="10" ry="12"/></g></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 56" stroke="#287028" stroke-width="4"/><ellipse cx="32" cy="76" rx="16" ry="8" fill="#42a242"/><ellipse cx="88" cy="70" rx="16" ry="8" fill="#42a242"/><g fill="#aa77ee"><circle cx="60" cy="38" r="13"/><ellipse cx="38" cy="22" rx="12" ry="14"/><ellipse cx="82" cy="22" rx="12" ry="14"/></g></svg>`,
-`<svg viewBox="0 0 120 160"><circle cx="60" cy="140" r="12" fill="#9b7b6b"/><path d="M60 130 L60 48" stroke="#287028" stroke-width="4"/><ellipse cx="28" cy="68" rx="18" ry="9" fill="#42a242"/><ellipse cx="92" cy="62" rx="18" ry="9" fill="#42a242"/><g fill="#bb88ff"><circle cx="60" cy="28" r="15"/><ellipse cx="34" cy="10" rx="14" ry="16"/><ellipse cx="86" cy="10" rx="14" ry="16"/></g></svg>`
-};
-if(!plantId) return "";
-const arr = svgMap[plantId];
-if(!arr) return "";
-const lv = Math.min(Math.max(level,0),6);
-return arr[lv];
-}
-}
-},
-template:`
-<div class="p-3 max-w-xl mx-auto">
-<div v-if="showLogin">
-<h2 class="text-xl font-bold text-center my-6">🌱种植小花园</h2>
-<div class="bg-white rounded-xl p-5 shadow">
-<div class="mb-4">
-<label class="block mb-1">输入密码</label>
-<input v-model="inputPwd" type="password" class="w-full border rounded p-3"/>
-</div>
-<div class="flex gap-3">
-<button @click="login('parent')" class="flex-1 bg-amber-500 text-white btn-lg rounded-xl">家长登录</button>
-<button @click="login('child')" class="flex-1 bg-sky-500 text-white btn-lg rounded-xl">孩子登录</button>
-</div>
-<p class="mt-3 text-sm text-gray-500">默认家长密码:parent123；孩子密码:child123</p>
-</div>
-</div>
-<div v-else>
-<div class="flex justify-between items-center mb-4">
-<div>
-<span class="font-bold text-lg">{{role==='parent'?'👨‍👩‍👧家长端':'👶孩子端'}}</span>
-<span v-if="countPending()>0" class="ml-2 bg-red-500 text-white px-2 py-1 rounded text-sm">待完成：{{countPending()}}</span>
-</div>
-<button @click="showLogin=true;role=null" class="btn-sm bg-gray-200 rounded">退出</button>
-</div>
-<section class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">🌿我的花园</h3>
-<div v-if="role==='parent'">
-<div v-if="!parentPlant">
-<p class="mb-2">还未选择植物</p>
-<div class="flex flex-wrap gap-2">
-<button v-for="op in plantOptions" @click="openPlantPreview(op)" class="bg-green-100 p-2 rounded">选择{{op.name}}</button>
-</div>
-</div>
-<div v-else>
-<div class="plant-svg" v-html="renderPlantSvg(parentPlant, parentGrowth.level)"></div>
-<p class="text-center mt-1">{{plantOptions.find(x=>x.id===parentPlant).name}}｜等级{{parentGrowth.level}}/6 <span v-if="parentGrowth.locked">🔒已锁定</span></p>
-<div class="flex gap-2 justify-center mt-2" v-if="!parentGrowth.locked">
-<button @click="plantOperate('parent','water')" :class="parentGrowth.water?'bg-blue-300':'bg-blue-100'" class="p-2 rounded">💧浇水</button>
-<button @click="plantOperate('parent','sun')" :class="parentGrowth.sun?'bg-yellow-300':'bg-yellow-100'" class="p-2 rounded">☀晒太阳</button>
-<button @click="plantOperate('parent','fertilize')" :class="parentGrowth.fertilize?'bg-lime-300':'bg-lime-100'" class="p-2 rounded">🧪施肥</button>
-</div>
-<p v-if="parentGrowth.water&&parentGrowth.sun&&parentGrowth.fertilize&&parentGrowth.level<6" class="text-green-600 text-center mt-2">✅今日三项照料全部完成，下次操作即可升级</p>
-</div>
-</div>
-<div v-if="role==='child'">
-<div v-if="!childPlant">
-<p class="mb-2">还未选择植物</p>
-<div class="flex flex-wrap gap-2">
-<button v-for="op in plantOptions" @click="openPlantPreview(op)" class="bg-green-100 p-2 rounded">选择{{op.name}}</button>
-</div>
-</div>
-<div v-else>
-<div class="plant-svg" v-html="renderPlantSvg(childPlant, childGrowth.level)"></div>
-<p class="text-center mt-1">{{plantOptions.find(x=>x.id===childPlant).name}}｜等级{{childGrowth.level}}/6 <span v-if="childGrowth.locked">🔒已锁定</span></p>
-<div class="flex gap-2 justify-center mt-2" v-if="!childGrowth.locked">
-<button @click="plantOperate('child','water')" :class="childGrowth.water?'bg-blue-300':'bg-blue-100'" class="p-2 rounded">💧浇水</button>
-<button @click="plantOperate('child','sun')" :class="childGrowth.sun?'bg-yellow-300':'bg-yellow-100'" class="p-2 rounded">☀晒太阳</button>
-<button @click="plantOperate('child','fertilize')" :class="childGrowth.fertilize?'bg-lime-300':'bg-lime-100'" class="p-2 rounded">🧪施肥</button>
-</div>
-<p v-if="childGrowth.water&&childGrowth.sun&&childGrowth.fertilize&&childGrowth.level<6" class="text-green-600 text-center mt-2">✅今日三项照料全部完成，下次操作即可升级</p>
-</div>
-</div>
-</section>
-<section class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">⭐星星统计｜家长：{{sumStar('parent')}}｜孩子：{{sumStar('child')}}</h3>
-<div class="max-h-40 overflow-y-auto">
-<div v-for="sr in starRecords" class="flex justify-between border-b py-1 text-sm">
-<span>{{sr.role==='parent'?'家长':'孩子'}} {{sr.delta>0?'+':''}}{{sr.delta}}｜{{sr.desc}}</span>
-<button v-if="role==='parent'" @click="revokeStarLog(sr)" class="text-red-500 btn-sm">撤销</button>
-</div>
-</div>
-</section>
-<section v-if="role==='parent'" class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">📝布置任务</h3>
-<input v-model="newTaskForm.title" placeholder="任务名称" class="w-full border p-2 rounded mb-2"/>
-<div class="flex gap-2 mb-2">
-<input v-model.number="newTaskForm.starTotal" type="number" min="1" placeholder="总星星" class="w-1/3 border p-2 rounded"/>
-<input v-model.number="newTaskForm.durationMin" type="number" min="10" placeholder="限时分钟" class="w-1/3 border p-2 rounded"/>
-<label class="flex items-center gap-1 w-1/3"><input v-model="newTaskForm.isLong" type="checkbox"/>长期任务</label>
-</div>
-<button @click="addTask" class="bg-green-500 text-white w-full p-2 rounded">新增任务</button>
-</section>
-<section class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">📋普通任务列表</h3>
-<div v-for="t in tasks" class="border-b py-2">
-<div class="font-medium">{{t.title}}｜星星：{{t.star_total}}｜状态：{{t.status}}</div>
-<div v-if="role==='child'&&t.status==='pending'">
-<button @click="startTask(t,false)" class="bg-sky-500 text-white btn-sm rounded my-1">开始任务</button>
-</div>
-<div v-if="role==='child'&&t.status==='submitted'">
-<button @click="reSubmitImg(t,false)" class="bg-orange-400 text-white btn-sm rounded my-1">撤回重新上传</button>
-</div>
-<div v-if="role==='child'&&(t.status==='pending'||t.status==='reject')">
-<input type="file" accept="image/*" @change="uploadFile($event,t,false)" class="my-1"/>
-</div>
-<div v-if="role==='parent'&&t.status==='submitted'">
-<img v-if="t.img_url" @click="viewImgUrl=t.img_url;showImgViewer=true" :src="t.img_url" style="max-height:120px" class="rounded my-1"/>
-<div class="flex gap-2">
-<button @click="parentCheckTask(t,false,true)" class="bg-green-500 text-white btn-sm rounded">审核通过</button>
-<button @click="parentCheckTask(t,false,false)" class="bg-red-500 text-white btn-sm rounded">驳回重传</button>
-</div>
-</div>
-</div>
-</section>
-<section class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">📜长期任务列表</h3>
-<div v-for="lt in longTasks" class="border-b py-2">
-<div class="font-medium">{{lt.title}}｜星星：{{lt.star_total}}｜状态：{{lt.status}}</div>
-<div v-if="role==='child'&&lt.status==='pending'">
-<button @click="startTask(lt,true)" class="bg-sky-500 text-white btn-sm rounded my-1">开始任务</button>
-</div>
-<div v-if="role==='child'&&lt.status==='submitted'">
-<button @click="reSubmitImg(lt,true)" class="bg-orange-400 text-white btn-sm rounded my-1">撤回重新上传</button>
-</div>
-<div v-if="role==='child'&&(lt.status==='pending'||lt.status==='reject')">
-<input type="file" accept="image/*" @change="uploadFile($event,lt,true)" class="my-1"/>
-</div>
-<div v-if="role==='parent'&&lt.status==='submitted'">
-<img v-if="lt.img_url" @click="viewImgUrl=lt.img_url;showImgViewer=true" :src="lt.img_url" style="max-height:120px" class="rounded my-1"/>
-<div class="flex gap-2">
-<button @click="parentCheckTask(lt,true,true)" class="bg-green-500 text-white btn-sm rounded">审核通过</button>
-<button @click="parentCheckTask(lt,true,false)" class="bg-red-500 text-white btn-sm rounded">驳回重传</button>
-</div>
-</div>
-</div>
-</section>
-<section v-if="role==='parent'" class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">🎁心愿清单（家长新增）</h3>
-<div class="flex gap-2 mb-2">
-<input v-model="newWishForm.title" placeholder="心愿内容" class="flex-1 border p-2 rounded"/>
-<select v-model="newWishForm.who" class="border p-2 rounded">
-<option value="parent">家长</option>
-<option value="child">孩子</option>
-</select>
-<button @click="addWishPunish('wish')" class="bg-pink-500 text-white btn-sm rounded">新增心愿</button>
-</div>
-<div v-for="w in wishList" class="flex justify-between border-b py-1">
-<span>{{w.who==='parent'?'家长':'孩子'}}：{{w.title}}</span>
-<button @click="delWishPunish(w)" class="text-red-500 btn-sm">删除</button>
-</div>
-</section>
-<section class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">🎁心愿清单（只读）</h3>
-<div v-for="w in wishList">
-<div>{{w.who==='parent'?'家长':'孩子'}}：{{w.title}}</div>
-</div>
-</section>
-<section v-if="role==='parent'" class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">⚠惩罚清单（家长新增）</h3>
-<div class="flex gap-2 mb-2">
-<input v-model="newPunishForm.title" placeholder="惩罚内容" class="flex-1 border p-2 rounded"/>
-<select v-model="newPunishForm.who" class="border p-2 rounded">
-<option value="parent">家长</option>
-<option value="child">孩子</option>
-</select>
-<button @click="addWishPunish('punish')" class="bg-orange-500 text-white btn-sm rounded">新增惩罚</button>
-</div>
-<div v-for="p in punishList" class="flex justify-between border-b py-1">
-<span>{{p.who==='parent'?'家长':'孩子'}}：{{p.title}}</span>
-<button @click="delWishPunish(p)" class="text-red-500 btn-sm">删除</button>
-</div>
-</section>
-<section class="bg-white rounded-xl p-4 shadow mb-4">
-<h3 class="font-bold mb-2">⚠惩罚清单（只读）</h3>
-<div v-for="p in punishList">
-<div>{{p.who==='parent'?'家长':'孩子'}}：{{p.title}}</div>
-</div>
-</section>
-<div v-if="role==='parent'" class="my-4">
-<button @click="weeklyReset" class="bg-red-500 text-white w-full p-3 rounded-xl">🔄每周重置</button>
-</div>
-</div>
-<div v-if="showPlantPreview" class="modal-mask" @click.self="showPlantPreview=false">
-<div class="modal-box">
-<h3 class="font-bold text-lg mb-3">预览植物：{{previewPlantItem?.name}}</h3>
-<div class="plant-svg" v-html="renderPlantSvg(previewPlantItem?.id,3)"></div>
-<div class="flex gap-3 mt-4">
-<button @click="showPlantPreview=false" class="flex-1 bg-gray-200 p-3 rounded-xl">取消</button>
-<button v-if="role==='parent'" @click="confirmSelectPlant('parent',previewPlantItem.id)" class="flex-1 bg-green-500 text-white p-3 rounded-xl">确认选择（家长）</button>
-<button v-if="role==='child'" @click="confirmSelectPlant('child',previewPlantItem.id)" class="flex-1 bg-green-500 text-white p-3 rounded-xl">确认选择（孩子）</button>
-</div>
-</div>
-</div>
-<div v-if="showImgViewer" class="modal-mask" @click.self="showImgViewer=false">
-<div class="modal-box img-preview-popup">
-<img :src="viewImgUrl"/>
-<button @click="showImgViewer=false" class="mt-3 w-full bg-gray-200 p-2 rounded">关闭</button>
-</div>
-</div>
-<div v-if="showConfirmModal" class="modal-mask" @click.self="confirmCancel()">
-<div class="modal-box">
-<p class="text-lg mb-4">{{confirmText}}</p>
-<div class="flex gap-3">
-<button @click="confirmCancel()" class="flex-1 bg-gray-200 p-3 rounded-xl">取消</button>
-<button @click="confirmOk()" class="flex-1 bg-blue-500 text-white p-3 rounded-xl">确定</button>
-</div>
-</div>
-</div>
-</div>
-`
+  el:"#app",
+  data(){
+    return{
+      isLogin:false,
+      role:"",
+      loginForm:{user:"",pwd:""},
+      tab:"task",
+      starCount:0,
+      plantProgress:0,
+      plantEmoji:"🌱",
+
+      taskList:[],
+      longTaskList:[],
+      wishList:[],
+      shopList:[],
+      starLogList:[],
+
+      showAddTask:false,
+      taskForm:{owner:"child",title:"",desc:"",starNum:1},
+      showAddLongTask:false,
+      longTaskForm:{owner:"child",title:"",desc:"",starNum:1},
+      showAddWish:false,
+      wishForm:{owner:"child",type:"wish",content:""},
+      showAddShop:false,
+      shopForm:{name:"",cost:1},
+
+      confirmModal:{
+        show:false,
+        text:"",
+        ok:()=>{},
+        close:()=>{this.confirmModal.show=false;}
+      }
+    }
+  },
+  methods:{
+    doLogin(){
+      if(this.loginForm.user==='parent' && this.loginForm.pwd==='1234'){
+        this.role="家长";
+        this.isLogin=true;
+        this.loadAllData();
+      }else if(this.loginForm.user==='child' && this.loginForm.pwd==='6666'){
+        this.role="孩子";
+        this.isLogin=true;
+        this.loadAllData();
+      }else{
+        alert("账号密码错误");
+      }
+    },
+    logout(){
+      this.isLogin=false;
+      this.role="";
+      this.loginForm={user:"",pwd:""};
+    },
+    async loadAllData(){
+      const {data:tasks}=await supabaseClient.from("tasks").select("*");
+      this.taskList=tasks||[];
+      const {data:longTasks}=await supabaseClient.from("long_tasks").select("*");
+      this.longTaskList=longTasks||[];
+      const {data:wishes}=await supabaseClient.from("wish_punish").select("*");
+      this.wishList=wishes||[];
+      const {data:shops}=await supabaseClient.from("shop_goods").select("*");
+      this.shopList=shops||[];
+      const {data:logs}=await supabaseClient.from("star_logs").select("*").order("id",{asc:false});
+      this.starLogList=logs||[];
+      this.calcStar();
+      this.calcPlant();
+    },
+    calcStar(){
+      let sum=0;
+      this.starLogList.forEach(l=>{
+        sum += Number(l.change||0);
+      });
+      this.starCount=sum;
+    },
+    calcPlant(){
+      const totalStar=this.starCount;
+      let p=Math.min(100,Math.floor(totalStar/3));
+      this.plantProgress=p;
+      if(p<30) this.plantEmoji="🌱";
+      else if(p<60) this.plantEmoji="🌿";
+      else if(p<90) this.plantEmoji="🌳";
+      else this.plantEmoji="🌻";
+    },
+    openAddTask(){
+      this.taskForm={owner:"child",title:"",desc:"",starNum:1};
+      this.showAddTask=true;
+    },
+    async saveTask(){
+      if(!this.taskForm.title){alert("请输入任务名称");return;}
+      await supabaseClient.from("tasks").insert([{
+        owner:this.taskForm.owner,
+        title:this.taskForm.title,
+        desc:this.taskForm.desc,
+        star_num:Number(this.taskForm.starNum||1),
+        status:"待完成"
+      }]);
+      this.showAddTask=false;
+      this.loadAllData();
+    },
+    async delTask(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="确定要删除该日常任务吗？";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("tasks").delete().eq("id",item.id);
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    submitTask(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="确认提交该任务等待家长审核？";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("tasks").update({status:"待审核"}).eq("id",item.id);
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    reSubmitTask(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="确认撤回，回到待完成？";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("tasks").update({status:"待完成"}).eq("id",item.id);
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    auditTask(item,isPass){
+      this.confirmModal.show=true;
+      this.confirmModal.text= isPass?"确定审核通过？":"确定驳回？";
+      this.confirmModal.ok=async ()=>{
+        if(isPass){
+          await supabaseClient.from("tasks").update({status:"已完成"}).eq("id",item.id);
+          await supabaseClient.from("star_logs").insert([{
+            change: Number(item.star_num),
+            log_desc:`任务【${item.title}】完成奖励星星`,
+            create_at:new Date().toLocaleString()
+          }])
+        }else{
+          await supabaseClient.from("tasks").update({status:"待完成"}).eq("id",item.id);
+        }
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    openAddLongTask(){
+      this.longTaskForm={owner:"child",title:"",desc:"",starNum:1};
+      this.showAddLongTask=true;
+    },
+    async saveLongTask(){
+      if(!this.longTaskForm.title){alert("请输入任务名称");return;}
+      await supabaseClient.from("long_tasks").insert([{
+        owner:this.longTaskForm.owner,
+        title:this.longTaskForm.title,
+        desc:this.longTaskForm.desc,
+        star_num:Number(this.longTaskForm.starNum||1),
+        status:"待完成"
+      }]);
+      this.showAddLongTask=false;
+      this.loadAllData();
+    },
+    async delLongTask(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="确定删除这条长期任务？";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("long_tasks").delete().eq("id",item.id);
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    submitLongTask(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="标记长期任务完成？";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("long_tasks").update({status:"已完成"}).eq("id",item.id);
+        await supabaseClient.from("star_logs").insert([{
+          change:Number(item.star_num),
+          log_desc:`长期任务【${item.title}】完成奖励`,
+          create_at:new Date().toLocaleString()
+        }])
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    openAddWish(){
+      this.wishForm={owner:"child",type:"wish",content:""};
+      this.showAddWish=true;
+    },
+    async saveWish(){
+      if(!this.wishForm.content){alert("请填写内容");return;}
+      await supabaseClient.from("wish_punish").insert([{
+        owner:this.wishForm.owner,
+        type:this.wishForm.type,
+        content:this.wishForm.content,
+        done:false
+      }]);
+      this.showAddWish=false;
+      this.loadAllData();
+    },
+    async delWish(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="确定删除心愿/惩罚条目？";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("wish_punish").delete().eq("id",item.id);
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    openAddShop(){
+      this.shopForm={name:"",cost:1};
+      this.showAddShop=true;
+    },
+    async saveShop(){
+      if(!this.shopForm.name){alert("填写商品名称");return;}
+      await supabaseClient.from("shop_goods").insert([{
+        name:this.shopForm.name,
+        cost:Number(this.shopForm.cost||1)
+      }]);
+      this.showAddShop=false;
+      this.loadAllData();
+    },
+    exchangeShop(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text=`确认兑换【${item.name}】，消耗${item.cost}颗星星？`;
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("star_logs").insert([{
+          change:-Number(item.cost),
+          log_desc:`商城兑换：${item.name}`,
+          create_at:new Date().toLocaleString()
+        }])
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    async delShop(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="确定删除商城商品？";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("shop_goods").delete().eq("id",item.id);
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    },
+    revokeStarLog(item){
+      this.confirmModal.show=true;
+      this.confirmModal.text="确定撤销这条星星记录，会反向增减星星";
+      this.confirmModal.ok=async ()=>{
+        await supabaseClient.from("star_logs").insert([{
+          change: -Number(item.change),
+          log_desc:`撤销记录：${item.log_desc}`,
+          create_at:new Date().toLocaleString()
+        }])
+        this.confirmModal.show=false;
+        this.loadAllData();
+      }
+    }
+  }
 })
 </script>
 </body>
