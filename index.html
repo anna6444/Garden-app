@@ -10,25 +10,32 @@
 <style>
 *{box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:0;background:#f7fff9;}
-.plant-svg{width:100%;max-width:220px;margin:0 auto;display:block;font-size:48px;}
+.plant-wrap{width:100%;max-width:320px;margin:0 auto;text-align:center;padding:24px 12px;}
+.plant-emoji{font-size:80px;line-height:1.2;}
 .modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99;display:flex;align-items:center;justify-content:center;padding:12px;}
 .modal-wrap{background:#fff;border-radius:12px;width:100%;max-width:420px;max-height:85vh;overflow:auto;padding:16px;}
 .btn{padding:10px 16px;border-radius:10px;border:none;cursor:pointer;font-size:15px;margin:4px;min-height:44px;}
 .btn-primary{background:#22c55e;color:white;}
 .btn-danger{background:#ef4444;color:white;}
 .btn-gray{background:#9ca3af;color:white;}
-.card{background:#fff;border-radius:10px;padding:14px;margin:10px 0;box-shadow:0 1px 3px #00000015;}
-.tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;margin:2px;}
+.card{background:#fff;border-radius:12px;padding:16px;margin:12px 0;box-shadow:0 2px 6px #00000018;}
+.tag{display:inline-block;padding:3px 9px;border-radius:6px;font-size:12px;margin:2px;}
 .tag-parent{background:#bfdbfe;color:#1e40af;}
 .tag-child{background:#fed7aa;color:#92400e;}
-input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin:6px 0;font-size:14px;}
-/* 导航按钮组居中 */
+input,select,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:8px;margin:7px 0;font-size:15px;}
 .nav-btn-group{
   display:flex;
   flex-wrap:wrap;
   justify-content:center;
   gap:8px;
-  margin:16px 0;
+  margin:18px 0;
+}
+.plant-select-group{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:6px;
+  margin:12px 0;
 }
 </style>
 </head>
@@ -64,21 +71,24 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
         </div>
       </div>
 
-      <!--植物卡片，增加切换植物按钮-->
+      <!--放大植物卡片，【植物下方直接放植物选择按钮组】-->
       <div class="card">
-        <h3>🌿植物成长</h3>
-        <div class="plant-svg text-center text-4xl my-4">{{plantEmoji}}</div>
-        <div>成长进度：{{plantProgress}}%</div>
-        <!--植物选择按钮组-->
-        <div class="nav-btn-group mt-3">
-          <button class="btn btn-primary" @click="changePlant('🌱')">种子</button>
-          <button class="btn btn-primary" @click="changePlant('🌿')">幼苗</button>
-          <button class="btn btn-primary" @click="changePlant('🌳')">小树</button>
-          <button class="btn btn-primary" @click="changePlant('🌻')">开花</button>
+        <div class="plant-wrap">
+          <div class="plant-emoji">{{plantEmoji}}</div>
+        </div>
+        <div class="text-center mb-2">成长进度：{{plantProgress}}%</div>
+        <!-- 植物选择按钮，页面上直接切换 -->
+        <div class="plant-select-group">
+          <button class="btn btn-primary" @click="plantEmoji='🌱'">小苗 🌱</button>
+          <button class="btn btn-primary" @click="plantEmoji='🌻'">向日葵 🌻</button>
+          <button class="btn btn-primary" @click="plantEmoji='🌹'">玫瑰 🌹</button>
+          <button class="btn btn-primary" @click="plantEmoji='🌷'">郁金香 🌷</button>
+          <button class="btn btn-primary" @click="plantEmoji='🌳'">小树 🌳</button>
+          <button class="btn btn-primary" @click="plantEmoji='🍀'">四叶草 🍀</button>
         </div>
       </div>
 
-      <!--【导航按钮组，移到植物下方页面中间】-->
+      <!--导航按钮居中放在植物下方-->
       <div class="nav-btn-group">
         <button class="btn btn-primary" @click="tab='task'">日常任务</button>
         <button class="btn btn-primary" @click="tab='longTask'">长期任务</button>
@@ -98,7 +108,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
             <div class="text-sm text-gray-500">{{item.task_desc}}</div>
             <div class="text-sm">奖励星星：{{item.star_num}}</div>
             <div class="text-sm">状态：{{item.status}}</div>
-            <div class="flex flex-wrap mt-2">
+            <div class="flex flex-wrap mt-3">
               <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitTask(item)">提交完成</button>
               <button v-if="role==='孩子' && item.status==='待审核'" class="btn btn-gray" @click="reSubmitTask(item)">撤回重提交</button>
               <button v-if="role==='家长' && item.status==='待审核'" class="btn btn-primary" @click="auditTask(item,true)">通过</button>
@@ -109,7 +119,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
         </div>
       </div>
 
-      <!--长期任务-->
+      <!--长期任务 修复：去掉plant字段写入，解决数据库报错-->
       <div v-if="tab==='longTask'">
         <div class="card">
           <h3>长期任务（无计时，22点未完成扣1星）</h3>
@@ -120,7 +130,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
             <div class="text-sm text-gray-500">{{item.task_desc}}</div>
             <div class="text-sm">奖励星星：{{item.star_num}}</div>
             <div class="text-sm">状态：{{item.status}}</div>
-            <div class="flex flex-wrap mt-2">
+            <div class="flex flex-wrap mt-3">
               <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitLongTask(item)">标记完成</button>
               <button v-if="role==='家长'" class="btn btn-danger" @click="delLongTask(item)">删除</button>
             </div>
@@ -128,7 +138,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
         </div>
       </div>
 
-      <!--心愿惩罚-->
+      <!--心愿惩罚 修复：去掉plant字段写入-->
       <div v-if="tab==='wish'">
         <div class="card">
           <h3>心愿与惩罚</h3>
@@ -138,7 +148,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
             <div>{{item.content}}</div>
             <div>类型：{{item.type==='wish'?'心愿':'惩罚'}}</div>
             <div>状态：{{item.done?'已生效':'等待植物完全成长'}}</div>
-            <div v-if="role==='家长'" class="mt-2">
+            <div v-if="role==='家长'" class="mt-3">
               <button class="btn btn-danger" @click="delWish(item)">删除</button>
             </div>
           </div>
@@ -153,7 +163,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <div v-for="item in shopList" :key="item.id" class="card">
             <div>{{item.name}}</div>
             <div>消耗星星：{{item.cost}}</div>
-            <div class="flex flex-wrap mt-2">
+            <div class="flex flex-wrap mt-3">
               <button class="btn btn-primary" @click="exchangeShop(item)">兑换</button>
               <button class="btn btn-danger" @click="delShop(item)">删除</button>
             </div>
@@ -168,14 +178,14 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <div v-for="item in starLogList" :key="item.id" class="card">
             <div>{{item.log_desc}}</div>
             <div class="text-sm">{{item.create_at}}</div>
-            <div class="mt-2">
+            <div class="mt-3">
               <button v-if="role==='家长'" class="btn btn-gray" @click="revokeStarLog(item)">撤销</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!--弹窗：新增普通任务-->
+      <!--弹窗：新增普通任务，保留植物选择下拉（仅日常任务）-->
       <div v-if="showAddTask" class="modal-mask" @click.self="showAddTask=false">
         <div class="modal-wrap">
           <h3>新增日常任务</h3>
@@ -183,6 +193,15 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <select v-model="taskForm.owner">
             <option value="parent">家长</option>
             <option value="child">孩子</option>
+          </select>
+          <label>选择植物</label>
+          <select v-model="taskForm.plant">
+            <option value="🌱">小苗 🌱</option>
+            <option value="🌻">向日葵 🌻</option>
+            <option value="🌹">玫瑰 🌹</option>
+            <option value="🌷">郁金香 🌷</option>
+            <option value="🌳">小树 🌳</option>
+            <option value="🍀">四叶草 🍀</option>
           </select>
           <label>任务名称</label>
           <input v-model="taskForm.title"/>
@@ -197,7 +216,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
         </div>
       </div>
 
-      <!--弹窗新增长期任务-->
+      <!--弹窗新增长期任务：移除植物选择下拉，因为数据库没有plant字段-->
       <div v-if="showAddLongTask" class="modal-mask" @click.self="showAddLongTask=false">
         <div class="modal-wrap">
           <h3>新增长期任务</h3>
@@ -296,7 +315,7 @@ new Vue({
       starLogList:[],
 
       showAddTask:false,
-      taskForm:{owner:"child",title:"",task_desc:"",starNum:1},
+      taskForm:{owner:"child",title:"",task_desc:"",starNum:1,plant:"🌱"},
       showAddLongTask:false,
       longTaskForm:{owner:"child",title:"",task_desc:"",starNum:1},
       showAddWish:false,
@@ -313,10 +332,6 @@ new Vue({
     }
   },
   methods:{
-    //新增：手动切换植物
-    changePlant(emoji){
-      this.plantEmoji = emoji;
-    },
     doLogin(){
       if(this.loginForm.user==='parent' && this.loginForm.pwd==='1234'){
         this.role="家长";
@@ -337,15 +352,20 @@ new Vue({
     },
     async loadAllData(){
       const {data:tasks}=await supabaseClient.from("tasks").select("*");
-      this.taskList=tasks||[];
+      this.taskList = tasks ?? [];
+
       const {data:longTasks}=await supabaseClient.from("long_tasks").select("*");
-      this.longTaskList=longTasks||[];
+      this.longTaskList = longTasks ?? [];
+
       const {data:wishes}=await supabaseClient.from("wish_punish").select("*");
-      this.wishList=wishes||[];
+      this.wishList = wishes ?? [];
+
       const {data:shops}=await supabaseClient.from("shop_goods").select("*");
-      this.shopList=shops||[];
+      this.shopList = shops ?? [];
+
       const {data:logs}=await supabaseClient.from("star_logs").select("*").order("id",{asc:false});
-      this.starLogList=logs||[];
+      this.starLogList = logs ?? [];
+
       this.calcStar();
       this.calcPlant();
     },
@@ -360,13 +380,19 @@ new Vue({
       const totalStar=this.starCount;
       let p=Math.min(100,Math.floor(totalStar/3));
       this.plantProgress=p;
-      //自动成长逻辑保留，但是可以手动覆盖
-      if(this.plantEmoji === "🌱" && p>=30) this.plantEmoji="🌿";
-      if(this.plantEmoji === "🌿" && p>=60) this.plantEmoji="🌳";
-      if(this.plantEmoji === "🌳" && p>=90) this.plantEmoji="🌻";
+      // 自动成长逻辑保留，但是手动点击按钮可以覆盖
+      if(p>=90){
+        this.plantEmoji="🌻";
+      }else if(p>=60){
+        this.plantEmoji="🌳";
+      }else if(p>=30){
+        this.plantEmoji="🌿";
+      }else{
+        this.plantEmoji="🌱";
+      }
     },
     openAddTask(){
-      this.taskForm={owner:"child",title:"",task_desc:"",starNum:1};
+      this.taskForm={owner:"child",title:"",task_desc:"",starNum:1,plant:"🌱"};
       this.showAddTask=true;
     },
     async saveTask(){
@@ -376,10 +402,11 @@ new Vue({
         title:this.taskForm.title,
         task_desc:this.taskForm.task_desc,
         star_num:Number(this.taskForm.starNum||1),
+        plant: this.taskForm.plant,
         status:"待完成"
       }]);
       this.showAddTask=false;
-      this.loadAllData();
+      await this.loadAllData();
     },
     async delTask(item){
       this.confirmModal.show=true;
@@ -387,7 +414,7 @@ new Vue({
       this.confirmModal.ok=async ()=>{
         await supabaseClient.from("tasks").delete().eq("id",item.id);
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     submitTask(item){
@@ -396,7 +423,7 @@ new Vue({
       this.confirmModal.ok=async ()=>{
         await supabaseClient.from("tasks").update({status:"待审核"}).eq("id",item.id);
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     reSubmitTask(item){
@@ -405,7 +432,7 @@ new Vue({
       this.confirmModal.ok=async ()=>{
         await supabaseClient.from("tasks").update({status:"待完成"}).eq("id",item.id);
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     auditTask(item,isPass){
@@ -423,7 +450,7 @@ new Vue({
           await supabaseClient.from("tasks").update({status:"待完成"}).eq("id",item.id);
         }
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     openAddLongTask(){
@@ -440,7 +467,7 @@ new Vue({
         status:"待完成"
       }]);
       this.showAddLongTask=false;
-      this.loadAllData();
+      await this.loadAllData();
     },
     async delLongTask(item){
       this.confirmModal.show=true;
@@ -448,7 +475,7 @@ new Vue({
       this.confirmModal.ok=async ()=>{
         await supabaseClient.from("long_tasks").delete().eq("id",item.id);
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     submitLongTask(item){
@@ -462,7 +489,7 @@ new Vue({
           create_at:new Date().toLocaleString()
         }])
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     openAddWish(){
@@ -478,7 +505,7 @@ new Vue({
         done:false
       }]);
       this.showAddWish=false;
-      this.loadAllData();
+      await this.loadAllData();
     },
     async delWish(item){
       this.confirmModal.show=true;
@@ -486,7 +513,7 @@ new Vue({
       this.confirmModal.ok=async ()=>{
         await supabaseClient.from("wish_punish").delete().eq("id",item.id);
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     openAddShop(){
@@ -500,7 +527,7 @@ new Vue({
         cost:Number(this.shopForm.cost||1)
       }]);
       this.showAddShop=false;
-      this.loadAllData();
+      await this.loadAllData();
     },
     exchangeShop(item){
       this.confirmModal.show=true;
@@ -512,7 +539,7 @@ new Vue({
           create_at:new Date().toLocaleString()
         }])
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     async delShop(item){
@@ -521,7 +548,7 @@ new Vue({
       this.confirmModal.ok=async ()=>{
         await supabaseClient.from("shop_goods").delete().eq("id",item.id);
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     },
     revokeStarLog(item){
@@ -534,10 +561,10 @@ new Vue({
           create_at:new Date().toLocaleString()
         }])
         this.confirmModal.show=false;
-        this.loadAllData();
+        await this.loadAllData();
       }
     }
-  }
+  } 
 })
 </script>
 </body>
