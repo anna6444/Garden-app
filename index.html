@@ -78,8 +78,8 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <div v-for="item in taskList" :key="item.id" class="card">
             <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
             <div>{{item.title}}</div>
-            <div class="text-sm text-gray-500">{{item.desc}}</div>
-            <div class="text-sm">奖励星星：{{item.starNum}}</div>
+            <div class="text-sm text-gray-500">{{item.task_desc}}</div>
+            <div class="text-sm">奖励星星：{{item.star_num}}</div>
             <div class="text-sm">状态：{{item.status}}</div>
             <div class="flex flex-wrap">
               <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitTask(item)">提交完成</button>
@@ -100,8 +100,8 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <div v-for="item in longTaskList" :key="item.id" class="card">
             <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
             <div>{{item.title}}</div>
-            <div class="text-sm text-gray-500">{{item.desc}}</div>
-            <div class="text-sm">奖励星星：{{item.starNum}}</div>
+            <div class="text-sm text-gray-500">{{item.task_desc}}</div>
+            <div class="text-sm">奖励星星：{{item.star_num}}</div>
             <div class="text-sm">状态：{{item.status}}</div>
             <div class="flex flex-wrap">
               <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitLongTask(item)">标记完成</button>
@@ -166,7 +166,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <label>任务名称</label>
           <input v-model="taskForm.title"/>
           <label>描述</label>
-          <textarea v-model="taskForm.desc"></textarea>
+          <textarea v-model="taskForm.task_desc"></textarea>
           <label>完成奖励星星</label>
           <input type="number" v-model.number="taskForm.starNum"/>
           <div class="flex gap-2 mt-3">
@@ -188,7 +188,7 @@ input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-ra
           <label>任务名称</label>
           <input v-model="longTaskForm.title"/>
           <label>描述</label>
-          <textarea v-model="longTaskForm.desc"></textarea>
+          <textarea v-model="longTaskForm.task_desc"></textarea>
           <label>完成奖励星星</label>
           <input type="number" v-model.number="longTaskForm.starNum"/>
           <div class="flex gap-2 mt-3">
@@ -275,9 +275,9 @@ new Vue({
       starLogList:[],
 
       showAddTask:false,
-      taskForm:{owner:"child",title:"",desc:"",starNum:1},
+      taskForm:{owner:"child",title:"",task_desc:"",starNum:1},
       showAddLongTask:false,
-      longTaskForm:{owner:"child",title:"",desc:"",starNum:1},
+      longTaskForm:{owner:"child",title:"",task_desc:"",starNum:1},
       showAddWish:false,
       wishForm:{owner:"child",type:"wish",content:""},
       showAddShop:false,
@@ -341,7 +341,7 @@ new Vue({
       else this.plantEmoji="🌻";
     },
     openAddTask(){
-      this.taskForm={owner:"child",title:"",desc:"",starNum:1};
+      this.taskForm={owner:"child",title:"",task_desc:"",starNum:1};
       this.showAddTask=true;
     },
     async saveTask(){
@@ -349,7 +349,7 @@ new Vue({
       await supabaseClient.from("tasks").insert([{
         owner:this.taskForm.owner,
         title:this.taskForm.title,
-        desc:this.taskForm.desc,
+        task_desc:this.taskForm.task_desc,
         star_num:Number(this.taskForm.starNum||1),
         status:"待完成"
       }]);
@@ -402,7 +402,7 @@ new Vue({
       }
     },
     openAddLongTask(){
-      this.longTaskForm={owner:"child",title:"",desc:"",starNum:1};
+      this.longTaskForm={owner:"child",title:"",task_desc:"",starNum:1};
       this.showAddLongTask=true;
     },
     async saveLongTask(){
@@ -410,7 +410,7 @@ new Vue({
       await supabaseClient.from("long_tasks").insert([{
         owner:this.longTaskForm.owner,
         title:this.longTaskForm.title,
-        desc:this.longTaskForm.desc,
+        task_desc:this.longTaskForm.task_desc,
         star_num:Number(this.longTaskForm.starNum||1),
         status:"待完成"
       }]);
