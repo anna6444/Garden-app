@@ -351,14 +351,18 @@ new Vue({
       this.loginForm={user:"",pwd:""};
     },
     async loadAllData(){
+      console.log("===开始加载全部数据===");
       const {data:tasks}=await supabaseClient.from("tasks").select("*");
       this.taskList = tasks ?? [];
+      console.log("tasks:",this.taskList);
 
       const {data:longTasks}=await supabaseClient.from("long_tasks").select("*");
       this.longTaskList = longTasks ?? [];
+      console.log("long_tasks:",this.longTaskList);
 
       const {data:wishes}=await supabaseClient.from("wish_punish").select("*");
       this.wishList = wishes ?? [];
+      console.log("wish_punish:",this.wishList);
 
       const {data:shops}=await supabaseClient.from("shop_goods").select("*");
       this.shopList = shops ?? [];
@@ -397,16 +401,22 @@ new Vue({
     },
     async saveTask(){
       if(!this.taskForm.title){alert("请输入任务名称");return;}
-      await supabaseClient.from("tasks").insert([{
-        owner:this.taskForm.owner,
-        title:this.taskForm.title,
-        task_desc:this.taskForm.task_desc,
-        star_num:Number(this.taskForm.starNum||1),
-        plant: this.taskForm.plant,
-        status:"待完成"
-      }]);
-      this.showAddTask=false;
-      await this.loadAllData();
+      try{
+        const res = await supabaseClient.from("tasks").insert([{
+          owner:this.taskForm.owner,
+          title:this.taskForm.title,
+          task_desc:this.taskForm.task_desc,
+          star_num:Number(this.taskForm.starNum||1),
+          plant: this.taskForm.plant,
+          status:"待完成"
+        }]);
+        console.log("保存日常任务返回：",res);
+        this.showAddTask=false;
+        await this.loadAllData();
+      }catch(err){
+        console.error("保存日常任务报错：",err);
+        alert("保存失败："+err.message);
+      }
     },
     async delTask(item){
       this.confirmModal.show=true;
@@ -459,15 +469,21 @@ new Vue({
     },
     async saveLongTask(){
       if(!this.longTaskForm.title){alert("请输入任务名称");return;}
-      await supabaseClient.from("long_tasks").insert([{
-        owner:this.longTaskForm.owner,
-        title:this.longTaskForm.title,
-        task_desc:this.longTaskForm.task_desc,
-        star_num:Number(this.longTaskForm.starNum||1),
-        status:"待完成"
-      }]);
-      this.showAddLongTask=false;
-      await this.loadAllData();
+      try{
+        const res = await supabaseClient.from("long_tasks").insert([{
+          owner:this.longTaskForm.owner,
+          title:this.longTaskForm.title,
+          task_desc:this.longTaskForm.task_desc,
+          star_num:Number(this.longTaskForm.starNum||1),
+          status:"待完成"
+        }]);
+        console.log("保存长期任务返回：",res);
+        this.showAddLongTask=false;
+        await this.loadAllData();
+      }catch(err){
+        console.error("保存长期任务报错：",err);
+        alert("保存失败："+err.message);
+      }
     },
     async delLongTask(item){
       this.confirmModal.show=true;
@@ -498,14 +514,20 @@ new Vue({
     },
     async saveWish(){
       if(!this.wishForm.content){alert("请填写内容");return;}
-      await supabaseClient.from("wish_punish").insert([{
-        owner:this.wishForm.owner,
-        type:this.wishForm.type,
-        content:this.wishForm.content,
-        done:false
-      }]);
-      this.showAddWish=false;
-      await this.loadAllData();
+      try{
+        const res = await supabaseClient.from("wish_punish").insert([{
+          owner:this.wishForm.owner,
+          type:this.wishForm.type,
+          content:this.wishForm.content,
+          done:false
+        }]);
+        console.log("保存心愿惩罚返回：",res);
+        this.showAddWish=false;
+        await this.loadAllData();
+      }catch(err){
+        console.error("保存心愿惩罚报错：",err);
+        alert("保存失败："+err.message);
+      }
     },
     async delWish(item){
       this.confirmModal.show=true;
@@ -564,7 +586,7 @@ new Vue({
         await this.loadAllData();
       }
     }
-  } 
+  }
 })
 </script>
 </body>
