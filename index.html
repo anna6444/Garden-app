@@ -10,433 +10,212 @@
 <style>
 *{box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:0;background:#f7fff9;}
-.plant-svg{width:100%;max-width:220px;margin:0 auto;display:block;}
-.modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99;}
-.modal-box{background:#fff;border-radius:16px;padding:20px;width:90%;max-width:420px;max-height:80vh;overflow:auto;}
-.btn{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:14px;}
-.btn-primary{background:#22c55e;color:#fff;}
-.btn-primary:disabled{background:#94a3b8;cursor:not-allowed;}
-.btn-danger{background:#ef4444;color:#fff;}
-.btn-warning{background:#f59e0b;color:#fff;}
-.btn-info{background:#3b82f6;color:#fff;}
-.card{background:#fff;border-radius:12px;padding:14px;margin:10px 0;box-shadow:0 1px 4px #00000015;}
-input,textarea,select{width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;margin:6px 0;}
-.tab{display:inline-block;padding:8px 12px;margin:4px;border-radius:8px;background:#eef;border:0;cursor:pointer;}
-.tab.active{background:#22c55e;color:white;}
-.plant-item{border:1px solid #c7f0c7;border-radius:12px;padding:12px;margin:8px 0;text-align:center;}
+.modal-mask{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.modal-content{background:#fff;padding:24px;border-radius:12px;width:90%;max-width:420px;}
+.plant-item{
+  border:2px solid #eee;
+  border-radius:8px;
+  padding:16px;
+  text-align:center;
+  font-size:36px;
+  cursor:pointer;
+}
+.plant-item.active{
+  border-color:#42b983;
+  background:#f0fff4;
+}
+.btn{
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  flex:1;
+  font-size:16px;
+}
+.btn.primary{
+  background:#42b983;
+  color:white;
+}
+.btn-group{display:flex;gap:10px;}
 </style>
 </head>
 <body>
 <div id="app">
-    <!-- 登录页面 -->
-    <div v-if="!isLogin" class="p-6">
-        <div class="modal-box mx-auto mt-20">
-            <h2 class="text-xl font-bold mb-4 text-center">🌱种植小花园 登录</h2>
-            <div>
-                <label>身份</label>
-                <select v-model="loginRole">
-                    <option value="parent">家长</option>
-                    <option value="child">孩子</option>
-                </select>
-            </div>
-            <div>
-                <label>密码</label>
-                <input v-model="loginPwd" type="password" placeholder="输入密码">
-            </div>
-            <button class="btn btn-primary w-full mt-4" @click="doLogin">确认登录</button>
-            <p class="text-gray-500 mt-3 text-sm text-center">家长密码：1234｜孩子密码：6666</p>
-        </div>
+  <!-- 登录区域 -->
+  <div v-if="!login">
+    <h2 class="text-center mt-10">🌱种植小花园 登录</h2>
+    <div class="max-w-sm mx-auto p-4">
+      <input v-model="inputPwd" placeholder="输入密码" class="w-full border p-3 rounded-lg my-4" type="password"/>
+      <button @click="doLogin" class="w-full bg-green-500 text-white p-3 rounded-lg">确认登录</button>
     </div>
+  </div>
 
-    <!-- 主页面（登录后） -->
-    <div v-else class="p-4">
-        <div class="flex justify-between items-center mb-4">
-            <h1 class="text-xl font-bold">🌱种植小花园</h1>
-            <span>当前：{{role==='parent'?'家长端':'孩子端'}}</span>
-            <button class="btn btn-danger text-sm" @click="logout">退出</button>
-        </div>
-        <div class="mb-3">
-            <button class="tab" :class="{active:currentTab=='garden'}" @click="currentTab='garden'">🌱我的花园</button>
-            <button class="tab" :class="{active:currentTab=='task'}" @click="currentTab='task'">任务</button>
-            <button class="tab" :class="{active:currentTab=='longtask'}" @click="currentTab='longtask'">长期任务</button>
-            <button class="tab" :class="{active:currentTab=='wish'}" @click="currentTab='wish'">心愿&惩罚</button>
-            <button class="tab" :class="{active:currentTab=='star'}" @click="currentTab='star'">星星记录</button>
-            <button class="tab" :class="{active:currentTab=='shop'}" @click="currentTab='shop'">商城</button>
-        </div>
-
-        <!-- ========== 花园页面【家长+孩子端共用，修复孩子端空白】 ========== -->
-        <div v-if="currentTab==='garden'">
-            <h3 class="font-bold text-lg">总星星：{{totalStar}}</h3>
-            <div class="plant-item">
-                <p>🌱种子阶段（0~10星）</p>
-                <p v-if="totalStar>=0 && totalStar<10">✅ 当前阶段</p>
-            </div>
-            <div class="plant-item">
-                <p>🌿小苗阶段（11~30星）</p>
-                <p v-if="totalStar>=11 && totalStar<=30">✅ 当前阶段</p>
-            </div>
-            <div class="plant-item">
-                <p>🌳开花阶段（31~60星）</p>
-                <p v-if="totalStar>=31 && totalStar<=60">✅ 当前阶段</p>
-            </div>
-            <div class="plant-item">
-                <p>🌻完全成熟（61星以上）</p>
-                <p v-if="totalStar>60">✅ 当前阶段</p>
-            </div>
-        </div>
-
-        <!-- ========== 普通任务 ========== -->
-        <div v-if="currentTab==='task'">
-            <!-- 仅家长可见：新增任务按钮 -->
-            <button v-if="role==='parent'" class="btn btn-primary mb-3" @click="openAddTaskModal">➕新增任务</button>
-            <div v-for="item in taskList" :key="item.id" class="card">
-                <div class="font-bold">{{item.title}}</div>
-                <p class="text-sm text-gray-600">{{item.desc}}</p>
-                <p>基础星星：{{item.starNum}}｜超时完成：{{Math.floor(item.starNum/2)}}｜22点未完成扣1⭐</p>
-                <p>状态：{{item.status}}</p>
-                <!-- 孩子操作：选图片预览 +【确认提交按钮】，不会自动上传 -->
-                <div v-if="role==='child' && item.status!=='审核完成'">
-                    <input type="file" accept="image/*" @change="previewImg(item,$event)">
-                    <img v-if="item.tempPreview" :src="item.tempPreview" style="max-width:100%;border-radius:8px;margin:8px 0;">
-                    <button v-if="item.tempPreview" class="btn btn-primary mt-2" @click="submitTaskImg(item)">✅确认提交</button>
-                    <button v-if="item.img_url" class="btn btn-warning mt-2 ml-2" @click="reSubmitTask(item)">撤回重新提交</button>
-                </div>
-                <!-- 家长审核 -->
-                <div v-if="role==='parent' && item.status==='待审核'">
-                    <img v-if="item.img_url" :src="item.img_url" style="max-width:100%;border-radius:8px;">
-                    <button class="btn btn-primary mt-2" @click="checkTask(item,true)">✅审核通过</button>
-                    <button class="btn btn-danger mt-2 ml-2" @click="checkTask(item,false)">❌驳回</button>
-                </div>
-                <button v-if="role==='parent'" class="btn btn-danger mt-2 text-sm" @click="deleteTask(item.id)">删除</button>
-            </div>
-        </div>
-
-        <!-- ========== 长期任务【修复打卡逻辑，增加确认弹窗+按钮禁用】 ========== -->
-        <div v-if="currentTab==='longtask'">
-            <!-- 仅家长可见：新增长期任务 -->
-            <button v-if="role==='parent'" class="btn btn-primary mb-3" @click="openAddLongTaskModal">➕新增长期任务</button>
-            <div v-for="item in longTaskList" :key="item.id" class="card">
-                <div class="font-bold">{{item.title}}</div>
-                <p class="text-sm text-gray-600">{{item.desc}}</p>
-                <p>奖励星星：{{item.starNum}}｜22点未完成扣1⭐（无需上传图片）</p>
-                <p>状态：{{item.status}}</p>
-                <div v-if="role==='child'">
-                    <!-- 判断：今天是否已经打卡，打卡后按钮禁用 -->
-                    <button class="btn btn-primary" :disabled="isTodayFinish(item.finish_date)" @click="openLongTaskConfirm(item)">标记今日完成</button>
-                    <p v-if="isTodayFinish(item.finish_date)" class="text-green-600 mt-2">✅今日已打卡，明天可以再次打卡</p>
-                </div>
-                <div v-if="role==='parent' && item.status==='待审核'">
-                    <button class="btn btn-primary mt-2" @click="checkLongTask(item,true)">✅审核通过</button>
-                    <button class="btn btn-danger mt-2 ml-2" @click="checkLongTask(item,false)">❌驳回</button>
-                </div>
-                <button v-if="role==='parent'" class="btn btn-danger mt-2 text-sm" @click="deleteLongTask(item.id)">删除</button>
-            </div>
-        </div>
-
-        <!-- ========== 心愿&惩罚【孩子端隐藏新增按钮，只能看】 ========== -->
-        <div v-if="currentTab==='wish'">
-            <button v-if="role==='parent'" class="btn btn-primary mb-3" @click="openAddWishModal">➕新增心愿/惩罚</button>
-            <div v-for="item in wishList" :key="item.id" class="card">
-                <div class="font-bold">{{item.type==='wish'?'心愿':'惩罚'}}（{{item.owner==='parent'?'家长':'孩子'}}）</div>
-                <p>{{item.content}}</p>
-                <p>需要星星：{{item.cost_star}}</p>
-                <button v-if="role==='parent'" class="btn btn-danger mt-2 text-sm" @click="deleteWish(item.id)">删除</button>
-                <!-- 孩子端：没有兑换按钮 -->
-            </div>
-        </div>
-
-        <!-- ========== 星星记录 ========== -->
-        <div v-if="currentTab==='star'">
-            <h3 class="font-bold">总星星：{{totalStar}}</h3>
-            <div v-for="log in starLogList" :key="log.id" class="card">
-                <p>{{log.log_desc}}  {{log.star>0?`+${log.star}`:log.star}}</p>
-                <button v-if="role==='parent' && log.can_revoke" class="btn btn-warning text-sm mt-1" @click="revokeStarLog(log)">撤销</button>
-            </div>
-        </div>
-
-        <!-- ========== 商城（只保留水、阳光、肥料） ========== -->
-        <div v-if="currentTab==='shop'">
-            <div v-for="shopItem in shopList" :key="shopItem.id" class="card">
-                <p class="font-bold">{{shopItem.name}}</p>
-                <p>消耗星星：{{shopItem.cost}}</p>
-                <button class="btn btn-primary" @click="openShopConfirm(shopItem)">兑换</button>
-            </div>
-        </div>
+  <div v-else>
+    <h2 class="text-center mt-4">欢迎，{{ userRole === 'parent' ? '家长' : '孩子' }}</h2>
+    <!-- 花园区域 -->
+    <div class="text-center my-8">
+      <div id="myPlantShow" style="font-size:60px;margin:20px 0;"></div>
+      <button @click="openPlantSelectModal" class="bg-green-500 text-white p-3 rounded-lg">选择本周植物</button>
     </div>
+  </div>
 
-    <!-- 弹窗模板：新增任务 -->
-    <div v-if="showAddTask" class="modal-mask" @click.self="showAddTask=false">
-        <div class="modal-box">
-            <h3 class="font-bold mb-2">新增任务</h3>
-            <input v-model="newTask.title" placeholder="任务名称">
-            <textarea v-model="newTask.desc" placeholder="任务说明"></textarea>
-            <input type="number" v-model="newTask.starNum" placeholder="完成可得星星">
-            <button class="btn btn-primary w-full mt-3" @click="saveTask">保存</button>
-        </div>
+  <!-- ========== 植物选择弹窗 ========== -->
+  <div id="plantSelectModal" class="modal-mask" style="display:none;">
+    <div class="modal-content">
+      <h3>选择本周植物</h3>
+      <div class="plant-preview-wrap" style="margin:16px 0;text-align:center;">
+        <div id="plantPreview" style="font-size:80px;height:120px;line-height:120px;"></div>
+        <p id="plantPreviewName"></p>
+      </div>
+      <div class="plant-list" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div class="plant-item" data-type="sprout" data-name="小嫩芽">🌱</div>
+        <div class="plant-item" data-type="seedling" data-name="幼苗">🌿</div>
+        <div class="plant-item" data-type="flower" data-name="小花">🌸</div>
+        <div class="plant-item" data-type="tree" data-name="小树">🌳</div>
+      </div>
+      <div class="btn-group">
+        <button id="cancelPlantBtn" class="btn">取消</button>
+        <button id="confirmPlantBtn" class="btn primary">确认选择</button>
+      </div>
     </div>
-    <!-- 新增长期任务弹窗 -->
-    <div v-if="showAddLongTask" class="modal-mask" @click.self="showAddLongTask=false">
-        <div class="modal-box">
-            <h3 class="font-bold mb-2">新增长期任务</h3>
-            <input v-model="newLongTask.title" placeholder="任务名称">
-            <textarea v-model="newLongTask.desc" placeholder="任务说明"></textarea>
-            <input type="number" v-model="newLongTask.starNum" placeholder="完成可得星星">
-            <button class="btn btn-primary w-full mt-3" @click="saveLongTask">保存</button>
-        </div>
-    </div>
-    <!-- 新增心愿惩罚弹窗 -->
-    <div v-if="showAddWish" class="modal-mask" @click.self="showAddWish=false">
-        <div class="modal-box">
-            <h3 class="font-bold mb-2">新增心愿/惩罚</h3>
-            <select v-model="newWish.type">
-                <option value="wish">心愿</option>
-                <option value="punish">惩罚</option>
-            </select>
-            <select v-model="newWish.owner">
-                <option value="parent">家长</option>
-                <option value="child">孩子</option>
-            </select>
-            <input v-model="newWish.content" placeholder="内容">
-            <input type="number" v-model="newWish.cost_star" placeholder="星星">
-            <button class="btn btn-primary w-full mt-3" @click="saveWish">保存</button>
-        </div>
-    </div>
-    <!-- 长期任务打卡确认弹窗 -->
-    <div v-if="showLongConfirm" class="modal-mask">
-        <div class="modal-box">
-            <p>确定标记【{{longTaskItem.title}}】今日完成？提交后今日不可重复打卡！</p>
-            <div class="flex gap-2 mt-4">
-                <button class="btn btn-primary flex-1" @click="confirmLongTaskFinish">确认</button>
-                <button class="btn flex-1" @click="showLongConfirm=false">取消</button>
-            </div>
-        </div>
-    </div>
-    <!-- 扣星确认弹窗 -->
-    <div v-if="showStarConfirm" class="modal-mask">
-        <div class="modal-box">
-            <p>{{confirmTip}}</p>
-            <div class="flex gap-2 mt-4">
-                <button class="btn btn-danger flex-1" @click="confirmStarAction">确认</button>
-                <button class="btn flex-1" @click="showStarConfirm=false">取消</button>
-            </div>
-        </div>
-    </div>
-    <!-- 商城兑换确认弹窗 -->
-    <div v-if="showShopConfirm" class="modal-mask">
-        <div class="modal-box">
-            <p>确定兑换【{{shopConfirmItem.name}}】，扣除{{shopConfirmItem.cost}}颗星星？</p>
-            <div class="flex gap-2 mt-4">
-                <button class="btn btn-primary flex-1" @click="confirmShopExchange">确认兑换</button>
-                <button class="btn flex-1" @click="showShopConfirm=false">取消</button>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 
 <script>
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
 const { createClient } = supabase;
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+let currentUserRole = "";
+let selectedPlantType = null;
+let selectedPlantName = null;
+
+// 获取本周周一日期，作为周锁标识
+function getWeekStartDate(){
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day +1);
+  return monday.toISOString().split('T')[0];
+}
+
+// 打开植物选择弹窗
+async function openPlantSelectModal(){
+  const weekStart = getWeekStartDate();
+  // 查询本周是否已经选过植物
+  const {data: plantData} = await supabase
+    .from('plant_settings')
+    .select('*')
+    .eq('role', currentUserRole)
+    .eq('week_start_date', weekStart)
+  if(plantData && plantData.length>0){
+    alert("本周植物已经选定，本周不可修改，请等待周重置");
+    return;
+  }
+  document.getElementById('plantSelectModal').style.display='flex';
+  selectedPlantType = null;
+  selectedPlantName = null;
+  document.getElementById('plantPreview').innerText="";
+  document.getElementById('plantPreviewName').innerText="请点击选择植物";
+  //清除选中样式
+  document.querySelectorAll('.plant-item').forEach(el=>el.classList.remove('active'));
+}
+
+// 关闭弹窗
+function closePlantSelectModal(){
+  document.getElementById('plantSelectModal').style.display='none';
+}
+
+// 植物点击选择
+document.querySelectorAll('.plant-item').forEach(item=>{
+  item.onclick = ()=>{
+    document.querySelectorAll('.plant-item').forEach(el=>el.classList.remove('active'));
+    item.classList.add('active');
+    selectedPlantType = item.dataset.type;
+    selectedPlantName = item.dataset.name;
+    document.getElementById('plantPreview').innerText = item.innerText;
+    document.getElementById('plantPreviewName').innerText = selectedPlantName;
+  }
+})
+
+// 取消
+document.getElementById('cancelPlantBtn').onclick = closePlantSelectModal;
+
+// 确认保存植物
+document.getElementById('confirmPlantBtn').onclick = async ()=>{
+  if(!selectedPlantType){
+    alert("请先选择一个植物");
+    return;
+  }
+  const weekStart = getWeekStartDate();
+  const {error} = await supabase
+    .from('plant_settings')
+    .insert([{
+      role: currentUserRole,
+      plant_type: selectedPlantType,
+      week_start_date: weekStart
+    }])
+  if(error){
+    alert("保存失败："+error.message);
+    return;
+  }
+  alert("植物选择完成！本周锁定不可修改");
+  closePlantSelectModal();
+  // 刷新页面植物展示
+  renderMyPlant();
+}
+
+// 渲染当前用户的植物（花园页面展示）
+async function renderMyPlant(){
+  const weekStart = getWeekStartDate();
+  const {data} = await supabase
+    .from('plant_settings')
+    .select('plant_type')
+    .eq('role', currentUserRole)
+    .eq('week_start_date', weekStart)
+  const plantDom = document.getElementById('myPlantShow');
+  if(!data || data.length ===0){
+    plantDom.innerText="🌱尚未选择本周植物";
+    return;
+  }
+  const plantType = data[0].plant_type;
+  const plantMap = {
+    'sprout':'🌱',
+    'seedling':'🌿',
+    'flower':'🌸',
+    'tree':'🌳'
+  }
+  plantDom.innerText = plantMap[plantType] || "🌱";
+}
+
+// Vue应用
 new Vue({
-el:'#app',
-data(){
-return{
-    isLogin:false,
-    role:'',
-    loginRole:'parent',
-    loginPwd:'',
-    currentTab:'garden',
-    //任务列表
-    taskList:[],
-    longTaskList:[],
-    wishList:[],
-    starLogList:[],
-    shopList:[],
-    totalStar:0,
-
-    showAddTask:false,
-    newTask:{title:'',desc:'',starNum:1},
-    showAddLongTask:false,
-    newLongTask:{title:'',desc:'',starNum:1},
-    showAddWish:false,
-    newWish:{type:'wish',owner:'child',content:'',cost_star:1},
-
-    showLongConfirm:false,
-    longTaskItem:null,
-
-    showStarConfirm:false,
-    confirmTip:'',
-    starCallback:null,
-
-    showShopConfirm:false,
-    shopConfirmItem:null
-}
-},
-mounted(){
-    this.loadAllData();
-},
-methods:{
-//判断是否今天打卡
-isTodayFinish(finishDateStr){
-    if(!finishDateStr) return false;
-    const today = new Date().toISOString().split('T')[0];
-    return finishDateStr === today;
-},
-openLongTaskConfirm(item){
-    this.longTaskItem = item;
-    this.showLongConfirm = true;
-},
-async confirmLongTaskFinish(){
-    const today = new Date().toISOString().split('T')[0];
-    await supabaseClient.from('long_tasks').update({
-        finish_date: today,
-        status:'待审核'
-    }).eq('id',this.longTaskItem.id);
-    this.showLongConfirm=false;
-    await this.loadAllData();
-},
-async doLogin(){
-    if((this.loginRole==='parent' && this.loginPwd==='1234') || (this.loginRole==='child' && this.loginPwd==='6666')){
-        this.role = this.loginRole;
-        this.isLogin=true;
-        await this.loadAllData();
-    }else{
-        alert('密码错误');
+  el:"#app",
+  data(){
+    return{
+      login:false,
+      inputPwd:"",
+      userRole:""
     }
-},
-logout(){
-    this.isLogin=false;
-    this.role='';
-},
-async loadAllData(){
-    const {data:tasks} = await supabaseClient.from('tasks').select('*').order('id',{ascending:false});
-    const {data:longTasks} = await supabaseClient.from('long_tasks').select('*').order('id',{ascending:false});
-    const {data:wishes} = await supabaseClient.from('wish_punish').select('*').order('id',{ascending:false});
-    const {data:logs} = await supabaseClient.from('star_log').select('*').order('id',{ascending:false});
-    const {data:shops} = await supabaseClient.from('shop').select('*');
-    this.taskList = tasks || [];
-    this.longTaskList = longTasks || [];
-    this.wishList = wishes || [];
-    this.starLogList = logs || [];
-    this.shopList = shops || [];
-    this.totalStar = logs.reduce((sum,item)=>sum + Number(item.star),0);
-},
-//图片预览（只预览不上传）
-previewImg(task,e){
-    const file = e.target.files[0];
-    if(!file) return;
-    task.tempPreview = URL.createObjectURL(file);
-    task.pendingFile = file;
-},
-//确认提交图片
-async submitTaskImg(task){
-    const file = task.pendingFile;
-    if(!file) return;
-    const fname = Date.now() + '_' + file.name;
-    const {data} = await supabaseClient.storage.from('task_imgs').upload(fname,file);
-    const {data:urlData} = supabaseClient.storage.from('task_imgs').getPublicUrl(fname);
-    await supabaseClient.from('tasks').update({img_url:urlData.publicUrl,status:'待审核'}).eq('id',task.id);
-    task.tempPreview=null;
-    task.pendingFile=null;
-    await this.loadAllData();
-},
-//普通任务
-openAddTaskModal(){this.showAddTask=true;this.newTask={title:'',desc:'',starNum:1};},
-async saveTask(){
-    await supabaseClient.from('tasks').insert([{...this.newTask,status:'待完成'}]);
-    this.showAddTask=false;
-    await this.loadAllData();
-},
-async deleteTask(id){
-    await supabaseClient.from('tasks').delete().eq('id',id);
-    await this.loadAllData();
-},
-async reSubmitTask(task){
-    await supabaseClient.from('tasks').update({img_url:'',status:'待完成'}).eq('id',task.id);
-    await this.loadAllData();
-},
-async checkTask(task,isPass){
-    let starAdd = 0;
-    if(isPass){
-        const now22 = new Date();
-        now22.setHours(22,0,0,0);
-        if(new Date() <= now22){
-            starAdd = Number(task.starNum);
-        }else{
-            starAdd = Math.floor(Number(task.starNum)/2);
-        }
-        await supabaseClient.from('star_log').insert([{star:starAdd,log_desc:`任务【${task.title}】完成奖励`,can_revoke:true}]);
-    }
-    await supabaseClient.from('tasks').update({status:isPass?'审核完成':'驳回'}).eq('id',task.id);
-    await this.loadAllData();
-},
-//长期任务
-openAddLongTaskModal(){this.showAddLongTask=true;this.newLongTask={title:'',desc:'',starNum:1};},
-async saveLongTask(){
-    await supabaseClient.from('long_tasks').insert([{...this.newLongTask,status:'待完成'}]);
-    this.showAddLongTask=false;
-    await this.loadAllData();
-},
-async deleteLongTask(id){
-    await supabaseClient.from('long_tasks').delete().eq('id',id);
-    await this.loadAllData();
-},
-async checkLongTask(item,isPass){
-    let starAdd=0;
-    if(isPass){
-        const now22 = new Date();
-        now22.setHours(22,0,0,0);
-        if(new Date() <= now22){
-            starAdd = Number(item.starNum);
-        }else{
-            starAdd = Math.floor(Number(item.starNum)/2);
-        }
-        await supabaseClient.from('star_log').insert([{star:starAdd,log_desc:`长期任务【${item.title}】奖励`,can_revoke:true}]);
-    }
-    await supabaseClient.from('long_tasks').update({status:isPass?'审核完成':'驳回'}).eq('id',item.id);
-    await this.loadAllData();
-},
-//心愿惩罚
-openAddWishModal(){this.showAddWish=true;this.newWish={type:'wish',owner:'child',content:'',cost_star:1};},
-async saveWish(){
-    await supabaseClient.from('wish_punish').insert([this.newWish]);
-    this.showAddWish=false;
-    await this.loadAllData();
-},
-async deleteWish(id){
-    await supabaseClient.from('wish_punish').delete().eq('id',id);
-    await this.loadAllData();
-},
-//星星撤销
-async revokeStarLog(log){
-    await supabaseClient.from('star_log').insert([{star:-Number(log.star),log_desc:`撤销：${log.log_desc}`,can_revoke:false}]);
-    await supabaseClient.from('star_log').update({can_revoke:false}).eq('id',log.id);
-    await this.loadAllData();
-},
-//商城兑换弹窗
-openShopConfirm(item){
-    this.shopConfirmItem = item;
-    this.showShopConfirm=true;
-},
-async confirmShopExchange(){
-    const cost = Number(this.shopConfirmItem.cost);
-    await supabaseClient.from('star_log').insert([{star:-cost,log_desc:`兑换商品【${this.shopConfirmItem.name}】`,can_revoke:false}]);
-    this.showShopConfirm=false;
-    await this.loadAllData();
-},
-//扣星确认通用
-openStarTip(tip,callback){
-    this.confirmTip = tip;
-    this.showStarConfirm=true;
-    this.starCallback = callback;
-},
-confirmStarAction(){
-    this.starCallback();
-    this.showStarConfirm=false;
-}
-}
+  },
+  methods:{
+    doLogin(){
+      if(this.inputPwd === "1234"){
+        this.login = true;
+        this.userRole = "家长";
+        currentUserRole = "parent";
+        setTimeout(renderMyPlant, 100);
+      }else if(this.inputPwd === "6666"){
+        this.login = true;
+        this.userRole = "孩子";
+        currentUserRole = "child";
+        setTimeout(renderMyPlant, 100);
+      }else{
+        alert("密码错误！家长：1234，孩子：6666");
+      }
+    },
+    openPlantSelectModal
+  }
 })
 </script>
 </body>
