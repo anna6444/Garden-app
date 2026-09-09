@@ -10,583 +10,433 @@
 <style>
 *{box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:0;background:#f7fff9;}
-.plant-wrap{width:100%;max-width:320px;margin:0 auto;text-align:center;padding:24px 12px;}
-.plant-emoji{font-size:80px;line-height:1.2;}
-.modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99;display:flex;align-items:center;justify-content:center;padding:12px;}
-.modal-wrap{background:#fff;border-radius:12px;width:100%;max-width:420px;max-height:85vh;overflow:auto;padding:16px;}
-.btn{padding:10px 16px;border-radius:10px;border:none;cursor:pointer;font-size:15px;margin:4px;min-height:44px;}
-.btn-primary{background:#22c55e;color:white;}
-.btn-danger{background:#ef4444;color:white;}
-.btn-gray{background:#9ca3af;color:white;}
-.card{background:#fff;border-radius:12px;padding:16px;margin:12px 0;box-shadow:0 2px 6px #00000018;}
-.tag{display:inline-block;padding:3px 9px;border-radius:6px;font-size:12px;margin:2px;}
-.tag-parent{background:#bfdbfe;color:#1e40af;}
-.tag-child{background:#fed7aa;color:#92400e;}
-input,select,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:8px;margin:7px 0;font-size:15px;}
-.nav-btn-group{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
-  gap:8px;
-  margin:18px 0;
-}
-.plant-select-group{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
-  gap:6px;
-  margin:12px 0;
-}
+.plant-svg{width:100%;max-width:220px;margin:0 auto;display:block;}
+.modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99;}
+.modal-box{background:#fff;border-radius:16px;padding:20px;width:90%;max-width:420px;max-height:80vh;overflow:auto;}
+.btn{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:14px;}
+.btn-primary{background:#22c55e;color:#fff;}
+.btn-primary:disabled{background:#94a3b8;cursor:not-allowed;}
+.btn-danger{background:#ef4444;color:#fff;}
+.btn-warning{background:#f59e0b;color:#fff;}
+.btn-info{background:#3b82f6;color:#fff;}
+.card{background:#fff;border-radius:12px;padding:14px;margin:10px 0;box-shadow:0 1px 4px #00000015;}
+input,textarea,select{width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;margin:6px 0;}
+.tab{display:inline-block;padding:8px 12px;margin:4px;border-radius:8px;background:#eef;border:0;cursor:pointer;}
+.tab.active{background:#22c55e;color:white;}
+.plant-item{border:1px solid #c7f0c7;border-radius:12px;padding:12px;margin:8px 0;text-align:center;}
 </style>
 </head>
 <body>
 <div id="app">
-  <div v-if="!isLogin">
-    <div class="modal-mask">
-      <div class="modal-wrap">
-        <h2 class="text-xl font-bold mb-3">🌱种植小花园 登录</h2>
-        <div>
-          <label>账号</label>
-          <input v-model="loginForm.user" placeholder="输入账号"/>
+    <!-- 登录页面 -->
+    <div v-if="!isLogin" class="p-6">
+        <div class="modal-box mx-auto mt-20">
+            <h2 class="text-xl font-bold mb-4 text-center">🌱种植小花园 登录</h2>
+            <div>
+                <label>身份</label>
+                <select v-model="loginRole">
+                    <option value="parent">家长</option>
+                    <option value="child">孩子</option>
+                </select>
+            </div>
+            <div>
+                <label>密码</label>
+                <input v-model="loginPwd" type="password" placeholder="输入密码">
+            </div>
+            <button class="btn btn-primary w-full mt-4" @click="doLogin">确认登录</button>
+            <p class="text-gray-500 mt-3 text-sm text-center">家长密码：1234｜孩子密码：6666</p>
         </div>
-        <div>
-          <label>密码</label>
-          <input v-model="loginForm.pwd" type="password" placeholder="输入密码"/>
-        </div>
-        <div class="mt-3 flex gap-2">
-          <button class="btn btn-primary" @click="doLogin">确认登录</button>
-        </div>
-        <div class="text-sm text-gray-500 mt-2">家长账号：parent 密码：1234；孩子账号：child 密码：6666</div>
-      </div>
     </div>
-  </div>
 
-  <div v-else>
-    <div class="p-3">
-      <div class="flex justify-between items-center mb-2">
-        <h1 class="text-lg font-bold">🌱种植小花园</h1>
-        <div>
-          <span>{{role}}｜星星：{{starCount}}</span>
-          <button class="btn btn-gray text-sm" @click="logout">退出</button>
+    <!-- 主页面（登录后） -->
+    <div v-else class="p-4">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-xl font-bold">🌱种植小花园</h1>
+            <span>当前：{{role==='parent'?'家长端':'孩子端'}}</span>
+            <button class="btn btn-danger text-sm" @click="logout">退出</button>
         </div>
-      </div>
-
-      <!--放大植物卡片，【植物下方直接放植物选择按钮组】-->
-      <div class="card">
-        <div class="plant-wrap">
-          <div class="plant-emoji">{{plantEmoji}}</div>
+        <div class="mb-3">
+            <button class="tab" :class="{active:currentTab=='garden'}" @click="currentTab='garden'">🌱我的花园</button>
+            <button class="tab" :class="{active:currentTab=='task'}" @click="currentTab='task'">任务</button>
+            <button class="tab" :class="{active:currentTab=='longtask'}" @click="currentTab='longtask'">长期任务</button>
+            <button class="tab" :class="{active:currentTab=='wish'}" @click="currentTab='wish'">心愿&惩罚</button>
+            <button class="tab" :class="{active:currentTab=='star'}" @click="currentTab='star'">星星记录</button>
+            <button class="tab" :class="{active:currentTab=='shop'}" @click="currentTab='shop'">商城</button>
         </div>
-        <div class="text-center mb-2">成长进度：{{plantProgress}}%</div>
-        <!-- 植物选择按钮，页面上直接切换 -->
-        <div class="plant-select-group">
-          <button class="btn btn-primary" @click="plantEmoji='🌱'">小苗 🌱</button>
-          <button class="btn btn-primary" @click="plantEmoji='🌻'">向日葵 🌻</button>
-          <button class="btn btn-primary" @click="plantEmoji='🌹'">玫瑰 🌹</button>
-          <button class="btn btn-primary" @click="plantEmoji='🌷'">郁金香 🌷</button>
-          <button class="btn btn-primary" @click="plantEmoji='🌳'">小树 🌳</button>
-          <button class="btn btn-primary" @click="plantEmoji='🍀'">四叶草 🍀</button>
-        </div>
-      </div>
 
-      <!--导航按钮居中放在植物下方-->
-      <div class="nav-btn-group">
-        <button class="btn btn-primary" @click="tab='task'">日常任务</button>
-        <button class="btn btn-primary" @click="tab='longTask'">长期任务</button>
-        <button class="btn btn-primary" @click="tab='wish'">心愿&惩罚</button>
-        <button v-if="role==='家长'" class="btn btn-primary" @click="tab='shop'">商城</button>
-        <button class="btn btn-primary" @click="tab='starLog'">星星记录</button>
-      </div>
-
-      <!-- 日常任务 -->
-      <div v-if="tab==='task'">
-        <div class="card">
-          <h3>日常任务</h3>
-          <button v-if="role==='家长'" class="btn btn-primary" @click="openAddTask">新增任务</button>
-          <div v-for="item in taskList" :key="item.id" class="card">
-            <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
-            <div>{{item.title}}</div>
-            <div class="text-sm text-gray-500">{{item.task_desc}}</div>
-            <div class="text-sm">奖励星星：{{item.star_num}}</div>
-            <div class="text-sm">状态：{{item.status}}</div>
-            <div class="flex flex-wrap mt-3">
-              <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitTask(item)">提交完成</button>
-              <button v-if="role==='孩子' && item.status==='待审核'" class="btn btn-gray" @click="reSubmitTask(item)">撤回重提交</button>
-              <button v-if="role==='家长' && item.status==='待审核'" class="btn btn-primary" @click="auditTask(item,true)">通过</button>
-              <button v-if="role==='家长' && item.status==='待审核'" class="btn btn-danger" @click="auditTask(item,false)">驳回</button>
-              <button v-if="role==='家长'" class="btn btn-danger" @click="delTask(item)">删除</button>
+        <!-- ========== 花园页面【家长+孩子端共用，修复孩子端空白】 ========== -->
+        <div v-if="currentTab==='garden'">
+            <h3 class="font-bold text-lg">总星星：{{totalStar}}</h3>
+            <div class="plant-item">
+                <p>🌱种子阶段（0~10星）</p>
+                <p v-if="totalStar>=0 && totalStar<10">✅ 当前阶段</p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!--长期任务 修复：去掉plant字段写入，解决数据库报错-->
-      <div v-if="tab==='longTask'">
-        <div class="card">
-          <h3>长期任务（无计时，22点未完成扣1星）</h3>
-          <button v-if="role==='家长'" class="btn btn-primary" @click="openAddLongTask">新增长期任务</button>
-          <div v-for="item in longTaskList" :key="item.id" class="card">
-            <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
-            <div>{{item.title}}</div>
-            <div class="text-sm text-gray-500">{{item.task_desc}}</div>
-            <div class="text-sm">奖励星星：{{item.star_num}}</div>
-            <div class="text-sm">状态：{{item.status}}</div>
-            <div class="flex flex-wrap mt-3">
-              <button v-if="role==='孩子' && item.status==='待完成'" class="btn btn-primary" @click="submitLongTask(item)">标记完成</button>
-              <button v-if="role==='家长'" class="btn btn-danger" @click="delLongTask(item)">删除</button>
+            <div class="plant-item">
+                <p>🌿小苗阶段（11~30星）</p>
+                <p v-if="totalStar>=11 && totalStar<=30">✅ 当前阶段</p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!--心愿惩罚 修复：去掉plant字段写入-->
-      <div v-if="tab==='wish'">
-        <div class="card">
-          <h3>心愿与惩罚</h3>
-          <button v-if="role==='家长'" class="btn btn-primary" @click="openAddWish">新增</button>
-          <div v-for="item in wishList" :key="item.id" class="card">
-            <span class="tag" :class="item.owner==='parent'?'tag-parent':'tag-child'">{{item.owner==='parent'?'家长':'孩子'}}</span>
-            <div>{{item.content}}</div>
-            <div>类型：{{item.type==='wish'?'心愿':'惩罚'}}</div>
-            <div>状态：{{item.done?'已生效':'等待植物完全成长'}}</div>
-            <div v-if="role==='家长'" class="mt-3">
-              <button class="btn btn-danger" @click="delWish(item)">删除</button>
+            <div class="plant-item">
+                <p>🌳开花阶段（31~60星）</p>
+                <p v-if="totalStar>=31 && totalStar<=60">✅ 当前阶段</p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!--商城 仅家长-->
-      <div v-if="tab==='shop' && role==='家长'">
-        <div class="card">
-          <h3>商城兑换</h3>
-          <button class="btn btn-primary" @click="openAddShop">新增商品</button>
-          <div v-for="item in shopList" :key="item.id" class="card">
-            <div>{{item.name}}</div>
-            <div>消耗星星：{{item.cost}}</div>
-            <div class="flex flex-wrap mt-3">
-              <button class="btn btn-primary" @click="exchangeShop(item)">兑换</button>
-              <button class="btn btn-danger" @click="delShop(item)">删除</button>
+            <div class="plant-item">
+                <p>🌻完全成熟（61星以上）</p>
+                <p v-if="totalStar>60">✅ 当前阶段</p>
             </div>
-          </div>
         </div>
-      </div>
 
-      <!--星星记录-->
-      <div v-if="tab==='starLog'">
-        <div class="card">
-          <h3>星星记录</h3>
-          <div v-for="item in starLogList" :key="item.id" class="card">
-            <div>{{item.log_desc}}</div>
-            <div class="text-sm">{{item.create_at}}</div>
-            <div class="mt-3">
-              <button v-if="role==='家长'" class="btn btn-gray" @click="revokeStarLog(item)">撤销</button>
+        <!-- ========== 普通任务 ========== -->
+        <div v-if="currentTab==='task'">
+            <!-- 仅家长可见：新增任务按钮 -->
+            <button v-if="role==='parent'" class="btn btn-primary mb-3" @click="openAddTaskModal">➕新增任务</button>
+            <div v-for="item in taskList" :key="item.id" class="card">
+                <div class="font-bold">{{item.title}}</div>
+                <p class="text-sm text-gray-600">{{item.desc}}</p>
+                <p>基础星星：{{item.starNum}}｜超时完成：{{Math.floor(item.starNum/2)}}｜22点未完成扣1⭐</p>
+                <p>状态：{{item.status}}</p>
+                <!-- 孩子操作：选图片预览 +【确认提交按钮】，不会自动上传 -->
+                <div v-if="role==='child' && item.status!=='审核完成'">
+                    <input type="file" accept="image/*" @change="previewImg(item,$event)">
+                    <img v-if="item.tempPreview" :src="item.tempPreview" style="max-width:100%;border-radius:8px;margin:8px 0;">
+                    <button v-if="item.tempPreview" class="btn btn-primary mt-2" @click="submitTaskImg(item)">✅确认提交</button>
+                    <button v-if="item.img_url" class="btn btn-warning mt-2 ml-2" @click="reSubmitTask(item)">撤回重新提交</button>
+                </div>
+                <!-- 家长审核 -->
+                <div v-if="role==='parent' && item.status==='待审核'">
+                    <img v-if="item.img_url" :src="item.img_url" style="max-width:100%;border-radius:8px;">
+                    <button class="btn btn-primary mt-2" @click="checkTask(item,true)">✅审核通过</button>
+                    <button class="btn btn-danger mt-2 ml-2" @click="checkTask(item,false)">❌驳回</button>
+                </div>
+                <button v-if="role==='parent'" class="btn btn-danger mt-2 text-sm" @click="deleteTask(item.id)">删除</button>
             </div>
-          </div>
         </div>
-      </div>
 
-      <!--弹窗：新增普通任务，保留植物选择下拉（仅日常任务）-->
-      <div v-if="showAddTask" class="modal-mask" @click.self="showAddTask=false">
-        <div class="modal-wrap">
-          <h3>新增日常任务</h3>
-          <label>归属</label>
-          <select v-model="taskForm.owner">
-            <option value="parent">家长</option>
-            <option value="child">孩子</option>
-          </select>
-          <label>选择植物</label>
-          <select v-model="taskForm.plant">
-            <option value="🌱">小苗 🌱</option>
-            <option value="🌻">向日葵 🌻</option>
-            <option value="🌹">玫瑰 🌹</option>
-            <option value="🌷">郁金香 🌷</option>
-            <option value="🌳">小树 🌳</option>
-            <option value="🍀">四叶草 🍀</option>
-          </select>
-          <label>任务名称</label>
-          <input v-model="taskForm.title"/>
-          <label>描述</label>
-          <textarea v-model="taskForm.task_desc"></textarea>
-          <label>完成奖励星星</label>
-          <input type="number" v-model.number="taskForm.starNum"/>
-          <div class="flex gap-2 mt-3">
-            <button class="btn btn-primary" @click="saveTask">保存</button>
-            <button class="btn btn-gray" @click="showAddTask=false">取消</button>
-          </div>
+        <!-- ========== 长期任务【修复打卡逻辑，增加确认弹窗+按钮禁用】 ========== -->
+        <div v-if="currentTab==='longtask'">
+            <!-- 仅家长可见：新增长期任务 -->
+            <button v-if="role==='parent'" class="btn btn-primary mb-3" @click="openAddLongTaskModal">➕新增长期任务</button>
+            <div v-for="item in longTaskList" :key="item.id" class="card">
+                <div class="font-bold">{{item.title}}</div>
+                <p class="text-sm text-gray-600">{{item.desc}}</p>
+                <p>奖励星星：{{item.starNum}}｜22点未完成扣1⭐（无需上传图片）</p>
+                <p>状态：{{item.status}}</p>
+                <div v-if="role==='child'">
+                    <!-- 判断：今天是否已经打卡，打卡后按钮禁用 -->
+                    <button class="btn btn-primary" :disabled="isTodayFinish(item.finish_date)" @click="openLongTaskConfirm(item)">标记今日完成</button>
+                    <p v-if="isTodayFinish(item.finish_date)" class="text-green-600 mt-2">✅今日已打卡，明天可以再次打卡</p>
+                </div>
+                <div v-if="role==='parent' && item.status==='待审核'">
+                    <button class="btn btn-primary mt-2" @click="checkLongTask(item,true)">✅审核通过</button>
+                    <button class="btn btn-danger mt-2 ml-2" @click="checkLongTask(item,false)">❌驳回</button>
+                </div>
+                <button v-if="role==='parent'" class="btn btn-danger mt-2 text-sm" @click="deleteLongTask(item.id)">删除</button>
+            </div>
         </div>
-      </div>
 
-      <!--弹窗新增长期任务：移除植物选择下拉，因为数据库没有plant字段-->
-      <div v-if="showAddLongTask" class="modal-mask" @click.self="showAddLongTask=false">
-        <div class="modal-wrap">
-          <h3>新增长期任务</h3>
-          <label>归属</label>
-          <select v-model="longTaskForm.owner">
-            <option value="parent">家长</option>
-            <option value="child">孩子</option>
-          </select>
-          <label>任务名称</label>
-          <input v-model="longTaskForm.title"/>
-          <label>描述</label>
-          <textarea v-model="longTaskForm.task_desc"></textarea>
-          <label>完成奖励星星</label>
-          <input type="number" v-model.number="longTaskForm.starNum"/>
-          <div class="flex gap-2 mt-3">
-            <button class="btn btn-primary" @click="saveLongTask">保存</button>
-            <button class="btn btn-gray" @click="showAddLongTask=false">取消</button>
-          </div>
+        <!-- ========== 心愿&惩罚【孩子端隐藏新增按钮，只能看】 ========== -->
+        <div v-if="currentTab==='wish'">
+            <button v-if="role==='parent'" class="btn btn-primary mb-3" @click="openAddWishModal">➕新增心愿/惩罚</button>
+            <div v-for="item in wishList" :key="item.id" class="card">
+                <div class="font-bold">{{item.type==='wish'?'心愿':'惩罚'}}（{{item.owner==='parent'?'家长':'孩子'}}）</div>
+                <p>{{item.content}}</p>
+                <p>需要星星：{{item.cost_star}}</p>
+                <button v-if="role==='parent'" class="btn btn-danger mt-2 text-sm" @click="deleteWish(item.id)">删除</button>
+                <!-- 孩子端：没有兑换按钮 -->
+            </div>
         </div>
-      </div>
 
-      <!--弹窗新增心愿惩罚-->
-      <div v-if="showAddWish" class="modal-mask" @click.self="showAddWish=false">
-        <div class="modal-wrap">
-          <h3>新增心愿/惩罚</h3>
-          <label>归属</label>
-          <select v-model="wishForm.owner">
-            <option value="parent">家长</option>
-            <option value="child">孩子</option>
-          </select>
-          <label>类型</label>
-          <select v-model="wishForm.type">
-            <option value="wish">心愿</option>
-            <option value="punish">惩罚</option>
-          </select>
-          <label>内容</label>
-          <textarea v-model="wishForm.content"></textarea>
-          <div class="flex gap-2 mt-3">
-            <button class="btn btn-primary" @click="saveWish">保存</button>
-            <button class="btn btn-gray" @click="showAddWish=false">取消</button>
-          </div>
+        <!-- ========== 星星记录 ========== -->
+        <div v-if="currentTab==='star'">
+            <h3 class="font-bold">总星星：{{totalStar}}</h3>
+            <div v-for="log in starLogList" :key="log.id" class="card">
+                <p>{{log.log_desc}}  {{log.star>0?`+${log.star}`:log.star}}</p>
+                <button v-if="role==='parent' && log.can_revoke" class="btn btn-warning text-sm mt-1" @click="revokeStarLog(log)">撤销</button>
+            </div>
         </div>
-      </div>
 
-      <!--弹窗新增商城-->
-      <div v-if="showAddShop" class="modal-mask" @click.self="showAddShop=false">
-        <div class="modal-wrap">
-          <h3>新增商城商品</h3>
-          <label>商品名称</label>
-          <input v-model="shopForm.name"/>
-          <label>消耗星星</label>
-          <input type="number" v-model.number="shopForm.cost"/>
-          <div class="flex gap-2 mt-3">
-            <button class="btn btn-primary" @click="saveShop">保存</button>
-            <button class="btn btn-gray" @click="showAddShop=false">取消</button>
-          </div>
+        <!-- ========== 商城（只保留水、阳光、肥料） ========== -->
+        <div v-if="currentTab==='shop'">
+            <div v-for="shopItem in shopList" :key="shopItem.id" class="card">
+                <p class="font-bold">{{shopItem.name}}</p>
+                <p>消耗星星：{{shopItem.cost}}</p>
+                <button class="btn btn-primary" @click="openShopConfirm(shopItem)">兑换</button>
+            </div>
         </div>
-      </div>
-
-      <!--确认弹窗通用-->
-      <div v-if="confirmModal.show" class="modal-mask">
-        <div class="modal-wrap">
-          <div>{{confirmModal.text}}</div>
-          <div class="flex gap-2 mt-3">
-            <button class="btn btn-primary" @click="confirmModal.ok()">确定</button>
-            <button class="btn btn-gray" @click="confirmModal.close()">取消</button>
-          </div>
-        </div>
-      </div>
-
     </div>
-  </div>
+
+    <!-- 弹窗模板：新增任务 -->
+    <div v-if="showAddTask" class="modal-mask" @click.self="showAddTask=false">
+        <div class="modal-box">
+            <h3 class="font-bold mb-2">新增任务</h3>
+            <input v-model="newTask.title" placeholder="任务名称">
+            <textarea v-model="newTask.desc" placeholder="任务说明"></textarea>
+            <input type="number" v-model="newTask.starNum" placeholder="完成可得星星">
+            <button class="btn btn-primary w-full mt-3" @click="saveTask">保存</button>
+        </div>
+    </div>
+    <!-- 新增长期任务弹窗 -->
+    <div v-if="showAddLongTask" class="modal-mask" @click.self="showAddLongTask=false">
+        <div class="modal-box">
+            <h3 class="font-bold mb-2">新增长期任务</h3>
+            <input v-model="newLongTask.title" placeholder="任务名称">
+            <textarea v-model="newLongTask.desc" placeholder="任务说明"></textarea>
+            <input type="number" v-model="newLongTask.starNum" placeholder="完成可得星星">
+            <button class="btn btn-primary w-full mt-3" @click="saveLongTask">保存</button>
+        </div>
+    </div>
+    <!-- 新增心愿惩罚弹窗 -->
+    <div v-if="showAddWish" class="modal-mask" @click.self="showAddWish=false">
+        <div class="modal-box">
+            <h3 class="font-bold mb-2">新增心愿/惩罚</h3>
+            <select v-model="newWish.type">
+                <option value="wish">心愿</option>
+                <option value="punish">惩罚</option>
+            </select>
+            <select v-model="newWish.owner">
+                <option value="parent">家长</option>
+                <option value="child">孩子</option>
+            </select>
+            <input v-model="newWish.content" placeholder="内容">
+            <input type="number" v-model="newWish.cost_star" placeholder="星星">
+            <button class="btn btn-primary w-full mt-3" @click="saveWish">保存</button>
+        </div>
+    </div>
+    <!-- 长期任务打卡确认弹窗 -->
+    <div v-if="showLongConfirm" class="modal-mask">
+        <div class="modal-box">
+            <p>确定标记【{{longTaskItem.title}}】今日完成？提交后今日不可重复打卡！</p>
+            <div class="flex gap-2 mt-4">
+                <button class="btn btn-primary flex-1" @click="confirmLongTaskFinish">确认</button>
+                <button class="btn flex-1" @click="showLongConfirm=false">取消</button>
+            </div>
+        </div>
+    </div>
+    <!-- 扣星确认弹窗 -->
+    <div v-if="showStarConfirm" class="modal-mask">
+        <div class="modal-box">
+            <p>{{confirmTip}}</p>
+            <div class="flex gap-2 mt-4">
+                <button class="btn btn-danger flex-1" @click="confirmStarAction">确认</button>
+                <button class="btn flex-1" @click="showStarConfirm=false">取消</button>
+            </div>
+        </div>
+    </div>
+    <!-- 商城兑换确认弹窗 -->
+    <div v-if="showShopConfirm" class="modal-mask">
+        <div class="modal-box">
+            <p>确定兑换【{{shopConfirmItem.name}}】，扣除{{shopConfirmItem.cost}}颗星星？</p>
+            <div class="flex gap-2 mt-4">
+                <button class="btn btn-primary flex-1" @click="confirmShopExchange">确认兑换</button>
+                <button class="btn flex-1" @click="showShopConfirm=false">取消</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const { createClient } = supabase;
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 new Vue({
-  el:"#app",
-  data(){
-    return{
-      isLogin:false,
-      role:"",
-      loginForm:{user:"",pwd:""},
-      tab:"task",
-      starCount:0,
-      plantProgress:0,
-      plantEmoji:"🌱",
+el:'#app',
+data(){
+return{
+    isLogin:false,
+    role:'',
+    loginRole:'parent',
+    loginPwd:'',
+    currentTab:'garden',
+    //任务列表
+    taskList:[],
+    longTaskList:[],
+    wishList:[],
+    starLogList:[],
+    shopList:[],
+    totalStar:0,
 
-      taskList:[],
-      longTaskList:[],
-      wishList:[],
-      shopList:[],
-      starLogList:[],
+    showAddTask:false,
+    newTask:{title:'',desc:'',starNum:1},
+    showAddLongTask:false,
+    newLongTask:{title:'',desc:'',starNum:1},
+    showAddWish:false,
+    newWish:{type:'wish',owner:'child',content:'',cost_star:1},
 
-      showAddTask:false,
-      taskForm:{owner:"child",title:"",task_desc:"",starNum:1,plant:"🌱"},
-      showAddLongTask:false,
-      longTaskForm:{owner:"child",title:"",task_desc:"",starNum:1},
-      showAddWish:false,
-      wishForm:{owner:"child",type:"wish",content:""},
-      showAddShop:false,
-      shopForm:{name:"",cost:1},
+    showLongConfirm:false,
+    longTaskItem:null,
 
-      confirmModal:{
-        show:false,
-        text:"",
-        ok:()=>{},
-        close:()=>{this.confirmModal.show=false;}
-      }
+    showStarConfirm:false,
+    confirmTip:'',
+    starCallback:null,
+
+    showShopConfirm:false,
+    shopConfirmItem:null
+}
+},
+mounted(){
+    this.loadAllData();
+},
+methods:{
+//判断是否今天打卡
+isTodayFinish(finishDateStr){
+    if(!finishDateStr) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return finishDateStr === today;
+},
+openLongTaskConfirm(item){
+    this.longTaskItem = item;
+    this.showLongConfirm = true;
+},
+async confirmLongTaskFinish(){
+    const today = new Date().toISOString().split('T')[0];
+    await supabaseClient.from('long_tasks').update({
+        finish_date: today,
+        status:'待审核'
+    }).eq('id',this.longTaskItem.id);
+    this.showLongConfirm=false;
+    await this.loadAllData();
+},
+async doLogin(){
+    if((this.loginRole==='parent' && this.loginPwd==='1234') || (this.loginRole==='child' && this.loginPwd==='6666')){
+        this.role = this.loginRole;
+        this.isLogin=true;
+        await this.loadAllData();
+    }else{
+        alert('密码错误');
     }
-  },
-  methods:{
-    doLogin(){
-      if(this.loginForm.user==='parent' && this.loginForm.pwd==='1234'){
-        this.role="家长";
-        this.isLogin=true;
-        this.loadAllData();
-      }else if(this.loginForm.user==='child' && this.loginForm.pwd==='6666'){
-        this.role="孩子";
-        this.isLogin=true;
-        this.loadAllData();
-      }else{
-        alert("账号密码错误");
-      }
-    },
-    logout(){
-      this.isLogin=false;
-      this.role="";
-      this.loginForm={user:"",pwd:""};
-    },
-    async loadAllData(){
-      console.log("===开始加载全部数据===");
-      const {data:tasks}=await supabaseClient.from("tasks").select("*");
-      this.taskList = tasks ?? [];
-      console.log("tasks:",this.taskList);
-
-      const {data:longTasks}=await supabaseClient.from("long_tasks").select("*");
-      this.longTaskList = longTasks ?? [];
-      console.log("long_tasks:",this.longTaskList);
-
-      const {data:wishes}=await supabaseClient.from("wish_punish").select("*");
-      this.wishList = wishes ?? [];
-      console.log("wish_punish:",this.wishList);
-
-      const {data:shops}=await supabaseClient.from("shop_goods").select("*");
-      this.shopList = shops ?? [];
-
-      const {data:logs}=await supabaseClient.from("star_logs").select("*").order("id",{asc:false});
-      this.starLogList = logs ?? [];
-
-      this.calcStar();
-      this.calcPlant();
-    },
-    calcStar(){
-      let sum=0;
-      this.starLogList.forEach(l=>{
-        sum += Number(l.change||0);
-      });
-      this.starCount=sum;
-    },
-    calcPlant(){
-      const totalStar=this.starCount;
-      let p=Math.min(100,Math.floor(totalStar/3));
-      this.plantProgress=p;
-      // 自动成长逻辑保留，但是手动点击按钮可以覆盖
-      if(p>=90){
-        this.plantEmoji="🌻";
-      }else if(p>=60){
-        this.plantEmoji="🌳";
-      }else if(p>=30){
-        this.plantEmoji="🌿";
-      }else{
-        this.plantEmoji="🌱";
-      }
-    },
-    openAddTask(){
-      this.taskForm={owner:"child",title:"",task_desc:"",starNum:1,plant:"🌱"};
-      this.showAddTask=true;
-    },
-    async saveTask(){
-      if(!this.taskForm.title){alert("请输入任务名称");return;}
-      try{
-        const res = await supabaseClient.from("tasks").insert([{
-          owner:this.taskForm.owner,
-          title:this.taskForm.title,
-          task_desc:this.taskForm.task_desc,
-          star_num:Number(this.taskForm.starNum||1),
-          plant: this.taskForm.plant,
-          status:"待完成"
-        }]);
-        console.log("保存日常任务返回：",res);
-        this.showAddTask=false;
-        await this.loadAllData();
-      }catch(err){
-        console.error("保存日常任务报错：",err);
-        alert("保存失败："+err.message);
-      }
-    },
-    async delTask(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="确定要删除该日常任务吗？";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("tasks").delete().eq("id",item.id);
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    submitTask(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="确认提交该任务等待家长审核？";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("tasks").update({status:"待审核"}).eq("id",item.id);
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    reSubmitTask(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="确认撤回，回到待完成？";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("tasks").update({status:"待完成"}).eq("id",item.id);
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    auditTask(item,isPass){
-      this.confirmModal.show=true;
-      this.confirmModal.text= isPass?"确定审核通过？":"确定驳回？";
-      this.confirmModal.ok=async ()=>{
-        if(isPass){
-          await supabaseClient.from("tasks").update({status:"已完成"}).eq("id",item.id);
-          await supabaseClient.from("star_logs").insert([{
-            change: Number(item.star_num),
-            log_desc:`任务【${item.title}】完成奖励星星`,
-            create_at:new Date().toLocaleString()
-          }])
+},
+logout(){
+    this.isLogin=false;
+    this.role='';
+},
+async loadAllData(){
+    const {data:tasks} = await supabaseClient.from('tasks').select('*').order('id',{ascending:false});
+    const {data:longTasks} = await supabaseClient.from('long_tasks').select('*').order('id',{ascending:false});
+    const {data:wishes} = await supabaseClient.from('wish_punish').select('*').order('id',{ascending:false});
+    const {data:logs} = await supabaseClient.from('star_log').select('*').order('id',{ascending:false});
+    const {data:shops} = await supabaseClient.from('shop').select('*');
+    this.taskList = tasks || [];
+    this.longTaskList = longTasks || [];
+    this.wishList = wishes || [];
+    this.starLogList = logs || [];
+    this.shopList = shops || [];
+    this.totalStar = logs.reduce((sum,item)=>sum + Number(item.star),0);
+},
+//图片预览（只预览不上传）
+previewImg(task,e){
+    const file = e.target.files[0];
+    if(!file) return;
+    task.tempPreview = URL.createObjectURL(file);
+    task.pendingFile = file;
+},
+//确认提交图片
+async submitTaskImg(task){
+    const file = task.pendingFile;
+    if(!file) return;
+    const fname = Date.now() + '_' + file.name;
+    const {data} = await supabaseClient.storage.from('task_imgs').upload(fname,file);
+    const {data:urlData} = supabaseClient.storage.from('task_imgs').getPublicUrl(fname);
+    await supabaseClient.from('tasks').update({img_url:urlData.publicUrl,status:'待审核'}).eq('id',task.id);
+    task.tempPreview=null;
+    task.pendingFile=null;
+    await this.loadAllData();
+},
+//普通任务
+openAddTaskModal(){this.showAddTask=true;this.newTask={title:'',desc:'',starNum:1};},
+async saveTask(){
+    await supabaseClient.from('tasks').insert([{...this.newTask,status:'待完成'}]);
+    this.showAddTask=false;
+    await this.loadAllData();
+},
+async deleteTask(id){
+    await supabaseClient.from('tasks').delete().eq('id',id);
+    await this.loadAllData();
+},
+async reSubmitTask(task){
+    await supabaseClient.from('tasks').update({img_url:'',status:'待完成'}).eq('id',task.id);
+    await this.loadAllData();
+},
+async checkTask(task,isPass){
+    let starAdd = 0;
+    if(isPass){
+        const now22 = new Date();
+        now22.setHours(22,0,0,0);
+        if(new Date() <= now22){
+            starAdd = Number(task.starNum);
         }else{
-          await supabaseClient.from("tasks").update({status:"待完成"}).eq("id",item.id);
+            starAdd = Math.floor(Number(task.starNum)/2);
         }
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    openAddLongTask(){
-      this.longTaskForm={owner:"child",title:"",task_desc:"",starNum:1};
-      this.showAddLongTask=true;
-    },
-    async saveLongTask(){
-      if(!this.longTaskForm.title){alert("请输入任务名称");return;}
-      try{
-        const res = await supabaseClient.from("long_tasks").insert([{
-          owner:this.longTaskForm.owner,
-          title:this.longTaskForm.title,
-          task_desc:this.longTaskForm.task_desc,
-          star_num:Number(this.longTaskForm.starNum||1),
-          status:"待完成"
-        }]);
-        console.log("保存长期任务返回：",res);
-        this.showAddLongTask=false;
-        await this.loadAllData();
-      }catch(err){
-        console.error("保存长期任务报错：",err);
-        alert("保存失败："+err.message);
-      }
-    },
-    async delLongTask(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="确定删除这条长期任务？";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("long_tasks").delete().eq("id",item.id);
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    submitLongTask(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="标记长期任务完成？";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("long_tasks").update({status:"已完成"}).eq("id",item.id);
-        await supabaseClient.from("star_logs").insert([{
-          change:Number(item.star_num),
-          log_desc:`长期任务【${item.title}】完成奖励`,
-          create_at:new Date().toLocaleString()
-        }])
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    openAddWish(){
-      this.wishForm={owner:"child",type:"wish",content:""};
-      this.showAddWish=true;
-    },
-    async saveWish(){
-      if(!this.wishForm.content){alert("请填写内容");return;}
-      try{
-        const res = await supabaseClient.from("wish_punish").insert([{
-          owner:this.wishForm.owner,
-          type:this.wishForm.type,
-          content:this.wishForm.content,
-          done:false
-        }]);
-        console.log("保存心愿惩罚返回：",res);
-        this.showAddWish=false;
-        await this.loadAllData();
-      }catch(err){
-        console.error("保存心愿惩罚报错：",err);
-        alert("保存失败："+err.message);
-      }
-    },
-    async delWish(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="确定删除心愿/惩罚条目？";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("wish_punish").delete().eq("id",item.id);
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    openAddShop(){
-      this.shopForm={name:"",cost:1};
-      this.showAddShop=true;
-    },
-    async saveShop(){
-      if(!this.shopForm.name){alert("填写商品名称");return;}
-      await supabaseClient.from("shop_goods").insert([{
-        name:this.shopForm.name,
-        cost:Number(this.shopForm.cost||1)
-      }]);
-      this.showAddShop=false;
-      await this.loadAllData();
-    },
-    exchangeShop(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text=`确认兑换【${item.name}】，消耗${item.cost}颗星星？`;
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("star_logs").insert([{
-          change:-Number(item.cost),
-          log_desc:`商城兑换：${item.name}`,
-          create_at:new Date().toLocaleString()
-        }])
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    async delShop(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="确定删除商城商品？";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("shop_goods").delete().eq("id",item.id);
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
-    },
-    revokeStarLog(item){
-      this.confirmModal.show=true;
-      this.confirmModal.text="确定撤销这条星星记录，会反向增减星星";
-      this.confirmModal.ok=async ()=>{
-        await supabaseClient.from("star_logs").insert([{
-          change: -Number(item.change),
-          log_desc:`撤销记录：${item.log_desc}`,
-          create_at:new Date().toLocaleString()
-        }])
-        this.confirmModal.show=false;
-        await this.loadAllData();
-      }
+        await supabaseClient.from('star_log').insert([{star:starAdd,log_desc:`任务【${task.title}】完成奖励`,can_revoke:true}]);
     }
-  }
+    await supabaseClient.from('tasks').update({status:isPass?'审核完成':'驳回'}).eq('id',task.id);
+    await this.loadAllData();
+},
+//长期任务
+openAddLongTaskModal(){this.showAddLongTask=true;this.newLongTask={title:'',desc:'',starNum:1};},
+async saveLongTask(){
+    await supabaseClient.from('long_tasks').insert([{...this.newLongTask,status:'待完成'}]);
+    this.showAddLongTask=false;
+    await this.loadAllData();
+},
+async deleteLongTask(id){
+    await supabaseClient.from('long_tasks').delete().eq('id',id);
+    await this.loadAllData();
+},
+async checkLongTask(item,isPass){
+    let starAdd=0;
+    if(isPass){
+        const now22 = new Date();
+        now22.setHours(22,0,0,0);
+        if(new Date() <= now22){
+            starAdd = Number(item.starNum);
+        }else{
+            starAdd = Math.floor(Number(item.starNum)/2);
+        }
+        await supabaseClient.from('star_log').insert([{star:starAdd,log_desc:`长期任务【${item.title}】奖励`,can_revoke:true}]);
+    }
+    await supabaseClient.from('long_tasks').update({status:isPass?'审核完成':'驳回'}).eq('id',item.id);
+    await this.loadAllData();
+},
+//心愿惩罚
+openAddWishModal(){this.showAddWish=true;this.newWish={type:'wish',owner:'child',content:'',cost_star:1};},
+async saveWish(){
+    await supabaseClient.from('wish_punish').insert([this.newWish]);
+    this.showAddWish=false;
+    await this.loadAllData();
+},
+async deleteWish(id){
+    await supabaseClient.from('wish_punish').delete().eq('id',id);
+    await this.loadAllData();
+},
+//星星撤销
+async revokeStarLog(log){
+    await supabaseClient.from('star_log').insert([{star:-Number(log.star),log_desc:`撤销：${log.log_desc}`,can_revoke:false}]);
+    await supabaseClient.from('star_log').update({can_revoke:false}).eq('id',log.id);
+    await this.loadAllData();
+},
+//商城兑换弹窗
+openShopConfirm(item){
+    this.shopConfirmItem = item;
+    this.showShopConfirm=true;
+},
+async confirmShopExchange(){
+    const cost = Number(this.shopConfirmItem.cost);
+    await supabaseClient.from('star_log').insert([{star:-cost,log_desc:`兑换商品【${this.shopConfirmItem.name}】`,can_revoke:false}]);
+    this.showShopConfirm=false;
+    await this.loadAllData();
+},
+//扣星确认通用
+openStarTip(tip,callback){
+    this.confirmTip = tip;
+    this.showStarConfirm=true;
+    this.starCallback = callback;
+},
+confirmStarAction(){
+    this.starCallback();
+    this.showStarConfirm=false;
+}
+}
 })
 </script>
 </body>
