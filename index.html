@@ -2,92 +2,103 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0"/>
 <title>🌱种植小花园</title>
-<!-- 换成国内稳定CDN -->
-<script src="https://unpkg.com/vue@2.7.14/dist/vue.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
-*{box-sizing:border-box;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:0;background:#f7fff9;}
-.modal-mask{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;}
-.modal-content{background:#fff;padding:24px;border-radius:12px;width:90%;max-width:420px;}
+.loading-wrap{position:fixed;top:0;left:0;width:100%;height:100%;background:#f7fff9;display:flex;align-items:center;justify-content:center;font-size:18px;z-index:99999;}
+.modal-mask{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal-content{background:#fff;padding:24px;border-radius:16px;width:100%;max-width:420px;}
 .plant-item{
   border:2px solid #eee;
-  border-radius:8px;
-  padding:16px;
+  border-radius:12px;
+  padding:20px;
   text-align:center;
-  font-size:36px;
+  font-size:40px;
   cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
 }
 .plant-item.active{
-  border-color:#42b983;
+  border-color:#22c55e;
   background:#f0fff4;
 }
 .btn{
-  padding:10px 16px;
+  padding:14px 16px;
   border:none;
-  border-radius:8px;
-  flex:1;
-  font-size:16px;
+  border-radius:10px;
+  font-size:17px;
 }
 .btn.primary{
-  background:#42b983;
+  background:#22c55e;
   color:white;
 }
-.btn-group{display:flex;gap:10px;}
+.btn-group{display:flex;gap:12px;margin-top:20px;}
+.w-full{width:100%;}
+.p-3{padding:14px;}
+.rounded-lg{border-radius:10px;}
+.my-4{margin:16px 0;}
+.text-center{text-align:center;}
+.mt-10{margin-top:40px;}
+.mt-4{margin-top:16px;}
+.my-8{margin:32px 0;}
+.plant-preview{font-size:80px;height:120px;line-height:120px;text-align:center;}
 </style>
 </head>
 <body>
-<div id="app">
+<!-- 加载遮罩，脚本没就绪一直显示 -->
+<div id="loading" class="loading-wrap">页面加载中...</div>
+
+<div id="app" style="display:none;">
   <!-- 登录区域 -->
   <div v-if="!login">
     <h2 class="text-center mt-10">🌱种植小花园 登录</h2>
     <div class="max-w-sm mx-auto p-4">
       <input v-model="inputPwd" placeholder="输入密码" class="w-full border p-3 rounded-lg my-4" type="password"/>
-      <button @click="doLogin" class="w-full bg-green-500 text-white p-3 rounded-lg">确认登录</button>
+      <button @click="doLogin" class="w-full btn primary">确认登录</button>
     </div>
   </div>
 
   <div v-else>
     <h2 class="text-center mt-4">欢迎，{{ userRole }}</h2>
-    <!-- 花园区域 -->
     <div class="text-center my-8">
       <div style="font-size:60px;margin:20px 0;">{{plantEmoji}}</div>
-      <button @click="openPlantSelectModal" class="bg-green-500 text-white p-3 rounded-lg">选择本周植物</button>
+      <button @click="openPlantSelectModal" class="btn primary">选择本周植物</button>
     </div>
   </div>
 
-  <!-- ========== 植物选择弹窗 ========== -->
+  <!-- 植物选择弹窗 -->
   <div v-if="showModal" class="modal-mask">
     <div class="modal-content">
       <h3>选择本周植物</h3>
-      <div class="plant-preview-wrap" style="margin:16px 0;text-align:center;">
-        <div style="font-size:80px;height:120px;line-height:120px;">{{previewEmoji}}</div>
-        <p>{{previewName}}</p>
+      <div class="plant-preview">
+        {{previewEmoji}}
       </div>
-      <div class="plant-list" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+      <p class="text-center">{{previewName}}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0;">
         <div class="plant-item" :class="{active: selectedType === 'sprout'}" @click="pickPlant('sprout','小嫩芽','🌱')">🌱</div>
         <div class="plant-item" :class="{active: selectedType === 'seedling'}" @click="pickPlant('seedling','幼苗','🌿')">🌿</div>
         <div class="plant-item" :class="{active: selectedType === 'flower'}" @click="pickPlant('flower','小花','🌸')">🌸</div>
         <div class="plant-item" :class="{active: selectedType === 'tree'}" @click="pickPlant('tree','小树','🌳')">🌳</div>
       </div>
       <div class="btn-group">
-        <button @click="closeModal" class="btn">取消</button>
-        <button @click="savePlant" class="btn primary">确认选择</button>
+        <button @click="closeModal" class="btn w-full">取消</button>
+        <button @click="savePlant" class="btn primary w-full">确认选择</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- 脚本放在body末尾，DOM加载完再执行 -->
+<script src="https://unpkg.com/vue@2.7.14/dist/vue.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
 const { createClient } = supabase;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 获取本周周一日期
+// 获取本周周一
 function getWeekStartDate(){
   const now = new Date();
   const day = now.getDay() || 7;
@@ -96,99 +107,120 @@ function getWeekStartDate(){
   return monday.toISOString().split('T')[0];
 }
 
-new Vue({
-  el:"#app",
-  data(){
-    return{
-      login:false,
-      inputPwd:"",
-      userRole:"",
-      roleCode:"",
-      showModal:false,
-      selectedType:"",
-      previewName:"请点击选择植物",
-      previewEmoji:"",
-      plantEmoji:"🌱尚未选择本周植物"
-    }
-  },
-  mounted(){
-    this.loadCurrentPlant();
-  },
-  methods:{
-    doLogin(){
-      if(this.inputPwd === "1234"){
-        this.login = true;
-        this.userRole = "家长";
-        this.roleCode = "parent";
-        this.loadCurrentPlant();
-      }else if(this.inputPwd === "6666"){
-        this.login = true;
-        this.userRole = "孩子";
-        this.roleCode = "child";
-        this.loadCurrentPlant();
-      }else{
-        alert("密码错误！家长：1234，孩子：6666");
+// 等待DOM加载完成
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    const vm = new Vue({
+      el:"#app",
+      data(){
+        return{
+          login:false,
+          inputPwd:"",
+          userRole:"",
+          roleCode:"",
+          showModal:false,
+          selectedType:"",
+          previewName:"请点击选择植物",
+          previewEmoji:"",
+          plantEmoji:"🌱尚未选择本周植物"
+        }
+      },
+      mounted(){
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+      },
+      methods:{
+        doLogin(){
+          if(this.inputPwd === "1234"){
+            this.login = true;
+            this.userRole = "家长";
+            this.roleCode = "parent";
+            this.loadCurrentPlant();
+          }else if(this.inputPwd === "6666"){
+            this.login = true;
+            this.userRole = "孩子";
+            this.roleCode = "child";
+            this.loadCurrentPlant();
+          }else{
+            alert("密码错误！家长：1234，孩子：6666");
+          }
+        },
+        async loadCurrentPlant(){
+          try{
+            const weekStart = getWeekStartDate();
+            const {data,error} = await supabase
+              .from('plant_settings')
+              .select('plant_type')
+              .eq('role', this.roleCode)
+              .eq('week_start_date', weekStart)
+            if(error) throw error;
+            if(data && data.length>0){
+              const map = {sprout:'🌱',seedling:'🌿',flower:'🌸',tree:'🌳'};
+              this.plantEmoji = map[data[0].plant_type];
+            }else{
+              this.plantEmoji = "🌱尚未选择本周植物";
+            }
+          }catch(e){
+            console.error(e);
+            alert("读取植物信息失败："+e.message);
+          }
+        },
+        async openPlantSelectModal(){
+          try{
+            const weekStart = getWeekStartDate();
+            const {data,error} = await supabase
+              .from('plant_settings')
+              .select('*')
+              .eq('role', this.roleCode)
+              .eq('week_start_date', weekStart)
+            if(error) throw error;
+            if(data && data.length>0){
+              alert("本周植物已经选定，本周不可修改，请等待周重置");
+              return;
+            }
+            this.selectedType = "";
+            this.previewName = "请点击选择植物";
+            this.previewEmoji = "";
+            this.showModal = true;
+          }catch(e){
+            alert("查询失败："+e.message);
+          }
+        },
+        pickPlant(type,name,emoji){
+          this.selectedType = type;
+          this.previewName = name;
+          this.previewEmoji = emoji;
+        },
+        closeModal(){
+          this.showModal = false;
+        },
+        async savePlant(){
+          if(!this.selectedType){
+            alert("请先选择一个植物");
+            return;
+          }
+          try{
+            const weekStart = getWeekStartDate();
+            const {error} = await supabase
+              .from('plant_settings')
+              .insert([{
+                role: this.roleCode,
+                plant_type: this.selectedType,
+                week_start_date: weekStart
+              }])
+            if(error) throw error;
+            alert("✅植物选择完成！本周锁定不可修改");
+            this.showModal = false;
+            await this.loadCurrentPlant();
+          }catch(e){
+            alert("保存失败："+e.message);
+          }
+        }
       }
-    },
-    async loadCurrentPlant(){
-      const weekStart = getWeekStartDate();
-      const {data} = await supabase
-        .from('plant_settings')
-        .select('plant_type')
-        .eq('role', this.roleCode)
-        .eq('week_start_date', weekStart)
-      if(data && data.length>0){
-        const map = {sprout:'🌱',seedling:'🌿',flower:'🌸',tree:'🌳'};
-        this.plantEmoji = map[data[0].plant_type];
-      }else{
-        this.plantEmoji = "🌱尚未选择本周植物";
-      }
-    },
-    async openPlantSelectModal(){
-      const weekStart = getWeekStartDate();
-      const {data} = await supabase
-        .from('plant_settings')
-        .select('*')
-        .eq('role', this.roleCode)
-        .eq('week_start_date', weekStart)
-      if(data && data.length>0){
-        alert("本周植物已经选定，本周不可修改，请等待周重置");
-        return;
-      }
-      this.selectedType = "";
-      this.previewName = "请点击选择植物";
-      this.previewEmoji = "";
-      this.showModal = true;
-    },
-    pickPlant(type,name,emoji){
-      this.selectedType = type;
-      this.previewName = name;
-      this.previewEmoji = emoji;
-    },
-    closeModal(){
-      this.showModal = false;
-    },
-    async savePlant(){
-      if(!this.selectedType){
-        alert("请先选择一个植物");
-        return;
-      }
-      const weekStart = getWeekStartDate();
-      const {error} = await supabase
-        .from('plant_settings')
-        .insert([{
-          role: this.roleCode,
-          plant_type: this.selectedType,
-          week_start_date: weekStart
-        }])
-      if(error){
-        alert("保存失败："+error.message);
-        return;
-      }
-      alert("植物选择完成！本周锁定不可修改");
-      this.showModal = false;
-      await this.loadCurrentPlant();
-    }
+    })
+  }catch(err){
+    document.getElementById('loading').innerText = '页面初始化失败，请下拉刷新重试';
+    console.error(err);
   }
 })
 </script>
