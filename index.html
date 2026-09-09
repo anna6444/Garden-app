@@ -3,212 +3,32 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0"/>
-<title>🌱种植小花园</title>
+<title>🌱种植小花园-静态测试</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:0;background:#f7fff9;}
-.loading-wrap{position:fixed;top:0;left:0;width:100%;height:100%;background:#f7fff9;display:flex;align-items:center;justify-content:center;font-size:18px;z-index:99999;}
-.hide{display:none !important;}
-.modal-mask{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
-.modal-content{background:#fff;padding:24px;border-radius:16px;width:100%;max-width:420px;}
-.plant-item{
-  border:2px solid #eee;
-  border-radius:12px;
-  padding:20px;
-  text-align:center;
-  font-size:40px;
-  cursor:pointer;
-}
-.plant-item.active{
-  border-color:#22c55e;
-  background:#f0fff4;
-}
-.btn{
-  padding:14px 16px;
-  border:none;
-  border-radius:10px;
-  font-size:17px;
-}
-.btn.primary{
-  background:#22c55e;
-  color:white;
-}
-.btn-group{display:flex;gap:12px;margin-top:20px;}
-.w-full{width:100%;}
-.p-3{padding:14px;}
-.rounded-lg{border-radius:10px;}
-.my-4{margin:16px 0;}
-.text-center{text-align:center;}
-.mt-10{margin-top:40px;}
-.mt-4{margin-top:16px;}
-.my-8{margin:32px 0;}
-.plant-preview{font-size:80px;height:120px;line-height:120px;text-align:center;}
-.max-w-sm{max-width:420px;margin:0 auto;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:20px;background:#f7fff9;}
+.wrap{max-width:420px;margin:50px auto;}
+h2{text-align:center;}
+input{width:100%;padding:14px;border:1px solid #ccc;border-radius:10px;margin:16px 0;font-size:17px;}
+button{width:100%;padding:14px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:17px;}
 </style>
 </head>
 <body>
-<div id="loading" class="loading-wrap">页面加载中...</div>
-<div id="app" class="hide">
-  <!--登录页面-->
-  <div id="loginView">
-    <h2 class="text-center mt-10">🌱种植小花园 登录</h2>
-    <div class="max-w-sm p-4">
-      <input id="pwdInput" placeholder="输入密码" class="w-full border p-3 rounded-lg my-4" type="password"/>
-      <button onclick="doLogin()" class="w-full btn primary">确认登录</button>
-    </div>
-  </div>
-
-  <!--主页面-->
-  <div id="mainView" class="hide">
-    <h2 class="text-center mt-4">欢迎，<span id="roleName"></span></h2>
-    <div class="text-center my-8">
-      <div id="plantShow" style="font-size:60px;margin:20px 0;">🌱尚未选择本周植物</div>
-      <button onclick="openPlantModal()" class="btn primary">选择本周植物</button>
-    </div>
-  </div>
-
-  <!--弹窗-->
-  <div id="plantModal" class="modal-mask hide">
-    <div class="modal-content">
-      <h3>选择本周植物</h3>
-      <div class="plant-preview" id="previewEmoji"></div>
-      <p class="text-center" id="previewName">请点击选择植物</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0;">
-        <div class="plant-item" onclick="pickPlant('sprout','小嫩芽','🌱')">🌱</div>
-        <div class="plant-item" onclick="pickPlant('seedling','幼苗','🌿')">🌿</div>
-        <div class="plant-item" onclick="pickPlant('flower','小花','🌸')">🌸</div>
-        <div class="plant-item" onclick="pickPlant('tree','小树','🌳')">🌳</div>
-      </div>
-      <div class="btn-group">
-        <button onclick="closeModal()" class="btn w-full">取消</button>
-        <button onclick="savePlant()" class="btn primary w-full">确认选择</button>
-      </div>
-    </div>
-  </div>
+<div class="wrap">
+  <h2>🌱种植小花园【测试页面】</h2>
+  <p>✅页面加载成功！</p>
+  <input id="pwd" placeholder="输入密码" type="password"/>
+  <button onclick="checkPwd()">登录</button>
+  <p id="msg" style="margin-top:20px;text-align:center;"></p>
 </div>
-
-<!--Supabase JS CDN，只引入这一个，去掉Vue！减少加载压力-->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
-const { createClient } = supabase;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let userRoleCode = "";
-let selectedType = "";
-let selectedEmoji = "";
-let selectedPlantName = "";
-
-//获取本周周一日期
-function getWeekStartDate(){
-  const now = new Date();
-  const day = now.getDay() ||7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - day + 1);
-  return monday.toISOString().split('T')[0];
-}
-
-//登录
-function doLogin(){
-  const pwd = document.getElementById("pwdInput").value;
-  if(pwd === "1234"){
-    userRoleCode = "parent";
-    document.getElementById("roleName").innerText = "家长";
-    showMainPage();
-  }else if(pwd === "6666"){
-    userRoleCode = "child";
-    document.getElementById("roleName").innerText = "孩子";
-    showMainPage();
+function checkPwd(){
+  const val = document.getElementById('pwd').value;
+  if(val === '1234' || val === '6666'){
+    document.getElementById('msg').innerText = '登录成功！静态页面正常';
   }else{
-    alert("密码错误！家长1234 / 孩子6666");
+    document.getElementById('msg').innerText = '密码错误';
   }
-}
-
-async function showMainPage(){
-  document.getElementById("loginView").classList.add("hide");
-  document.getElementById("mainView").classList.remove("hide");
-  await loadPlantData();
-}
-
-//读取已选植物
-async function loadPlantData(){
-  const weekStart = getWeekStartDate();
-  const {data,error} = await supabase.from("plant_settings")
-    .select("plant_type")
-    .eq("role",userRoleCode)
-    .eq("week_start_date",weekStart);
-  if(error){
-    alert("读取失败:"+error.message);
-    return;
-  }
-  const map = {sprout:"🌱",seedling:"🌿",flower:"🌸",tree:"🌳"};
-  if(data.length>0){
-    document.getElementById("plantShow").innerText = map[data[0].plant_type];
-  }else{
-    document.getElementById("plantShow").innerText = "🌱尚未选择本周植物";
-  }
-}
-
-async function openPlantModal(){
-  const weekStart = getWeekStartDate();
-  const {data,error} = await supabase.from("plant_settings")
-    .select("*")
-    .eq("role",userRoleCode)
-    .eq("week_start_date",weekStart);
-  if(error){
-    alert("查询失败:"+error.message);
-    return;
-  }
-  if(data.length>0){
-    alert("本周植物已经选定，本周不可修改，请等待周重置");
-    return;
-  }
-  //重置选择
-  selectedType = "";
-  selectedEmoji = "";
-  selectedPlantName = "";
-  document.getElementById("previewEmoji").innerText = "";
-  document.getElementById("previewName").innerText = "请点击选择植物";
-  document.getElementById("plantModal").classList.remove("hide");
-}
-
-function pickPlant(type,name,emoji){
-  selectedType = type;
-  selectedEmoji = emoji;
-  selectedPlantName = name;
-  document.getElementById("previewEmoji").innerText = emoji;
-  document.getElementById("previewName").innerText = name;
-}
-
-function closeModal(){
-  document.getElementById("plantModal").classList.add("hide");
-}
-
-async function savePlant(){
-  if(!selectedType){
-    alert("请先选择植物！");
-    return;
-  }
-  const weekStart = getWeekStartDate();
-  const {error} = await supabase.from("plant_settings").insert([{
-    role:userRoleCode,
-    plant_type:selectedType,
-    week_start_date:weekStart
-  }]);
-  if(error){
-    alert("保存失败:"+error.message);
-    return;
-  }
-  alert("✅植物选择完成！本周锁定");
-  closeModal();
-  await loadPlantData();
-}
-
-//页面就绪后关闭loading
-window.onload = async function(){
-  document.getElementById("loading").classList.add("hide");
-  document.getElementById("app").classList.remove("hide");
 }
 </script>
 </body>
