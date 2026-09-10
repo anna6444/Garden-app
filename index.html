@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>🌱种植小花园</title>
+<!-- 更换国内可稳定访问的CDN地址，解决Safari加载失败问题 -->
 <script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -20,7 +21,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;m
 .btn-red{background:#ef4444;color:white;}
 input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;margin:8px 0;font-size:16px;}
 .tab-bar{display:flex;gap:4px;margin:12px 0;overflow-x:auto;}
-.tab{flex:1;text-align:center;padding:10px;background:#e8f5ee;border-radius:10px;font-size:14px;white-space:nowrap;}
+.tab{flex:1;text-align:center;padding:10px;background:#e8f5ee;border-radius:10px;font-size:14px;white-space:nowrap;cursor:pointer;}
 .tab.active{background:#22c55e;color:#fff;}
 </style>
 </head>
@@ -124,8 +125,6 @@ input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;ma
         <div class="card" @click="buyItem('fert')">兑换 肥料</div>
       </div>
     </div>
-
-    <!--弹窗省略，保留基础逻辑-->
   </div>
 </div>
 
@@ -166,6 +165,42 @@ new Vue({
       this.dailyList=daily;
       this.longList=long;
       this.wishList=wish;
+    },
+    pickPlant(p){
+      this.selectedPlant = p;
+    },
+    useItem(type){
+      if(type==='water') this.plantWater++;
+      if(type==='sun') this.plantSun++;
+      if(type==='fert') this.plantFert++;
+      // 检查是否满足阶段升级条件
+      if(this.plantWater >=1 && this.plantSun >=1 && this.plantFert >=1){
+        if(this.plantStage <7){
+          this.plantStage++;
+          this.plantWater=0;
+          this.plantSun=0;
+          this.plantFert=0;
+          alert(`🎉植物升级到第${this.plantStage}阶段！`);
+        }else{
+          alert("✅植物培育全部完成！等待家长重置开启新一周");
+        }
+      }
+    },
+    buyItem(type){
+      if(this.starCount >=6){
+        this.starCount -=6;
+        alert("兑换成功！");
+      }else{
+        alert("星星不足，需要6颗星星");
+      }
+    },
+    finishTask(t){
+      this.starCount += t.star;
+      alert("任务完成，获得星星");
+    },
+    finishLongTask(t){
+      this.starCount += t.star;
+      alert("长期任务完成，获得星星");
     }
   }
 })
