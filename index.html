@@ -2,166 +2,470 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>🌱种植小花园</title>
 <style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:rgba(0,0,0,0.1);touch-action:manipulation;}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:0;padding:20px;background:#f7fff9;}
-.wrap{max-width:420px;margin:50px auto;}
-h2{text-align:center;}
-input{width:100%;padding:14px;border:1px solid #ccc;border-radius:10px;margin:16px 0;font-size:17px;}
-button{width:100%;padding:14px;background:#22c55e;color:#fff;border:none;border-radius:10px;font-size:17px;cursor:pointer;}
-button:active{opacity:0.7;}
-.hide{display:none !important;}
-.modal-mask{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
-.modal-content{background:#fff;padding:24px;border-radius:16px;width:100%;max-width:420px;}
-.plant-item{
-  border:2px solid #eee;
-  border-radius:12px;
-  padding:20px;
-  text-align:center;
-  font-size:40px;
-  cursor:pointer;
-}
-.plant-item.active{
-  border-color:#22c55e;
-  background:#f0fff4;
-}
-.btn-group{display:flex;gap:12px;margin-top:20px;}
-.w-full{width:100%;}
-.plant-preview{font-size:80px;height:120px;line-height:120px;text-align:center;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f7f2;color:#333;padding-bottom:80px;}
+.page{max-width:480px;margin:0 auto;padding:12px;}
+.card{background:#fff;border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+.card h3{font-size:16px;margin-bottom:10px;color:#2c5e36;}
+.tab-bar{display:flex;background:#fff;border-radius:12px;overflow:hidden;margin:10px 0;position:sticky;top:0;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+.tab-item{flex:1;text-align:center;padding:14px 4px;font-size:14px;cursor:pointer;transition:all .2s;}
+.tab-item.active{background:#34d399;color:#fff;font-weight:bold;}
+.btn{padding:12px 16px;border:none;border-radius:10px;font-size:15px;cursor:pointer;margin:4px 0;}
+.btn-primary{background:#34d399;color:#fff;width:100%;}
+.btn-danger{background:#f87171;color:#fff;width:100%;}
+.btn-gray{background:#e5e7eb;color:#333;}
+.btn-sm{padding:8px 12px;font-size:13px;width:auto;}
+input,select,textarea{width:100%;border:1px solid #ddd;border-radius:8px;padding:12px;margin:6px 0;font-size:16px;}
+input:focus{outline:none;border-color:#34d399;}
+.modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99;display:none;align-items:flex-end;justify-content:center;}
+.modal-mask.show{display:flex;}
+.modal-box{background:#fff;border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto;}
+.task-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0;}
+.task-item:last-child{border-bottom:none;}
+.task-info{flex:1;}
+.task-title{font-size:15px;font-weight:500;}
+.task-meta{font-size:12px;color:#888;margin-top:4px;}
+.star-big{font-size:32px;text-align:center;margin:10px 0;}
+.res-row{display:flex;justify-content:space-around;margin:10px 0;font-size:14px;}
+.plant-display{text-align:center;font-size:72px;margin:16px 0;}
+.stage-dots{display:flex;justify-content:center;gap:8px;margin:16px 0;}
+.stage-dot{width:24px;height:24px;border-radius:50%;background:#ddd;}
+.stage-dot.done{background:#34d399;}
+.login-box{max-width:360px;margin:60px auto;padding:24px;}
+.wish-item{padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:15px;}
 </style>
 </head>
 <body>
-<div class="wrap" id="loginView">
-  <h2>🌱种植小花园</h2>
-  <input id="pwd" placeholder="输入密码" type="password"/>
-  <button id="loginBtn">登录</button>
-  <p id="msg" style="margin-top:20px;text-align:center;"></p>
-</div>
+<div class="page" id="app">
 
-<div class="wrap hide" id="mainView">
-  <h2>欢迎，<span id="roleName"></span></h2>
-  <div style="text-align:center;margin:30px 0;">
-    <div id="plantShow" style="font-size:60px;margin:20px 0;">🌱尚未选择本周植物</div>
-    <button id="openPlantBtn">选择本周植物</button>
+  <!-- 登录页 -->
+  <div id="loginView" class="login-box card">
+    <h2 style="text-align:center;margin-bottom:20px;">🌱 种植小花园</h2>
+    <label style="font-size:14px;color:#666;">账号</label>
+    <input id="loginAccount" placeholder="parent / child" autocomplete="off"/>
+    <label style="font-size:14px;color:#666;">密码</label>
+    <input id="loginPwd" type="password" placeholder="输入密码"/>
+    <button class="btn btn-primary" style="margin-top:12px;" onclick="doLogin()">登 录</button>
+  </div>
+
+  <!-- 主页面 -->
+  <div id="mainView" style="display:none;">
+    <div class="tab-bar">
+      <div class="tab-item active" data-tab="home" onclick="switchTab('home')">🏠 花园</div>
+      <div class="tab-item" data-tab="task" onclick="switchTab('task')">📋 任务</div>
+      <div class="tab-item" data-tab="shop" onclick="switchTab('shop')">🏪 商城</div>
+      <div class="tab-item" data-tab="admin" onclick="switchTab('admin')" id="adminTab" style="display:none;">⚙️ 管理</div>
+    </div>
+
+    <!-- 花园页 -->
+    <div id="tab-home">
+      <div class="card">
+        <div class="star-big">⭐ <span id="starCount">0</span></div>
+        <div class="res-row">
+          <span>☀️ 阳光 <b id="resSun">0</b></span>
+          <span>💧 水 <b id="resWater">0</b></span>
+          <span>🌱 肥料 <b id="resFert">0</b></span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🌿 本周植物</h3>
+        <div id="plantEmpty">
+          <p style="color:#888;margin-bottom:12px;">还未选择本周植物，点击下方选择：</p>
+          <div id="plantOptions"></div>
+        </div>
+        <div id="plantHas" style="display:none;">
+          <div class="plant-display" id="plantEmoji">🌱</div>
+          <p style="text-align:center;font-size:15px;">阶段 <b id="curStage">1</b> / 7</p>
+          <p style="text-align:center;font-size:13px;color:#888;margin:8px 0;" id="stageText">种子发芽</p>
+          <div class="stage-dots" id="stageDots"></div>
+          <button class="btn btn-primary" onclick="feedPlant()">提交培育物资</button>
+          <p id="plantDoneTip" style="display:none;text-align:center;color:#34d399;margin-top:8px;">✅ 植物培育完成！</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 任务页 -->
+    <div id="tab-task" style="display:none;">
+      <div class="card">
+        <h3>📅 日常任务</h3>
+        <div id="dailyTaskList"></div>
+        <button class="btn btn-primary btn-sm" id="addDailyBtn" style="display:none;" onclick="openModal('dailyModal')">+ 新增日常任务</button>
+      </div>
+      <div class="card">
+        <h3>⏳ 长期任务</h3>
+        <div id="longTaskList"></div>
+        <button class="btn btn-primary btn-sm" id="addLongBtn" style="display:none;" onclick="openModal('longModal')">+ 新增长期任务</button>
+      </div>
+      <div class="card">
+        <h3>💖 心愿清单</h3>
+        <div id="wishList"></div>
+        <button class="btn btn-primary btn-sm" id="addWishBtn" style="display:none;" onclick="openModal('wishModal')">+ 新增心愿</button>
+      </div>
+    </div>
+
+    <!-- 商城页 -->
+    <div id="tab-shop" style="display:none;">
+      <div class="card">
+        <h3>🏪 物资商城</h3>
+        <p style="font-size:13px;color:#888;margin-bottom:12px;">6 颗星兑换 1 份物资</p>
+        <button class="btn btn-primary" onclick="exchange('sun')">☀️ 兑换阳光（6⭐）</button>
+        <button class="btn btn-primary" onclick="exchange('water')">💧 兑换水（6⭐）</button>
+        <button class="btn btn-primary" onclick="exchange('fertilizer')">🌱 兑换肥料（6⭐）</button>
+      </div>
+    </div>
+
+    <!-- 管理页 -->
+    <div id="tab-admin" style="display:none;">
+      <div class="card">
+        <h3>⚙️ 家长管理</h3>
+        <button class="btn btn-gray" style="margin-bottom:8px;" onclick="resetWeek()">🔄 重置本周植物周期</button>
+        <button class="btn btn-danger" onclick="settleNightTask()">⏰ 执行 21:30 任务结算</button>
+        <p style="font-size:12px;color:#888;margin-top:12px;line-height:1.6;">
+          · 重置：清空本周植物，可重新选择<br/>
+          · 结算：未完成日常任务每项扣1星并清空
+        </p>
+      </div>
+    </div>
   </div>
 </div>
 
-<div id="plantModal" class="modal-mask hide">
-  <div class="modal-content">
-    <h3>选择本周植物</h3>
-    <div class="plant-preview" id="previewEmoji"></div>
-    <p class="text-center" id="previewName">请点击选择植物</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0;">
-      <div class="plant-item" data-type="sprout" data-name="小嫩芽" data-emoji="🌱">🌱</div>
-      <div class="plant-item" data-type="seedling" data-name="幼苗" data-emoji="🌿">🌿</div>
-      <div class="plant-item" data-type="flower" data-name="小花" data-emoji="🌸">🌸</div>
-      <div class="plant-item" data-type="tree" data-name="小树" data-emoji="🌳">🌳</div>
-    </div>
-    <div class="btn-group">
-      <button id="closeModalBtn" class="btn w-full">取消</button>
-      <button id="savePlantBtn" class="btn w-full">确认选择</button>
+<!-- 新增日常任务弹窗 -->
+<div class="modal-mask" id="dailyModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;">新增日常任务</h3>
+    <input id="dailyTitle" placeholder="任务名称，如：背10个单词"/>
+    <input id="dailyEnd" placeholder="截止时间，如：今天20:00"/>
+    <input id="dailyStar" type="number" placeholder="奖励星星数，如：2" value="2"/>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('dailyModal')">关闭</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="saveDailyTask()">保存</button>
     </div>
   </div>
 </div>
 
+<!-- 新增长期任务弹窗 -->
+<div class="modal-mask" id="longModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;">新增长期任务</h3>
+    <input id="longTitle" placeholder="任务名称，如：读完一本书"/>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('longModal')">关闭</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="saveLongTask()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新增心愿弹窗 -->
+<div class="modal-mask" id="wishModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;">新增心愿</h3>
+    <input id="wishTitle" placeholder="心愿内容，如：周末去动物园"/>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('wishModal')">关闭</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="saveWish()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 使用本地supabase.js文件 -->
+<script src="./supabase.js"></script>
 <script>
-let userRoleCode = "";
-let selectedType = "";
-let selectedEmoji = "";
-let selectedPlantName = "";
+// ===== 配置 =====
+const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
+const { createClient } = supabase;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-//获取本周周一
-function getWeekStartDate(){
-  const now = new Date();
-  const day = now.getDay() ||7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - day + 1);
-  return monday.toISOString().split('T')[0];
+const PLANT_LIST = [
+  {id:1, name:"向日葵", emoji:"🌻"},
+  {id:2, name:"小番茄", emoji:"🍅"},
+  {id:3, name:"小多肉", emoji:"🪴"}
+];
+const STAGE_TEXTS = ["种子发芽","长出小苗","长叶片","抽枝长茎","含苞待放","开花啦","结果丰收"];
+
+// ===== 状态 =====
+let isParent = false;
+let starCount = 0;
+let res = {sun:0, water:0, fertilizer:0};
+let currentPlant = null;
+let currentStage = 1;
+let plantDone = false;
+let dailyTasks = [];
+let longTasks = [];
+let wishList = [];
+
+// ===== 初始化 =====
+window.onload = function(){
+  //页面加载直接显示登录框
+};
+
+// ===== 登录 =====
+function doLogin(){
+  const acc = document.getElementById("loginAccount").value.trim();
+  const pwd = document.getElementById("loginPwd").value.trim();
+  if(acc === "parent" && pwd === "1234"){
+    isParent = true;
+  }else if(acc === "child" && pwd === "6666"){
+    isParent = false;
+  }else{
+    alert("账号或密码错误！");
+    return;
+  }
+  document.getElementById("loginView").style.display = "none";
+  document.getElementById("mainView").style.display = "block";
+  if(isParent){
+    document.getElementById("adminTab").style.display = "block";
+    document.getElementById("addDailyBtn").style.display = "inline-block";
+    document.getElementById("addLongBtn").style.display = "inline-block";
+    document.getElementById("addWishBtn").style.display = "inline-block";
+  }
+  loadAllData();
 }
 
-//读取本地存储
-function loadLocalPlant(){
-  const week = getWeekStartDate();
-  const key = "plant_"+userRoleCode+"_"+week;
-  const data = localStorage.getItem(key);
-  const map = {sprout:"🌱",seedling:"🌿",flower:"🌸",tree:"🌳"};
+// ===== Tab切换 =====
+function switchTab(name){
+  document.querySelectorAll(".tab-item").forEach(t=>t.classList.remove("active"));
+  document.querySelector('.tab-item[data-tab="'+name+'"]').classList.add("active");
+  ["home","task","shop","admin"].forEach(t=>{
+    document.getElementById("tab-"+t).style.display = (t===name)?"block":"none";
+  });
+}
+
+// ===== 弹窗 =====
+function openModal(id){ document.getElementById(id).classList.add("show"); }
+function closeModal(id){ document.getElementById(id).classList.remove("show"); }
+
+// ===== 加载全部数据 =====
+async function loadAllData(){
+  await loadStarInfo();
+  await loadPlantStatus();
+  await loadTasks();
+  await renderAll();
+}
+
+async function loadStarInfo(){
+  const {data,error} = await supabase.from("star_info").select("*").eq("id",1).single();
+  if(error && error.code !== "PGRST116"){ console.error(error); return; }
   if(data){
-    document.getElementById("plantShow").innerText = map[data];
-  }else{
-    document.getElementById("plantShow").innerText = "🌱尚未选择本周植物";
+    starCount = data.star || 0;
+    res.sun = data.sun || 0;
+    res.water = data.water || 0;
+    res.fertilizer = data.fertilizer || 0;
   }
 }
 
-//登录
-document.getElementById("loginBtn").addEventListener('click',function(){
-  const val = document.getElementById('pwd').value;
-  if(val === '1234'){
-    userRoleCode = "parent";
-    document.getElementById('roleName').innerText = "家长";
-    document.getElementById("loginView").classList.add("hide");
-    document.getElementById("mainView").classList.remove("hide");
-    loadLocalPlant();
-  }else if(val === '6666'){
-    userRoleCode = "child";
-    document.getElementById('roleName').innerText = "孩子";
-    document.getElementById("loginView").classList.add("hide");
-    document.getElementById("mainView").classList.remove("hide");
-    loadLocalPlant();
+async function loadPlantStatus(){
+  const {data,error} = await supabase.from("plant_status").select("*").eq("id",1).single();
+  if(error && error.code !== "PGRST116"){ console.error(error); return; }
+  if(data){
+    currentPlant = data.plant;
+    currentStage = data.stage || 1;
+    plantDone = data.done || false;
+  }
+}
+
+async function loadTasks(){
+  const {data:d} = await supabase.from("daily_tasks").select("*").order("id",{ascending:false});
+  dailyTasks = d || [];
+  const {data:l} = await supabase.from("long_tasks").select("*").order("id",{ascending:false});
+  longTasks = l || [];
+  const {data:w} = await supabase.from("wish").select("*").order("id",{ascending:false});
+  wishList = w || [];
+}
+
+// ===== 渲染 =====
+function renderAll(){
+  // 星星和物资
+  document.getElementById("starCount").innerText = starCount;
+  document.getElementById("resSun").innerText = res.sun;
+  document.getElementById("resWater").innerText = res.water;
+  document.getElementById("resFert").innerText = res.fertilizer;
+
+  // 植物
+  const emptyDiv = document.getElementById("plantEmpty");
+  const hasDiv = document.getElementById("plantHas");
+  if(!currentPlant){
+    emptyDiv.style.display = "block";
+    hasDiv.style.display = "none";
+    let html = "";
+    PLANT_LIST.forEach(p=>{
+      html += `<button class="btn btn-primary" style="margin:6px 0;" onclick="pickPlant(${p.id})">${p.emoji} 选择${p.name}</button>`;
+    });
+    document.getElementById("plantOptions").innerHTML = html;
   }else{
-    document.getElementById('msg').innerText = "密码错误";
+    emptyDiv.style.display = "none";
+    hasDiv.style.display = "block";
+    const p = PLANT_LIST.find(x=>x.id===currentPlant);
+    document.getElementById("plantEmoji").innerText = p ? p.emoji : "🌱";
+    document.getElementById("curStage").innerText = currentStage;
+    document.getElementById("stageText").innerText = STAGE_TEXTS[currentStage-1] || "";
+    document.getElementById("plantDoneTip").style.display = plantDone ? "block" : "none";
+    let dotsHtml = "";
+    for(let i=1;i<=7;i++){
+      dotsHtml += `<div class="stage-dot ${i<=currentStage?'done':''}"></div>`;
+    }
+    document.getElementById("stageDots").innerHTML = dotsHtml;
   }
-});
 
-//打开弹窗
-document.getElementById("openPlantBtn").addEventListener('click',function(){
-  const week = getWeekStartDate();
-  const key = "plant_"+userRoleCode+"_"+week;
-  const saved = localStorage.getItem(key);
-  if(saved){
-    alert("本周植物已经选定，本周不可修改，请等待周重置");
+  // 日常任务
+  let dh = "";
+  dailyTasks.forEach(t=>{
+    dh += `<div class="task-item">
+      <div class="task-info">
+        <div class="task-title">${t.title}</div>
+        <div class="task-meta">截止 ${t.end_time} · ⭐${t.star}星</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="finishTask(${t.id})">完成</button>
+    </div>`;
+  });
+  document.getElementById("dailyTaskList").innerHTML = dh || '<p style="color:#aaa;font-size:13px;">暂无日常任务</p>';
+
+  // 长期任务
+  let lh = "";
+  longTasks.forEach(t=>{
+    lh += `<div class="task-item">
+      <div class="task-info"><div class="task-title">${t.title}</div></div>
+      <button class="btn btn-primary btn-sm" onclick="finishLongTask(${t.id})">完成</button>
+    </div>`;
+  });
+  document.getElementById("longTaskList").innerHTML = lh || '<p style="color:#aaa;font-size:13px;">暂无长期任务</p>';
+
+  // 心愿
+  let wh = "";
+  wishList.forEach(t=>{
+    wh += `<div class="wish-item">💖 ${t.title}</div>`;
+  });
+  document.getElementById("wishList").innerHTML = wh || '<p style="color:#aaa;font-size:13px;">暂无心愿</p>';
+}
+
+// ===== 植物操作 =====
+async function pickPlant(plantId){
+  const p = PLANT_LIST.find(x=>x.id===plantId);
+  const {error} = await supabase.from("plant_status").upsert({id:1, plant:plantId, stage:1, done:false});
+  if(error){ alert("保存失败："+error.message); return; }
+  currentPlant = plantId;
+  currentStage = 1;
+  plantDone = false;
+  renderAll();
+}
+
+async function feedPlant(){
+  if(res.sun<1 || res.water<1 || res.fertilizer<1){
+    alert("物资不足！需要阳光、水、肥料各1份");
     return;
   }
-  selectedType = "";
-  selectedEmoji = "";
-  selectedPlantName = "";
-  document.getElementById("previewEmoji").innerText = "";
-  document.getElementById("previewName").innerText = "请点击选择植物";
-  document.getElementById("plantModal").classList.remove("hide");
-});
+  if(plantDone){ alert("本周植物已经培育完成啦！"); return; }
+  res.sun--; res.water--; res.fertilizer--;
+  currentStage++;
+  if(currentStage>=7){ currentStage=7; plantDone=true; }
+  await saveStarAndPlant();
+  renderAll();
+  if(plantDone) alert("🎉 恭喜！植物培育完成！");
+}
 
-//选择植物
-document.querySelectorAll(".plant-item").forEach(item=>{
-  item.addEventListener('click',function(){
-    document.querySelectorAll(".plant-item").forEach(i=>i.classList.remove("active"));
-    this.classList.add("active");
-    selectedType = this.dataset.type;
-    selectedEmoji = this.dataset.emoji;
-    selectedPlantName = this.dataset.name;
-    document.getElementById("previewEmoji").innerText = selectedEmoji;
-    document.getElementById("previewName").innerText = selectedPlantName;
-  })
-})
+async function saveStarAndPlant(){
+  await supabase.from("star_info").upsert({id:1, star:starCount, sun:res.sun, water:res.water, fertilizer:res.fertilizer});
+  await supabase.from("plant_status").upsert({id:1, plant:currentPlant, stage:currentStage, done:plantDone});
+}
 
-//关闭弹窗
-document.getElementById("closeModalBtn").addEventListener('click',function(){
-  document.getElementById("plantModal").classList.add("hide");
-});
+// ===== 商城兑换 =====
+async function exchange(type){
+  if(starCount<6){ alert("星星不足！需要6颗星兑换"); return; }
+  starCount -= 6;
+  res[type]++;
+  await saveStarAndPlant();
+  renderAll();
+  alert("兑换成功！");
+}
 
-//保存植物到本地
-document.getElementById("savePlantBtn").addEventListener('click',function(){
-  if(!selectedType){
-    alert("请先选择植物！");
-    return;
+// ===== 任务操作 =====
+async function saveDailyTask(){
+  const title = document.getElementById("dailyTitle").value.trim();
+  const end_time = document.getElementById("dailyEnd").value.trim();
+  const star = parseInt(document.getElementById("dailyStar").value) || 1;
+  if(!title){ alert("请输入任务名称"); return; }
+  const {error} = await supabase.from("daily_tasks").insert([{title, end_time, star}]);
+  if(error){ alert("保存失败："+error.message); return; }
+  closeModal("dailyModal");
+  document.getElementById("dailyTitle").value = "";
+  document.getElementById("dailyEnd").value = "";
+  await loadTasks();
+  renderAll();
+}
+
+async function saveLongTask(){
+  const title = document.getElementById("longTitle").value.trim();
+  if(!title){ alert("请输入任务名称"); return; }
+  await supabase.from("long_tasks").insert([{title}]);
+  closeModal("longModal");
+  document.getElementById("longTitle").value = "";
+  await loadTasks();
+  renderAll();
+}
+
+async function saveWish(){
+  const title = document.getElementById("wishTitle").value.trim();
+  if(!title){ alert("请输入心愿内容"); return; }
+  await supabase.from("wish").insert([{title}]);
+  closeModal("wishModal");
+  document.getElementById("wishTitle").value = "";
+  await loadTasks();
+  renderAll();
+}
+
+async function finishTask(id){
+  const task = dailyTasks.find(t=>t.id===id);
+  if(!task) return;
+  // 超时任务扣半星
+  const now = new Date();
+  const endTime = new Date(task.end_time);
+  let getStar;
+  if(now <= endTime){
+    getStar = task.star;
+  }else{
+    getStar = Math.floor(task.star / 2);
   }
-  const week = getWeekStartDate();
-  const key = "plant_"+userRoleCode+"_"+week;
-  localStorage.setItem(key,selectedType);
-  alert("✅植物选择完成！本周锁定");
-  document.getElementById("plantModal").classList.add("hide");
-  loadLocalPlant();
-})
+  starCount += getStar;
+  await supabase.from("daily_tasks").delete().eq("id", id);
+  await saveStarAndPlant();
+  await loadTasks();
+  renderAll();
+  alert("完成任务 +"+getStar+"⭐");
+}
+
+async function finishLongTask(id){
+  starCount += 1;
+  await supabase.from("long_tasks").delete().eq("id", id);
+  await saveStarAndPlant();
+  await loadTasks();
+  renderAll();
+  alert("完成长期任务 +1⭐");
+}
+
+// ===== 家长管理 =====
+async function resetWeek(){
+  if(!confirm("确定要重置本周植物吗？将清空当前植物选择")) return;
+  currentPlant = null;
+  currentStage = 1;
+  plantDone = false;
+  await supabase.from("plant_status").upsert({id:1, plant:null, stage:1, done:false});
+  renderAll();
+  alert("✅ 本周植物已重置");
+}
+
+async function settleNightTask(){
+  if(!confirm("执行21:30结算？未完成的日常任务每项扣1星并清空")) return;
+  const penalty = dailyTasks.length;
+  starCount = Math.max(0, starCount - penalty);
+  await supabase.from("star_info").upsert({id:1, star:starCount, sun:res.sun, water:res.water, fertilizer:res.fertilizer});
+  await supabase.from("daily_tasks").delete().neq("id", 0);
+  await loadTasks();
+  renderAll();
+  alert("⏰ 结算完成，扣了 "+penalty+" 颗星");
+}
 </script>
 </body>
 </html>
