@@ -3,11 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>测试页</title>
+<title>🌱种植小花园</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto;padding:20px;background:#f7fff9;}
+.card{background:#fff;border-radius:16px;padding:20px;margin:10px 0;box-shadow:0 2px 8px #00000010;}
+.btn{padding:12px;border:none;border-radius:10px;font-size:16px;cursor:pointer;width:100%;margin:6px 0;}
+.btn-green{background:#34d399;color:#fff;}
+.btn-gray{background:#e5e7eb;color:#333;}
+input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;margin:6px 0;font-size:16px;box-sizing:border-box;}
+.hidden{display:none!important;}
+.nav-bar{display:flex;gap:8px;overflow-x:auto;margin:12px 0;}
+.nav-btn{padding:8px 12px;background:#e8f5ee;border:none;border-radius:8px;font-size:14px;white-space:nowrap;}
+.nav-btn.active{background:#34d399;color:#fff;}
+</style>
 </head>
-<body style="padding:20px;font-size:18px;">
-<h1>🌱 测试页</h1>
-<p>如果下面按钮点了能弹出提示，说明基础JS完全正常</p>
-<button style="padding:12px 24px;background:#34d399;color:white;border:none;border-radius:8px;font-size:18px;" onclick="alert('按钮正常！JS加载成功')">点我测试按钮</button>
+<body>
+<!-- 登录页 -->
+<div id="loginPage" class="card">
+  <h2 style="text-align:center;">🌱 种植小花园</h2>
+  <label>身份</label>
+  <select id="roleSelect">
+    <option value="parent">家长</option>
+    <option value="child">孩子</option>
+  </select>
+  <label>密码</label>
+  <input type="password" id="pwdInput" placeholder="输入密码">
+  <button class="btn btn-green" onclick="doLogin()">登 录</button>
+  <p style="font-size:12px;color:#888;text-align:center;">家长密码：1234 ｜ 孩子密码：6666</p>
+</div>
+
+<!-- 主页面 -->
+<div id="mainPage" class="hidden">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h2>🌱种植小花园</h2>
+    <button class="btn btn-gray" style="width:auto;padding:6px 12px;font-size:14px;" onclick="doLogout()">退出</button>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn active" onclick="switchTab('garden',this)">🌱我的花园</button>
+    <button class="nav-btn" onclick="switchTab('task',this)">📋任务</button>
+    <button class="nav-btn" onclick="switchTab('shop',this)">🏪商城</button>
+    <button class="nav-btn" onclick="switchTab('mine',this)">👤我的</button>
+  </div>
+  <div class="card" id="tabContent">
+    <p style="text-align:center;color:#888;">页面加载成功！当前是 <b id="roleShow">家长</b> 端</p>
+  </div>
+</div>
+
+<script>
+function doLogin(){
+  const role = document.getElementById('roleSelect').value;
+  const pwd = document.getElementById('pwdInput').value.trim();
+  if(role === 'parent' && pwd === '1234'){
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('mainPage').classList.remove('hidden');
+    document.getElementById('roleShow').innerText = '家长';
+  }else if(role === 'child' && pwd === '6666'){
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('mainPage').classList.remove('hidden');
+    document.getElementById('roleShow').innerText = '孩子';
+  }else{
+    alert('密码错误！');
+  }
+}
+function doLogout(){
+  document.getElementById('mainPage').classList.add('hidden');
+  document.getElementById('loginPage').classList.remove('hidden');
+  document.getElementById('pwdInput').value = '';
+}
+function switchTab(name,btn){
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const content = document.getElementById('tabContent');
+  if(name === 'garden') content.innerHTML = '<p style="text-align:center;color:#888;">🌱 我的花园页面（待加载植物）</p>';
+  if(name === 'task') content.innerHTML = '<p style="text-align:center;color:#888;">📋 任务页面（待加载任务）</p>';
+  if(name === 'shop') content.innerHTML = '<p style="text-align:center;color:#888;">🏪 商城页面（待加载物资）</p>';
+  if(name === 'mine') content.innerHTML = '<p style="text-align:center;color:#888;">👤 我的页面（待加载设置）</p>';
+}
+</script>
 </body>
 </html>
