@@ -58,6 +58,8 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .password-input{width:100%;padding:14px;border:1px solid #ddd;border-radius:12px;font-size:18px;margin-bottom:20px;box-sizing:border-box;}
 .login-btn{width:100%;padding:16px;border:none;border-radius:16px;background:linear-gradient(90deg,#ef4444,#dc2626);color:#fff;font-size:20px;font-weight:bold;cursor:pointer;}
 .tip-text{font-size:13px;color:#999;text-align:center;margin-top:12px;}
+/* 新增：限时标签样式，不改动原有UI */
+.limit-tag{display:inline-block;background:#fffbeb;color:#92400e;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:6px;}
 @media (max-width:375px){.stage-preview-grid{grid-template-columns:repeat(7,120px);overflow-x:auto;}}
 </style>
 </head>
@@ -169,11 +171,13 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     <button class="btn btn-gray" style="margin-top:10px;" onclick="closeModal('plantPreviewModal')">再看看</button>
   </div>
 </div>
+<!-- 【修改：新增限时分钟输入框】弹窗不变，只多一个input -->
 <div class="modal-mask" id="dailyModal">
   <div class="modal-box">
     <h3 style="margin-bottom:12px;">新增日常任务</h3>
     <input id="dailyTitle" placeholder="任务名称，如：背10个单词"/>
     <input id="dailyStar" type="number" value="2" placeholder="奖励星星数"/>
+    <input id="dailyMinuteLimit" type="number" value="0" placeholder="限时多少分钟完成（填0=不限时）"/>
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button class="btn btn-gray" style="flex:1;" onclick="closeModal('dailyModal')">取消</button>
       <button class="btn btn-red" style="flex:1;" onclick="saveDailyTask()">保存</button>
@@ -244,6 +248,7 @@ async function doLogin(){
     if(currentRole === 'parent') document.getElementById('adminArea').classList.remove('hidden');
     await loadAllData();
     renderAll();
+    startNightTimer(); // 登录后启动21:30定时检测
   }else{
     alert('密码错误');
   }
@@ -320,21 +325,51 @@ function buyRes(type){
   if(type==='fert')state.fert++;
   saveState();renderAll();alert('兑换成功！');
 }
+
+// ========== 新增：保存日常任务，存入限时分钟、创建时间 ==========
 async function saveDailyTask(){
   const title=document.getElementById('dailyTitle').value.trim();
   const star=parseInt(document.getElementById('dailyStar').value)||1;
+  const minuteLimit = parseInt(document.getElementById('dailyMinuteLimit').value) || 0;
   if(!title)return alert('请输入任务名称');
-  await supabase.from('daily_tasks').insert([{title,star}]);
-  closeModal('dailyModal');document.getElementById('dailyTitle').value='';
+  const createAt = new Date().toISOString();
+  await supabase.from('daily_tasks').insert([{
+    title,
+    star,
+    minute_limit: minuteLimit,
+    create_at: createAt
+  }]);
+  closeModal('dailyModal');
+  document.getElementById('dailyTitle').value='';
+  document.getElementById('dailyStar').value='2';
+  document.getElementById('dailyMinuteLimit').value='0';
   await loadAllData();renderAll();
 }
+
+// ========== 新增：完成任务判断超时逻辑 ==========
 async function finishDaily(idx){
   const task=state.daily[idx];
-  state.star+=task.star;
+  const createTime = new Date(task.create_at);
+  const now = new Date();
+  const diffMin = (now - createTime)/1000/60;
+  let getStar = 0;
+
+  if(task.minute_limit === 0 || diffMin <= task.minute_limit){
+    // 不限时，或者在限时内完成：拿全额星星
+    getStar = task.star;
+  }else{
+    // 超时完成：一半星星向下取整
+    getStar = Math.floor(task.star / 2);
+  }
+
+  state.star += getStar;
   await supabase.from('daily_tasks').delete().eq('id',task.id);
-  await saveState();await loadAllData();renderAll();
-  alert('完成任务+'+task.star+'⭐');
+  await saveState();
+  await loadAllData();
+  renderAll();
+  alert(`完成任务！获得 ${getStar} ⭐`);
 }
+
 async function saveLongTask(){
   const title=document.getElementById('longTitle').value.trim();
   const star=parseInt(document.getElementById('longStar').value)||1;
@@ -361,6 +396,29 @@ async function saveWish(){
   await loadAllData();renderAll();
 }
 
+// ========== 新增：21:30定时扣星清理任务 ==========
+let nightTimer = null;
+function startNightTimer(){
+  if(nightTimer) return;
+  // 每30秒检查一次时间
+  nightTimer = setInterval(async ()=>{
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    if(h === 21 && m === 30){
+      if(state.daily.length === 0) return;
+      for(const t of state.daily){
+        state.star -= 1;
+        await supabase.from('daily_tasks').delete().eq('id', t.id);
+      }
+      await saveState();
+      await loadAllData();
+      renderAll();
+      alert("⏰21:30到！未完成日常任务已扣星并清空！");
+    }
+  },30000);
+}
+
 function renderAll(){
   document.getElementById('starNum').innerText=state.star;
   document.getElementById('resWater').innerText=state.water;
@@ -382,11 +440,18 @@ function renderAll(){
     document.getElementById('feedBtn').disabled=state.plantDone;
     document.getElementById('doneTip').classList.toggle('hidden',!state.plantDone);
   }
+
+  // 日常任务渲染：增加限时标签
   let dh='';
   state.daily.forEach((t,i)=>{
-    dh+=`<div class="task-row"><div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}</div><div class="task-meta">${t.star}⭐</div></div></div><button class="task-btn" onclick="finishDaily(${i})">完成</button></div>`;
+    let limitHtml = '';
+    if(t.minute_limit > 0){
+      limitHtml = `<span class="limit-tag">限时${t.minute_limit}分钟</span>`;
+    }
+    dh+=`<div class="task-row"><div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}</div><div class="task-meta">${t.star}⭐</div></div></div><button class="task-btn" onclick="finishDaily(${i})">完成</button></div>`;
   });
   document.getElementById('dailyList').innerHTML=dh||'<p style="color:#aaa;text-align:center;">暂无日常任务</p>';
+
   let lh='';
   const today=new Date().toDateString();
   state.long.forEach((t,i)=>{
@@ -394,6 +459,7 @@ function renderAll(){
     lh+=`<div class="task-row"><div class="task-info"><div class="task-icon">⏳</div><div><div class="task-text">${t.title}</div><div class="task-meta">${t.star}⭐</div></div></div><button class="task-btn" ${checked?'disabled':''} onclick="finishLong(${i})">${checked?'今日已打卡':'打卡'}</button></div>`;
   });
   document.getElementById('longList').innerHTML=lh||'<p style="color:#aaa;text-align:center;">暂无长期任务</p>';
+
   let wh='';
   state.wish.forEach(w=>{wh+=`<div class="task-row"><div class="task-info"><div class="task-icon">💖</div><div class="task-text">${w.content}</div></div></div>`;});
   document.getElementById('wishList').innerHTML=wh||'<p style="color:#aaa;text-align:center;">暂无心愿</p>';
