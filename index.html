@@ -16,8 +16,6 @@ input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;ma
 .nav-btn{padding:8px 12px;background:#e8f5ee;border:none;border-radius:8px;font-size:14px;white-space:nowrap;}
 .nav-btn.active{background:#34d399;color:#fff;}
 </style>
-<!-- 更换unpkg的Supabase CDN，Safari兼容性更好 -->
-<script src="https://unpkg.com/@supabase/supabase-js@2.42.7/dist/umd/supabase.js"></script>
 </head>
 <body>
 <!-- 登录页 -->
@@ -52,19 +50,22 @@ input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;ma
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.7"></script>
 <script>
-// Supabase 配置（填好你的信息）
+// Supabase 配置
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
 
 let supabase = null;
 let currentRole = "";
 
-// 优先初始化supabase，就算加载失败，登录按钮依然可以点击
-if(typeof supabase !== 'undefined'){
-  const { createClient } = supabase;
-  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
+// 等脚本加载完成后初始化supabase
+window.addEventListener('load', function(){
+  if(typeof supabase !== 'undefined'){
+    const { createClient } = supabase;
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+})
 
 // 登录逻辑
 function doLogin(){
@@ -84,7 +85,7 @@ function loginSuccess(){
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainPage').classList.remove('hidden');
   document.getElementById('roleShow').innerText = currentRole === "parent" ? "家长" : "孩子";
-  if(supabase) loadStarData(); //仅当数据库加载成功才读取星星
+  if(supabase) loadStarData();
 }
 function doLogout(){
   currentRole = "";
@@ -109,8 +110,9 @@ function switchTab(name,btn){
   if(name === 'mine') content.innerHTML = '<p style="text-align:center;color:#888;">👤 我的页面（待加载设置）</p>';
 }
 
-// 从数据库读取星星
+// 读取星星
 async function loadStarData(){
+  if(!supabase) return;
   const { data, error } = await supabase.from("user_star").select("*").eq("role", "child").single();
   if(error){
     console.log("读取星星报错：",error);
