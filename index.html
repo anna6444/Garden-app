@@ -16,8 +16,8 @@ input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;ma
 .nav-btn{padding:8px 12px;background:#e8f5ee;border:none;border-radius:8px;font-size:14px;white-space:nowrap;}
 .nav-btn.active{background:#34d399;color:#fff;}
 </style>
-<!-- Supabase SDK CDN -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- 更换unpkg的Supabase CDN，Safari兼容性更好 -->
+<script src="https://unpkg.com/@supabase/supabase-js@2.42.7/dist/umd/supabase.js"></script>
 </head>
 <body>
 <!-- 登录页 -->
@@ -53,13 +53,18 @@ input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;ma
 </div>
 
 <script>
-// Supabase 配置（已经填好你的信息）
+// Supabase 配置（填好你的信息）
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
-const { createClient } = supabase;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+let supabase = null;
 let currentRole = "";
+
+// 优先初始化supabase，就算加载失败，登录按钮依然可以点击
+if(typeof supabase !== 'undefined'){
+  const { createClient } = supabase;
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 // 登录逻辑
 function doLogin(){
@@ -79,7 +84,7 @@ function loginSuccess(){
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainPage').classList.remove('hidden');
   document.getElementById('roleShow').innerText = currentRole === "parent" ? "家长" : "孩子";
-  loadStarData(); //登录成功，加载星星数据
+  if(supabase) loadStarData(); //仅当数据库加载成功才读取星星
 }
 function doLogout(){
   currentRole = "";
@@ -97,7 +102,7 @@ function switchTab(name,btn){
       <p>⭐ 星星数量：<span id="starNum">0</span></p>
       <p>🌱 植物区域（后续添加）</p>
     `;
-    loadStarData();
+    if(supabase) loadStarData();
   }
   if(name === 'task') content.innerHTML = '<p style="text-align:center;color:#888;">📋 任务页面（待加载任务）</p>';
   if(name === 'shop') content.innerHTML = '<p style="text-align:center;color:#888;">🏪 商城页面（待加载物资）</p>';
@@ -109,6 +114,7 @@ async function loadStarData(){
   const { data, error } = await supabase.from("user_star").select("*").eq("role", "child").single();
   if(error){
     console.log("读取星星报错：",error);
+    document.getElementById("starNum").innerText = "读取失败";
     return;
   }
   document.getElementById("starNum").innerText = data.star_count;
