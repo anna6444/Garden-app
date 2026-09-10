@@ -16,6 +16,8 @@ input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;ma
 .nav-btn{padding:8px 12px;background:#e8f5ee;border:none;border-radius:8px;font-size:14px;white-space:nowrap;}
 .nav-btn.active{background:#34d399;color:#fff;}
 </style>
+<!-- Supabase SDK CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <!-- 登录页 -->
@@ -45,27 +47,42 @@ input,select{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;ma
     <button class="nav-btn" onclick="switchTab('mine',this)">👤我的</button>
   </div>
   <div class="card" id="tabContent">
-    <p style="text-align:center;color:#888;">页面加载成功！当前是 <b id="roleShow">家长</b> 端</p>
+    <p>当前身份：<b id="roleShow">家长</b></p>
+    <p>⭐ 星星数量：<span id="starNum">0</span></p>
   </div>
 </div>
 
 <script>
+// Supabase 配置（已经填好你的信息）
+const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
+const { createClient } = supabase;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentRole = "";
+
+// 登录逻辑
 function doLogin(){
   const role = document.getElementById('roleSelect').value;
   const pwd = document.getElementById('pwdInput').value.trim();
   if(role === 'parent' && pwd === '1234'){
-    document.getElementById('loginPage').classList.add('hidden');
-    document.getElementById('mainPage').classList.remove('hidden');
-    document.getElementById('roleShow').innerText = '家长';
+    currentRole = 'parent';
+    loginSuccess();
   }else if(role === 'child' && pwd === '6666'){
-    document.getElementById('loginPage').classList.add('hidden');
-    document.getElementById('mainPage').classList.remove('hidden');
-    document.getElementById('roleShow').innerText = '孩子';
+    currentRole = 'child';
+    loginSuccess();
   }else{
     alert('密码错误！');
   }
 }
+function loginSuccess(){
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('mainPage').classList.remove('hidden');
+  document.getElementById('roleShow').innerText = currentRole === "parent" ? "家长" : "孩子";
+  loadStarData(); //登录成功，加载星星数据
+}
 function doLogout(){
+  currentRole = "";
   document.getElementById('mainPage').classList.add('hidden');
   document.getElementById('loginPage').classList.remove('hidden');
   document.getElementById('pwdInput').value = '';
@@ -74,10 +91,27 @@ function switchTab(name,btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   const content = document.getElementById('tabContent');
-  if(name === 'garden') content.innerHTML = '<p style="text-align:center;color:#888;">🌱 我的花园页面（待加载植物）</p>';
+  if(name === 'garden') {
+    content.innerHTML = `
+      <p>当前身份：<b id="roleShow">${currentRole==='parent'?'家长':'孩子'}</b></p>
+      <p>⭐ 星星数量：<span id="starNum">0</span></p>
+      <p>🌱 植物区域（后续添加）</p>
+    `;
+    loadStarData();
+  }
   if(name === 'task') content.innerHTML = '<p style="text-align:center;color:#888;">📋 任务页面（待加载任务）</p>';
   if(name === 'shop') content.innerHTML = '<p style="text-align:center;color:#888;">🏪 商城页面（待加载物资）</p>';
   if(name === 'mine') content.innerHTML = '<p style="text-align:center;color:#888;">👤 我的页面（待加载设置）</p>';
+}
+
+// 从数据库读取星星
+async function loadStarData(){
+  const { data, error } = await supabase.from("user_star").select("*").eq("role", "child").single();
+  if(error){
+    console.log("读取星星报错：",error);
+    return;
+  }
+  document.getElementById("starNum").innerText = data.star_count;
 }
 </script>
 </body>
