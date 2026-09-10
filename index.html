@@ -27,21 +27,47 @@ input,select,textarea{width:100%;padding:12px;border:1px solid #ddd;border-radiu
 .modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99;display:none;align-items:flex-end;justify-content:center;}
 .modal-mask.show{display:flex;}
 .modal-box{background:#fff;border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;}
+
+/* 登录页新风格 */
+.login-page{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(180deg,#fff7d7 0%,#f7fff9 100%);padding:20px;}
+.login-title{font-size:32px;font-weight:bold;color:#4b7f23;margin-bottom:8px;}
+.login-subtitle{font-size:18px;color:#6b9d45;margin-bottom:30px;}
+.login-card{width:100%;max-width:420px;background:#fff;border-radius:24px;padding:24px;box-shadow:0 4px 12px #00000015;}
+.login-card-title{font-size:22px;font-weight:bold;text-align:center;margin-bottom:20px;color:#333;}
+.role-buttons{display:flex;gap:12px;margin-bottom:20px;}
+.role-btn{flex:1;padding:14px 8px;border:2px solid #e8e8e8;border-radius:16px;background:#fafafa;text-align:center;font-size:18px;font-weight:bold;color:#553c2a;cursor:pointer;transition:0.2s;}
+.role-btn.active{border-color:#34d399;background:#e8f5ee;color:#2f855a;}
+.password-input{width:100%;padding:14px;border:1px solid #ddd;border-radius:12px;font-size:18px;margin-bottom:20px;box-sizing:border-box;}
+.login-btn{width:100%;padding:16px;border:none;border-radius:16px;background:linear-gradient(90deg,#34d399,#22c55e);color:#fff;font-size:20px;font-weight:bold;cursor:pointer;}
+.login-btn:active{background:#10b981;}
+.tip-text{font-size:13px;color:#999;text-align:center;margin-top:12px;}
 </style>
 </head>
 <body>
-<!-- 登录页 -->
-<div id="loginPage" class="card">
-  <h2 style="text-align:center;">🌱 种植小花园</h2>
-  <label>身份</label>
-  <select id="roleSelect">
-    <option value="parent">家长</option>
-    <option value="child">孩子</option>
-  </select>
-  <label>密码</label>
-  <input type="password" id="pwdInput" placeholder="输入密码">
-  <button class="btn btn-green" onclick="doLogin()">登 录</button>
-  <p style="font-size:12px;color:#888;text-align:center;">家长密码：1234 ｜ 孩子密码：6666</p>
+
+<!-- 登录页：新大卡片风格 -->
+<div id="loginPage" class="login-page">
+  <div class="login-title">🌱 种植小花园</div>
+  <div class="login-subtitle">每天完成小任务，一起种出小花园</div>
+
+  <div class="login-card">
+    <div class="login-card-title">选择身份登录</div>
+
+    <div class="role-buttons">
+      <div class="role-btn" id="parentBtn" onclick="selectRole('parent')">
+        👨‍👩‍👧<br>家长
+      </div>
+      <div class="role-btn" id="childBtn" onclick="selectRole('child')">
+        🧒<br>孩子
+      </div>
+    </div>
+
+    <input type="password" id="pwdInput" class="password-input" placeholder="请输入密码">
+
+    <button class="login-btn" onclick="doLogin()">登录</button>
+
+    <div class="tip-text">选择身份后输入对应密码</div>
+  </div>
 </div>
 
 <!-- 主页面 -->
@@ -194,24 +220,42 @@ const STAGE_NAMES = ["种子发芽","长出小苗","长叶片","抽枝长茎","�
 const PLANT_ICONS = {sunflower:'🌻',tomato:'🍅',succulent:'🪴'};
 const PLANT_NAMES = {sunflower:'向日葵',tomato:'小番茄',succulent:'小多肉'};
 
+// 登录页角色选择
+function selectRole(role){
+  currentRole = role;
+  document.getElementById('parentBtn').classList.toggle('active', role === 'parent');
+  document.getElementById('childBtn').classList.toggle('active', role === 'child');
+}
+
 // 登录
 function doLogin(){
-  const role = document.getElementById('roleSelect').value;
   const pwd = document.getElementById('pwdInput').value.trim();
-  if(role==='parent'&&pwd==='1234'||role==='child'&&pwd==='6666'){
-    currentRole=role;
-    document.getElementById('loginPage').classList.add('hidden');
-    document.getElementById('mainPage').classList.remove('hidden');
-    if(role==='parent') document.getElementById('adminArea').classList.remove('hidden');
-    renderAll();
+
+  if(currentRole === 'parent' && pwd === '1234'){
+    loginSuccess();
+  }else if(currentRole === 'child' && pwd === '6666'){
+    loginSuccess();
   }else{
     alert('密码错误');
   }
 }
+
+function loginSuccess(){
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('mainPage').classList.remove('hidden');
+  if(currentRole === 'parent'){
+    document.getElementById('adminArea').classList.remove('hidden');
+  }
+  renderAll();
+}
+
 function doLogout(){
-  currentRole="";
+  currentRole = "";
   document.getElementById('mainPage').classList.add('hidden');
   document.getElementById('loginPage').classList.remove('hidden');
+  document.getElementById('pwdInput').value = '';
+  document.getElementById('parentBtn').classList.remove('active');
+  document.getElementById('childBtn').classList.remove('active');
 }
 
 // Tab切换
