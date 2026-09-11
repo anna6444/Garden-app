@@ -32,6 +32,7 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .task-meta{font-size:13px;color:#999;margin-top:2px;}
 .task-btn{padding:8px 14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;cursor:pointer;}
 .task-btn:disabled{background:#ddd;color:#999;}
+.task-btn-start{background:#34d399;color:#fff;}
 .plant-big{font-size:80px;text-align:center;margin:20px 0;}
 .stage-dots{display:flex;justify-content:center;gap:8px;margin:16px 0;}
 .stage-dot{width:22px;height:22px;border-radius:50%;background:#ddd;}
@@ -336,7 +337,8 @@ async function saveDailyTask(){
     title,
     star,
     minute_limit: minuteLimit,
-    create_at: createAt
+    create_at: createAt,
+    start_at: null
   }]);
   closeModal('dailyModal');
   document.getElementById('dailyTitle').value='';
@@ -345,34 +347,30 @@ async function saveDailyTask(){
   await loadAllData();renderAll();
 }
 
-// 旧的finishDaily保留（不再被按钮调用，仅作备份）
-async function finishDaily(idx){
-  const task=state.daily[idx];
-  const createTime = new Date(task.create_at);
-  const now = new Date();
-  const diffMin = (now - createTime)/1000/60;
-  let getStar = 0;
-  if(task.minute_limit === 0 || diffMin <= task.minute_limit){
-    getStar = task.star;
-  }else{
-    getStar = Math.floor(task.star / 2);
-  }
-  state.star += getStar;
-  await supabase.from('daily_tasks').delete().eq('id',task.id);
-  await saveState();
+// 👉 新增：开始任务，记录开始时间存入数据库
+async function startTask(idx){
+  const task = state.daily[idx];
+  if(!task || task.start_at) return;
+  const startTime = new Date().toISOString();
+  await supabase.from('daily_tasks').update({
+    start_at: startTime
+  }).eq('id', task.id);
   await loadAllData();
   renderAll();
-  alert(`完成任务！获得 ${getStar} ⭐`);
 }
 
-// ✅ 修正后的完成按钮逻辑：确认弹窗 + 自动判断超时
+// ✅ 修改后的完成任务逻辑，使用start_at计算耗时
 async function handleTaskComplete(idx){
   const task = state.daily[idx];
   if(!task) return;
+  if(!task.start_at){
+    alert('请先点击【开始任务】，再提交完成！');
+    return;
+  }
 
-  const createTime = new Date(task.create_at);
+  const startTime = new Date(task.start_at);
   const now = new Date();
-  const diffMin = (now - createTime) / 1000 / 60;
+  const diffMin = (now - startTime) / 1000 / 60;
   let getStar = 0;
 
   // 限时0=不限时间，全额；否则比较用时
@@ -383,7 +381,7 @@ async function handleTaskComplete(idx){
   }
 
   const overTime = (task.minute_limit !== 0 && diffMin > task.minute_limit);
-  const msg = `确认完成【${task.title}】？\n预计获得星星：${getStar}⭐` + (overTime ? "\n（已超时，只能拿一半星星）" : "");
+  const msg = `确认完成【${task.title}】？\n用时：${Math.round(diffMin)}分钟\n预计获得星星：${getStar}⭐` + (overTime ? "\n（已超时，只能拿一半星星）" : "");
 
   if(!confirm(msg)) return;
 
@@ -491,7 +489,7 @@ function renderAll(){
     document.getElementById('doneTip').classList.toggle('hidden',!state.plantDone);
   }
 
-  // 日常任务渲染：完成按钮绑定 handleTaskComplete
+  // 日常任务渲染：新增开始任务按钮
   let dh='';
   state.daily.forEach((t,i)=>{
     let limitHtml = '';
@@ -499,10 +497,19 @@ function renderAll(){
       limitHtml = `<span class="limit-tag">限时${t.minute_limit}分钟</span>`;
     }
     let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
+    let startBtnHtml = '';
+    let completeDisabled = true;
+    if(!t.start_at){
+      startBtnHtml = `<button class="task-btn task-btn-start" onclick="startTask(${i})">开始任务</button>`;
+    }else{
+      startBtnHtml = `<span style="color:#22c55e;font-size:13px;">✅计时已启动</span>`;
+      completeDisabled = false;
+    }
     dh+=`<div class="task-row">
       <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
-      <div style="display:flex;gap:6px;">
-        <button class="task-btn" onclick="handleTaskComplete(${i})">完成</button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        ${startBtnHtml}
+        <button class="task-btn" onclick="handleTaskComplete(${i})" ${completeDisabled?'disabled':''}>完成</button>
         ${delBtnHtml}
       </div>
     </div>`;
