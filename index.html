@@ -92,6 +92,23 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .log-time{font-size:12px;color:#999;margin-top:3px;}
 .log-plus{color:#16a34a;font-weight:bold;}
 .log-minus{color:#dc2626;font-weight:bold;}
+
+/* 奖惩卡片新增样式 */
+.reward-block{margin-bottom:14px;}
+.reward-block-title{font-size:15px;font-weight:bold;margin-bottom:8px;color:#333;}
+.reward-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f3f3;}
+.reward-item:last-child{border-bottom:none;}
+.reward-item-text{font-size:15px;}
+.reward-btn-add{background:#22c55e;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer;}
+.reward-btn-minus{background:#ef4444;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer;}
+
+/* 星星日志滚动区域 */
+.star-log-scroll{
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right:4px;
+}
+
 @media (max-width:375px){.stage-preview-grid{grid-template-columns:repeat(7,120px);overflow-x:auto;}}
 </style>
 </head>
@@ -184,7 +201,71 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
       <div id="wishList"></div>
     </div>
 
-    <!-- 新增星星日志卡片 -->
+    <!-- 新增：快捷奖惩卡片 -->
+    <div class="card" id="quickRewardCard">
+      <h3 class="task-card-title">⚖️快捷奖惩记录</h3>
+      <!-- 家长端显示区域 -->
+      <div id="parentRewardPanel">
+        <div class="reward-block">
+          <div class="reward-block-title">✨孩子奖励（+1⭐）</div>
+          <div class="reward-item">
+            <div class="reward-item-text">主动帮助家人</div>
+            <button class="reward-btn-add" onclick="quickReward('child',1,'主动帮助家人')">+1⭐</button>
+          </div>
+          <div class="reward-item">
+            <div class="reward-item-text">独立思考解决生活问题</div>
+            <button class="reward-btn-add" onclick="quickReward('child',1,'独立思考解决生活问题')">+1⭐</button>
+          </div>
+          <div class="reward-item">
+            <div class="reward-item-text">得到学校的奖状</div>
+            <button class="reward-btn-add" onclick="quickReward('child',1,'得到学校的奖状')">+1⭐</button>
+          </div>
+        </div>
+        <div class="reward-block">
+          <div class="reward-block-title">⚠️孩子惩罚（‑1⭐）</div>
+          <div class="reward-item">
+            <div class="reward-item-text">乱发脾气不好好说话</div>
+            <button class="reward-btn-minus" onclick="quickReward('child',-1,'乱发脾气不好好说话')">-1⭐</button>
+          </div>
+          <div class="reward-item">
+            <div class="reward-item-text">未遵守约定</div>
+            <button class="reward-btn-minus" onclick="quickReward('child',-1,'未遵守约定')">-1⭐</button>
+          </div>
+          <div class="reward-item">
+            <div class="reward-item-text">没报备外出</div>
+            <button class="reward-btn-minus" onclick="quickReward('child',-1,'没报备外出')">-1⭐</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 孩子端显示区域 -->
+      <div id="childRewardPanel">
+        <div class="reward-block">
+          <div class="reward-block-title">✨家长奖励（+1⭐）</div>
+          <div class="reward-item">
+            <div class="reward-item-text">带孩子出门玩</div>
+            <button class="reward-btn-add" onclick="quickReward('parent',1,'带孩子出门玩')">+1⭐</button>
+          </div>
+          <div class="reward-item">
+            <div class="reward-item-text">给孩子做好吃的</div>
+            <button class="reward-btn-add" onclick="quickReward('parent',1,'给孩子做好吃的')">+1⭐</button>
+          </div>
+        </div>
+        <div class="reward-block">
+          <div class="reward-block-title">⚠️家长惩罚（‑1⭐）</div>
+          <div class="reward-item">
+            <div class="reward-item-text">乱发脾气不好好说话</div>
+            <button class="reward-btn-minus" onclick="quickReward('parent',-1,'乱发脾气不好好说话')">-1⭐</button>
+          </div>
+          <div class="reward-item">
+            <div class="reward-item-text">未遵守约定</div>
+            <button class="reward-btn-minus" onclick="quickReward('parent',-1,'未遵守约定')">-1⭐</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 星星日志卡片 -->
     <div class="card">
       <h3 class="task-card-title">⭐星星日志</h3>
       <div class="log-stat-row">
@@ -201,7 +282,9 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
           <div id="statCur">0</div>
         </div>
       </div>
-      <div id="starLogBox"></div>
+      <div class="star-log-scroll">
+        <div id="starLogBox"></div>
+      </div>
     </div>
 
     <div class="card" id="adminArea" class="hidden">
@@ -326,6 +409,10 @@ async function doLogin(){
   if(currentRole === 'parent' && pwd === '1234' || currentRole === 'child' && pwd === '6666'){
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('mainPage').classList.remove('hidden');
+    // 切换奖惩面板显示
+    document.getElementById('parentRewardPanel').classList.toggle('hidden', currentRole !== 'parent');
+    document.getElementById('childRewardPanel').classList.toggle('hidden', currentRole !== 'child');
+
     if(currentRole === 'parent'){
       document.getElementById('adminArea').classList.remove('hidden');
       document.getElementById('addDailyBtn').classList.remove('hidden');
@@ -446,6 +533,29 @@ async function deleteStarLog(uuid){
   }
 }
 
+// =========新增快捷奖惩函数【带确认弹窗】=========
+async function quickReward(targetRole, delta, reason){
+  let confirmTip = "";
+  if(delta > 0){
+    confirmTip = `确认记录奖励：${reason}\n是否确定 +1⭐？`;
+  }else{
+    confirmTip = `确认记录惩罚：${reason}\n是否确定 -1⭐？`;
+  }
+  if(!confirm(confirmTip)){
+    return; // 点取消，直接退出，不执行任何操作
+  }
+
+  if(targetRole === "child"){
+    state.star += delta;
+  }else{
+    state.parent_star += delta;
+  }
+  await addStarLogItem(targetRole, delta, reason);
+  await saveState();
+  renderAll();
+  alert(`✅已记录：${reason}，${delta>0?"+":""}${delta}⭐`);
+}
+
 function switchTab(name,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
@@ -497,7 +607,7 @@ function feedPlant(){
 }
 
 async function resetWeek(){
-  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n4. 清空星星日志\n\n此操作不可撤销！'))return;
+  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n4. 清空星星日志流水\n\n此操作不可撤销！'))return;
 
   state.plant = null;
   state.stage = 1;
@@ -525,7 +635,7 @@ async function resetWeek(){
   await loadAllData();
   await loadStarLog();
   renderAll();
-  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片、星星日志已全部删除。\n可以重新选择植物。');
+  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片、星星日志流水已全部删除。\n可以重新选择植物。');
 }
 
 async function buyRes(type){
@@ -705,213 +815,124 @@ async function saveWish(){
 
 async function handleDelete(type, idx) {
   if (!confirm("确定删除这条记录，删除后无法恢复？")) return;
-  try {
-    if(type === "daily"){
-      const task = state.daily[idx];
-      await supabase.from('daily_tasks').delete().eq('id', task.id);
-    }else if(type === "long"){
-      const task = state.long[idx];
-      await supabase.from('long_tasks').delete().eq('id', task.id);
-    }else if(type === "wish"){
-      const wish = state.wish[idx];
-      await supabase.from('wishes').delete().eq('id', wish.id);
-    }
-    await loadAllData();
-    renderAll();
-  }catch(err){
-    alert("❌ 删除失败："+err.message);
+  if(type === 'wish'){
+    const wish = state.wish[idx];
+    await supabase.from('wishes').delete().eq('id',wish.id);
   }
+  await loadAllData();
+  renderAll();
 }
 
 function renderAll(){
-  const displayStar = currentRole === 'parent' ? state.parent_star : state.star;
-  document.getElementById('starNum').innerText = displayStar;
-  document.getElementById('starRoleTip').innerText = currentRole==='parent'?'(家长)':'(孩子)';
+  // 渲染星星数字
+  document.getElementById('starNum').innerText = currentRole === "parent" ? state.parent_star : state.star;
+  document.getElementById('starRoleTip').innerText = currentRole === "parent" ? "家长星星" : "孩子星星";
 
-  document.getElementById('resWater').innerText=state.water;
-  document.getElementById('resSun').innerText=state.sun;
-  document.getElementById('resFert').innerText=state.fert;
+  // 植物渲染
+  const plantSel = document.getElementById("plantSelect");
+  const plantGrow = document.getElementById("plantGrow");
   if(!state.plant){
-    document.getElementById('plantSelect').classList.remove('hidden');
-    document.getElementById('plantGrow').classList.add('hidden');
+    plantSel.classList.remove("hidden");
+    plantGrow.classList.add("hidden");
   }else{
-    document.getElementById('plantSelect').classList.add('hidden');
-    document.getElementById('plantGrow').classList.remove('hidden');
-    document.getElementById('plantIcon').innerText=PLANT[state.plant].stages[state.stage-1];
-    document.getElementById('plantNameText').innerText=PLANT[state.plant].name;
-    document.getElementById('curStage').innerText=state.stage;
-    document.getElementById('stageName').innerText=STAGE_NAMES[state.stage-1];
-    let dots='';
-    for(let i=1;i<=7;i++)dots+=`<div class="stage-dot ${i<=state.stage?'done':''}"></div>`;
-    document.getElementById('stageDots').innerHTML=dots;
-    document.getElementById('feedBtn').disabled=state.plantDone;
-    document.getElementById('doneTip').classList.toggle('hidden',!state.plantDone);
+    plantSel.classList.add("hidden");
+    plantGrow.classList.remove("hidden");
+    const p = PLANT[state.plant];
+    document.getElementById("plantIcon").innerText = p.stages[state.stage-1];
+    document.getElementById("plantNameText").innerText = p.name;
+    document.getElementById("curStage").innerText = state.stage;
+    document.getElementById("stageName").innerText = STAGE_NAMES[state.stage-1];
+    // 阶段圆点
+    let dotHtml = "";
+    for(let i=1;i<=7;i++){
+      dotHtml += `<div class="stage-dot ${i <= state.stage ? 'done' : ''}"></div>`;
+    }
+    document.getElementById("stageDots").innerHTML = dotHtml;
+    document.getElementById("resWater").innerText = state.water;
+    document.getElementById("resSun").innerText = state.sun;
+    document.getElementById("resFert").innerText = state.fert;
+    document.getElementById("doneTip").classList.toggle("hidden", !state.plantDone);
   }
 
-  let activeHtml = '';
-  let pendingHtml = '';
-  state.daily.forEach((t,i)=>{
-    const isPending = t.status === 'pending_review';
-    const isTiming = !!t.start_at && !isPending;
-    let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
-    let statusBadgeHtml = isTiming ? `<span class="badge-timing">计时中</span>` : '';
-    let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
-
-    let subjectBadgeHtml = '';
-    if(t.subject && SUBJECT_MAP[t.subject]){
-      subjectBadgeHtml = `<span class="${SUBJECT_MAP[t.subject].cls}">${SUBJECT_MAP[t.subject].name}</span>`;
-    }
-
-    if(isPending){
-      if(currentRole === 'parent'){
-        pendingHtml+=`<div class="task-row">
-          <div class="task-info"><div class="task-icon">📷</div><div>
-            <div class="task-text">${t.title}${subjectBadgeHtml}${limitHtml}<span class="badge-pending">待审核</span></div>
-            <div class="task-meta">${t.star}⭐ 作业已提交</div>
-          </div></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="task-btn btn-blue" onclick="viewProofImage('${t.proof_image}')">看图</button>
-            <button class="task-btn task-btn-approve" onclick="parentApprove(${i})">通过</button>
-            <button class="task-btn task-btn-reject" onclick="parentReject(${i})">退回</button>
-            ${delBtnHtml}
+  // 日常任务渲染
+  let dailyActiveHtml = "";
+  let dailyPendingHtml = "";
+  state.daily.forEach((task,idx)=>{
+    const subjInfo = SUBJECT_MAP[task.subject] || {name:"",cls:""};
+    if(task.status === 'pending_review'){
+      dailyPendingHtml += `
+      <div class="task-row">
+        <div class="task-info">
+          <div class="task-icon">📌</div>
+          <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
+            <div class="task-meta">奖励${task.star}⭐<span class="badge-submit">待审核</span></div>
           </div>
-        </div>`;
-      }else{
-        pendingHtml+=`<div class="task-row">
-          <div class="task-info"><div class="task-icon">📷</div><div>
-            <div class="task-text">${t.title}${subjectBadgeHtml}<span class="badge-pending">待审核</span></div>
-            <div class="task-meta">✅ 作业已上传，等待家长审核</div>
-          </div></div>
-        </div>`;
-      }
+        </div>
+        <div>
+          ${currentRole==='parent'?`
+            <button class="task-btn task-btn-approve" onclick="parentApprove(${idx})">✅通过</button>
+            <button class="task-btn task-btn-reject" onclick="parentReject(${idx})">↩退回</button>
+          `:`<button class="task-btn" onclick="viewProofImage('${task.proof_image}')">查看图片</button>`}
+        </div>
+      </div>`;
     }else{
-      if(currentRole === 'parent'){
-        activeHtml+=`<div class="task-row">
-        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${subjectBadgeHtml}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          ${delBtnHtml}
+      dailyActiveHtml += `
+      <div class="task-row">
+        <div class="task-info">
+          <div class="task-icon">📌</div>
+          <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
+            <div class="task-meta">奖励${task.star}⭐ ${task.minute_limit>0?`限时${task.minute_limit}分钟`:"不限时"}
+            ${task.start_at?`<span class="badge-timing">已开始</span>`:""}
+            </div>
+          </div>
+        </div>
+        <div>
+          ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="startTask(${idx})">开始任务</button>`:""}
+          ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
         </div>
       </div>`;
-      }else{
-        let startBtnHtml = '';
-        let completeDisabled = true;
-        if(!t.start_at){
-          startBtnHtml = `<button class="task-btn task-btn-start" onclick="startTask(${i})">开始任务</button>`;
-        }else{
-          startBtnHtml = `<span style="color:#22c55e;font-size:13px;">✅计时中</span>`;
-          completeDisabled = false;
-        }
-        activeHtml+=`<div class="task-row">
-        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${subjectBadgeHtml}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          ${startBtnHtml}
-          <button class="task-btn" onclick="handleTaskComplete(${i})" ${completeDisabled?'disabled':''}>完成</button>
-          ${delBtnHtml}
-        </div>
-      </div>`;
-      }
     }
   });
-  document.getElementById('dailyActiveList').innerHTML=activeHtml||'<p style="color:#aaa;text-align:center;">暂无待开始/进行中任务</p>';
-  document.getElementById('dailyPendingList').innerHTML=pendingHtml||'<p style="color:#aaa;text-align:center;">暂无待审核任务</p>';
+  document.getElementById("dailyActiveList").innerHTML = dailyActiveHtml || `<p style="padding:10px;color:#888;">暂无日常任务</p>`;
+  document.getElementById("dailyPendingList").innerHTML = dailyPendingHtml || `<p style="padding:10px;color:#888;">无待审核任务</p>`;
 
-  let childHtml = '';
-  let parentHtml = '';
-  const today=new Date().toDateString();
-  state.long.forEach((t,i)=>{
-    const checked=t.last_date===today;
-    const submitted = t.submit_status === 'submitted';
-
-    let statusBadge = '';
-    if(checked){
-      statusBadge = `<span class="badge-pending">已打卡</span>`;
-    }else if(submitted){
-      statusBadge = `<span class="badge-submit">已提交待确认</span>`;
-    }
-
-    let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('long',${i})">删除</button>` : '';
-
-    let btnHtml = '';
-    if(t.owner_type === 'child'){
-      if(currentRole === 'child'){
-        if(checked){
-          btnHtml = `<button class="task-btn" disabled>今日已打卡</button>`;
-        }else if(submitted){
-          btnHtml = `<button class="task-btn" disabled>已提交待确认</button>`;
-        }else{
-          btnHtml = `<button class="task-btn task-btn-start" onclick="submitLongTask(${i})">打卡提交</button>`;
-        }
-      }else if(currentRole === 'parent'){
-        if(checked){
-          btnHtml = `<button class="task-btn" disabled>今日已打卡</button>`;
-        }else if(submitted){
-          btnHtml = `<button class="task-btn task-btn-approve" onclick="approveLongTask(${i})">确认完成</button>`;
-        }else{
-          btnHtml = `<button class="task-btn" disabled>等待孩子打卡</button>`;
-        }
-      }
-    }
-    if(t.owner_type === 'parent'){
-      if(currentRole === 'parent'){
-        if(checked){
-          btnHtml = `<button class="task-btn" disabled>今日已打卡</button>`;
-        }else if(submitted){
-          btnHtml = `<button class="task-btn" disabled>已提交待确认</button>`;
-        }else{
-          btnHtml = `<button class="task-btn task-btn-start" onclick="submitLongTask(${i})">打卡提交</button>`;
-        }
-      }else if(currentRole === 'child'){
-        if(checked){
-          btnHtml = `<button class="task-btn" disabled>今日已打卡</button>`;
-        }else if(submitted){
-          btnHtml = `<button class="task-btn task-btn-approve" onclick="approveLongTask(${i})">确认完成</button>`;
-        }else{
-          btnHtml = `<button class="task-btn" disabled>等待家长打卡</button>`;
-        }
-      }
-    }
-
-    const itemHtml =`<div class="task-row">
-      <div class="task-info"><div class="task-icon">⏳</div><div>
-        <div class="task-text">${t.title} ${statusBadge}</div>
-        <div class="task-meta">${t.star}⭐</div>
-      </div></div>
-      <div style="display:flex;gap:6px;">
-        ${btnHtml}
-        ${delBtnHtml}
+  // 长期任务渲染
+  let longHtml = "";
+  state.long.forEach((task,idx)=>{
+    const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
+    longHtml += `
+    <div class="task-row">
+      <div class="task-info">
+        <div class="task-icon">⏳</div>
+        <div class="task-text">${task.title} ${ownerLabel}
+          <div class="task-meta">奖励${task.star}⭐
+          ${task.submit_status === 'submitted' ? `<span class="badge-pending">已提交等待确认</span>` : ""}
+          </div>
+        </div>
+      </div>
+      <div>
+        ${task.submit_status !== 'submitted' && ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
+          ?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})">提交打卡</button>`:""}
+        ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
+          ?`<button class="task-btn task-btn-approve" onclick="approveLongTask(${idx})">确认完成</button>`:""}
       </div>
     </div>`;
-    if(t.owner_type === 'child'){
-      childHtml += itemHtml;
-    }else{
-      parentHtml += itemHtml;
-    }
   });
+  document.getElementById("longList").innerHTML = longHtml || `<p style="padding:10px;color:#888;">暂无长期任务</p>`;
 
-  let lh = '';
-  lh += `<div class="group-title">👧 孩子长期任务</div>`;
-  if(childHtml){
-    lh += childHtml;
-  }else{
-    lh += `<p style="color:#aaa;text-align:center;padding:8px 0;">暂无孩子长期任务</p>`;
-  }
-  lh += `<div class="group-title">👨‍👩‍👧 家长长期任务</div>`;
-  if(parentHtml){
-    lh += parentHtml;
-  }else{
-    lh += `<p style="color:#aaa;text-align:center;padding:8px 0;">暂无家长长期任务</p>`;
-  }
-  document.getElementById('longList').innerHTML=lh;
-
-  let wh='';
-  state.wish.forEach((w,i)=>{
-    let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('wish',${i})">删除</button>` : '';
-    wh+=`<div class="task-row">
-      <div class="task-info"><div class="task-icon">💖</div><div class="task-text">${w.content}</div></div>
-      ${delBtnHtml}
+  // 心愿渲染
+  let wishHtml = "";
+  state.wish.forEach((wish,idx)=>{
+    wishHtml += `
+    <div class="task-row">
+      <div class="task-info">
+        <div class="task-icon">💖</div>
+        <div class="task-text">${wish.content}</div>
+      </div>
+      ${currentRole==='parent'?`<button class="btn-del" onclick="handleDelete('wish',${idx})">删除</button>`:""}
     </div>`;
   });
-  document.getElementById('wishList').innerHTML=wh||'<p style="color:#aaa;text-align:center;">暂无心愿</p>';
+  document.getElementById("wishList").innerHTML = wishHtml || `<p style="padding:10px;color:#888;">暂无心愿</p>`;
 }
 </script>
 </body>
