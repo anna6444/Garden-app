@@ -81,6 +81,17 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .subject-btn.math{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe;}
 .subject-btn.english{background:#dcfce7;color:#15803d;border-color:#bbf7d0;}
 .subject-btn.active{border-width:2px;font-weight:bold;}
+.log-stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.log-stat-item{padding:10px;border-radius:12px;text-align:center;font-size:14px;}
+.stat-add{background:#dcfce7;color:#15803d;}
+.stat-minus{background:#fee2e2;color:#b91c1c;}
+.stat-cur{background:#dbeafe;color:#1d4ed8;}
+.log-item{padding:10px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.log-item:last-child{border-bottom:none;}
+.log-desc{flex:1;}
+.log-time{font-size:12px;color:#999;margin-top:3px;}
+.log-plus{color:#16a34a;font-weight:bold;}
+.log-minus{color:#dc2626;font-weight:bold;}
 @media (max-width:375px){.stage-preview-grid{grid-template-columns:repeat(7,120px);overflow-x:auto;}}
 </style>
 </head>
@@ -172,6 +183,27 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
       <button id="addWishBtn" class="btn btn-red btn-sm" onclick="openModal('wishModal')">+ 新增心愿</button>
       <div id="wishList"></div>
     </div>
+
+    <!-- 新增星星日志卡片 -->
+    <div class="card">
+      <h3 class="task-card-title">⭐星星日志</h3>
+      <div class="log-stat-row">
+        <div class="log-stat-item stat-add">
+          <div>累计获得</div>
+          <div id="statAdd">0</div>
+        </div>
+        <div class="log-stat-item stat-minus">
+          <div>累计扣除</div>
+          <div id="statMinus">0</div>
+        </div>
+        <div class="log-stat-item stat-cur">
+          <div>当前星星</div>
+          <div id="statCur">0</div>
+        </div>
+      </div>
+      <div id="starLogBox"></div>
+    </div>
+
     <div class="card" id="adminArea" class="hidden">
       <h3 class="task-card-title">⚙️ 家长管理</h3>
       <button class="btn btn-gray" onclick="resetWeek()">🔄 重置本周植物（清空图片+星星清零）</button>
@@ -306,6 +338,7 @@ async function doLogin(){
       document.getElementById('addWishBtn').classList.add('hidden');
     }
     await loadAllData();
+    await loadStarLog();
     renderAll();
   }else{
     alert('密码错误');
@@ -314,29 +347,110 @@ async function doLogin(){
 
 async function loadAllData(){
   if(!supabase) return;
-  const {data:stateData} = await supabase.from('app_state').select('*').eq('id',1).single();
-  if(stateData) state = {...state, ...stateData};
-  const {data:daily} = await supabase.from('daily_tasks').select('*');
-  state.daily = daily || [];
-  const {data:long} = await supabase.from('long_tasks').select('*');
-  state.long = long || [];
-  const {data:wishes} = await supabase.from('wishes').select('*');
-  state.wish = wishes || [];
+  try{
+    const {data:stateData} = await supabase.from('app_state').select('*').eq('id',1).single();
+    if(stateData) state = {...state, ...stateData};
+    const {data:daily} = await supabase.from('daily_tasks').select('*');
+    state.daily = daily || [];
+    const {data:long} = await supabase.from('long_tasks').select('*');
+    state.long = long || [];
+    const {data:wishes} = await supabase.from('wishes').select('*');
+    state.wish = wishes || [];
+  }catch(e){
+    console.warn("加载基础数据异常",e);
+  }
 }
 
 async function saveState(){
   if(!supabase) return;
-  await supabase.from('app_state').upsert({
-    id:1, star:state.star, parent_star:state.parent_star,
-    water:state.water, sun:state.sun, fert:state.fert,
-    plant:state.plant, stage:state.stage, plant_done:state.plantDone
-  });
+  try{
+    await supabase.from('app_state').upsert({
+      id:1, star:state.star, parent_star:state.parent_star,
+      water:state.water, sun:state.sun, fert:state.fert,
+      plant:state.plant, stage:state.stage, plant_done:state.plantDone
+    });
+  }catch(e){
+    console.warn("saveState异常",e);
+  }
+}
+
+// =========星星日志模块=========
+async function addStarLogItem(roleType, changeNum, reason){
+  if(!supabase) return;
+  let curStar = roleType === "parent" ? state.parent_star : state.star;
+  try{
+    await supabase.from('star_logs').insert([{
+      role_type:roleType,
+      change_num:changeNum,
+      reason:reason,
+      current_star:curStar
+    }]);
+    await loadStarLog();
+  }catch(e){
+    console.warn("写入星星日志失败，可能表未创建",e);
+  }
+}
+
+async function loadStarLog(){
+  const box = document.getElementById("starLogBox");
+  document.getElementById("statAdd").innerText="0";
+  document.getElementById("statMinus").innerText="0";
+  document.getElementById("statCur").innerText="0";
+  box.innerHTML = `<p style="text-align:center;color:#aaa;padding:12px 0;">加载中…</p>`;
+  if(!supabase) return;
+  try{
+    const {data} = await supabase.from('star_logs')
+      .select("*")
+      .eq("role_type",currentRole)
+      .order("created_at",{ascending:false});
+    if(!data || data.length===0){
+      box.innerHTML = `<p style="text-align:center;color:#aaa;padding:12px 0;">暂无星星流水</p>`;
+      document.getElementById("statCur").innerText = currentRole==="parent"?state.parent_star:state.star;
+      return;
+    }
+    let addTotal=0,minusTotal=0;
+    let html = "";
+    data.forEach(log=>{
+      if(log.change_num>0) addTotal += log.change_num;
+      else minusTotal += Math.abs(log.change_num);
+      const signClass = log.change_num>0?"log-plus":"log-minus";
+      const signText = log.change_num>0?`+${log.change_num}`:log.change_num;
+      const timeStr = new Date(log.created_at).toLocaleString();
+      html += `
+      <div class="log-item">
+        <div class="log-desc">
+          <div>${log.reason}</div>
+          <div class="log-time">${timeStr}</div>
+        </div>
+        <span class="${signClass}">${signText}⭐</span>
+        ${currentRole==='parent'?`<button class="btn-del" onclick="deleteStarLog('${log.id}')">删除</button>`:""}
+      </div>`;
+    });
+    box.innerHTML = html;
+    document.getElementById("statAdd").innerText = addTotal;
+    document.getElementById("statMinus").innerText = minusTotal;
+    document.getElementById("statCur").innerText = currentRole==="parent"?state.parent_star:state.star;
+  }catch(err){
+    box.innerHTML = `<p style="text-align:center;color:#aaa;padding:12px 0;">星星日志读取失败（检查表是否已创建）</p>`;
+    console.warn("loadStarLog异常",err);
+  }
+}
+
+async function deleteStarLog(uuid){
+  if(!confirm("确定删除这条日志？")) return;
+  try{
+    await supabase.from('star_logs').delete().eq('id',uuid);
+    await loadStarLog();
+  }catch(e){
+    alert("删除失败");
+  }
 }
 
 function switchTab(name,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
   ['garden','task','long','shop','mine'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden', t!==name));
+  if(name==="mine") loadStarLog();
 }
 function openModal(id){
   document.getElementById(id).classList.add('show');
@@ -383,7 +497,7 @@ function feedPlant(){
 }
 
 async function resetWeek(){
-  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n\n此操作不可撤销！'))return;
+  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n4. 清空星星日志\n\n此操作不可撤销！'))return;
 
   state.plant = null;
   state.stage = 1;
@@ -403,25 +517,36 @@ async function resetWeek(){
   }catch(err){
     console.warn('清理图片出错', err);
   }
+  try{
+    await supabase.from('star_logs').delete().neq("id","00000000-0000-0000-0000-000000000000");
+  }catch(e){console.warn("清空星星日志异常",e);}
 
   await saveState();
   await loadAllData();
+  await loadStarLog();
   renderAll();
-  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片已全部删除。\n可以重新选择植物。');
+  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片、星星日志已全部删除。\n可以重新选择植物。');
 }
 
-function buyRes(type){
+async function buyRes(type){
   const myStar = currentRole === 'parent' ? state.parent_star : state.star;
   if(myStar < 6){ alert('星星不足，需要6颗星'); return; }
-  if(currentRole === 'parent'){
-    state.parent_star -= 6;
-  }else{
-    state.star -= 6;
-  }
+  let resName;
+  if(type==='water') resName="水";
+  if(type==='sun') resName="阳光";
+  if(type==='fert') resName="肥料";
+
+  if(currentRole === 'parent') state.parent_star -=6;
+  else state.star -=6;
+
   if(type==='water')state.water++;
   if(type==='sun')state.sun++;
   if(type==='fert')state.fert++;
-  saveState();renderAll();alert('兑换成功！');
+
+  await addStarLogItem(currentRole,-6,`商城兑换${resName}`);
+  await saveState();
+  renderAll();
+  alert('兑换成功！');
 }
 
 async function saveDailyTask(){
@@ -505,10 +630,15 @@ async function parentApprove(idx){
   const diffMin = (now - startTime) / 1000 / 60;
   let getStar = (task.minute_limit === 0 || diffMin <= task.minute_limit) ? task.star : Math.floor(task.star/2);
   const over = task.minute_limit !== 0 && diffMin > task.minute_limit;
-  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟` + (over?'（超时，半星）':'') + `\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
+  const tipText = over?"（超时减半）":"";
+  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟${tipText}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
 
   state.star += getStar;
   state.parent_star += getStar;
+
+  await addStarLogItem("child",getStar,`日常任务【${task.title}】完成${tipText}`);
+  await addStarLogItem("parent",getStar,`审核任务【${task.title}】${tipText}`);
+
   await supabase.from('daily_tasks').delete().eq('id', task.id);
   await saveState();
   await loadAllData();
@@ -553,11 +683,13 @@ async function approveLongTask(idx){
   if(task.submit_status !== 'submitted') return;
   await supabase.from('long_tasks').update({last_date:today,submit_status:'normal'}).eq('id',task.id);
   
+  const roleType = task.owner_type;
   if(task.owner_type === 'child'){
     state.star += task.star;
   }else{
     state.parent_star += task.star;
   }
+  await addStarLogItem(roleType, task.star,`长期任务【${task.title}】打卡完成`);
 
   await saveState();await loadAllData();renderAll();
   alert('✅ 确认完成，+'+task.star+'⭐');
