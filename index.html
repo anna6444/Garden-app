@@ -117,7 +117,8 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 class="task-card-title">📅 日常任务</h3>
-        <button class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
+        <!-- 只有家长才显示新增按钮 -->
+        <button id="addDailyBtn" class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
       </div>
       <div id="dailyList"></div>
     </div>
@@ -127,7 +128,8 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 class="task-card-title">⏳ 长期任务</h3>
-        <button class="btn btn-red btn-sm" onclick="openModal('longModal')">+ 新增</button>
+        <!-- 只有家长才显示新增按钮 -->
+        <button id="addLongBtn" class="btn btn-red btn-sm" onclick="openModal('longModal')">+ 新增</button>
       </div>
       <div id="longList"></div>
     </div>
@@ -146,7 +148,8 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
   <div id="tab-mine" class="hidden">
     <div class="card">
       <h3 class="task-card-title">💖 心愿清单</h3>
-      <button class="btn btn-red btn-sm" onclick="openModal('wishModal')">+ 新增心愿</button>
+      <!-- 只有家长才显示新增心愿按钮 -->
+      <button id="addWishBtn" class="btn btn-red btn-sm" onclick="openModal('wishModal')">+ 新增心愿</button>
       <div id="wishList"></div>
     </div>
     <div class="card" id="adminArea" class="hidden">
@@ -248,7 +251,18 @@ async function doLogin(){
   if(currentRole === 'parent' && pwd === '1234' || currentRole === 'child' && pwd === '6666'){
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('mainPage').classList.remove('hidden');
-    if(currentRole === 'parent') document.getElementById('adminArea').classList.remove('hidden');
+    // 家长：显示新增按钮和管理区；孩子：隐藏新增按钮
+    if(currentRole === 'parent'){
+      document.getElementById('adminArea').classList.remove('hidden');
+      document.getElementById('addDailyBtn').classList.remove('hidden');
+      document.getElementById('addLongBtn').classList.remove('hidden');
+      document.getElementById('addWishBtn').classList.remove('hidden');
+    }else{
+      document.getElementById('adminArea').classList.add('hidden');
+      document.getElementById('addDailyBtn').classList.add('hidden');
+      document.getElementById('addLongBtn').classList.add('hidden');
+      document.getElementById('addWishBtn').classList.add('hidden');
+    }
     await loadAllData();
     renderAll();
     startNightTimer();
@@ -347,7 +361,6 @@ async function saveDailyTask(){
   await loadAllData();renderAll();
 }
 
-// 👉 新增：开始任务，记录开始时间存入数据库
 async function startTask(idx){
   const task = state.daily[idx];
   if(!task || task.start_at) return;
@@ -359,7 +372,6 @@ async function startTask(idx){
   renderAll();
 }
 
-// ✅ 修改后的完成任务逻辑，使用start_at计算耗时
 async function handleTaskComplete(idx){
   const task = state.daily[idx];
   if(!task) return;
@@ -373,7 +385,6 @@ async function handleTaskComplete(idx){
   const diffMin = (now - startTime) / 1000 / 60;
   let getStar = 0;
 
-  // 限时0=不限时间，全额；否则比较用时
   if(task.minute_limit === 0 || diffMin <= task.minute_limit){
     getStar = task.star;
   }else{
@@ -441,7 +452,6 @@ function startNightTimer(){
   },30000);
 }
 
-// 删除函数
 async function handleDelete(type, idx) {
   if (!confirm("确定删除这条记录，删除后无法恢复？")) return;
   try {
@@ -489,7 +499,6 @@ function renderAll(){
     document.getElementById('doneTip').classList.toggle('hidden',!state.plantDone);
   }
 
-  // 日常任务渲染：新增开始任务按钮
   let dh='';
   state.daily.forEach((t,i)=>{
     let limitHtml = '';
