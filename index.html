@@ -307,7 +307,6 @@ async function doLogin(){
     }
     await loadAllData();
     renderAll();
-    startNightTimer();
   }else{
     alert('密码错误');
   }
@@ -554,12 +553,9 @@ async function approveLongTask(idx){
   if(task.submit_status !== 'submitted') return;
   await supabase.from('long_tasks').update({last_date:today,submit_status:'normal'}).eq('id',task.id);
   
-  // ========== 修改后的长期任务星星规则 ==========
   if(task.owner_type === 'child'){
-    // 孩子长期任务：确认完成，只给孩子加星，家长不加
     state.star += task.star;
   }else{
-    // 家长长期任务：确认完成，只给家长加星，孩子不加
     state.parent_star += task.star;
   }
 
@@ -573,38 +569,6 @@ async function saveWish(){
   await supabase.from('wishes').insert([{content}]);
   closeModal('wishModal');document.getElementById('wishContent').value='';
   await loadAllData();renderAll();
-}
-
-let nightTimer = null;
-function startNightTimer(){
-  if(nightTimer) return;
-  nightTimer = setInterval(async ()=>{
-    const now = new Date();
-    const h = now.getHours();
-    const m = now.getMinutes();
-    if(h === 21 && m === 30){
-      const activeDailyList = state.daily.filter(item => item.status === 'active');
-      const pendingList = state.daily.filter(item => item.status === 'pending_review');
-
-      if(activeDailyList.length > 0){
-        state.star = Math.max(0, state.star - 1);
-        for(const t of activeDailyList){
-          await supabase.from('daily_tasks').delete().eq('id', t.id);
-        }
-      }
-      if(pendingList.length > 0){
-        state.parent_star = Math.max(0, state.parent_star - 1);
-      }
-
-      await saveState();
-      await loadAllData();
-      renderAll();
-      let msg = "⏰21:30到！";
-      if(activeDailyList.length > 0) msg += "\n孩子有未完成任务，扣1⭐";
-      if(pendingList.length > 0) msg += "\n家长有未审核作业，扣1⭐";
-      alert(msg || "今日全部完成！");
-    }
-  },30000);
 }
 
 async function handleDelete(type, idx) {
