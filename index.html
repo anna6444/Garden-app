@@ -42,6 +42,10 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .badge-notdone{background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-submit{display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-timing{display:inline-block;background:#dcfce7;color:#15803d;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
+/* 科目标签样式 */
+.badge-chinese{background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
+.badge-math{background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
+.badge-english{background:#dcfce7;color:#15803d;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .plant-big{font-size:80px;text-align:center;margin:20px 0;}
 .stage-dots{display:flex;justify-content:center;gap:8px;margin:16px 0;}
 .stage-dot{width:22px;height:22px;border-radius:50%;background:#ddd;}
@@ -72,6 +76,13 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .label-text{font-size:15px;color:#333;font-weight:bold;margin-top:8px;margin-bottom:4px;display:block;}
 .limit-tag{display:inline-block;background:#fffbeb;color:#92400e;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:6px;}
 .group-title{font-size:17px;font-weight:bold;color:#444;margin:16px 0 8px 0;padding-bottom:4px;border-bottom:1px solid #eee;}
+/* 科目选择按钮组 */
+.subject-buttons{display:flex;gap:8px;margin-bottom:12px;}
+.subject-btn{flex:1;padding:10px;border-radius:12px;border:1px solid #ddd;font-size:15px;cursor:pointer;}
+.subject-btn.chinese{background:#fee2e2;color:#b91c1c;border-color:#fecdd3;}
+.subject-btn.math{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe;}
+.subject-btn.english{background:#dcfce7;color:#15803d;border-color:#bbf7d0;}
+.subject-btn.active{border-width:2px;font-weight:bold;}
 @media (max-width:375px){.stage-preview-grid{grid-template-columns:repeat(7,120px);overflow-x:auto;}}
 </style>
 </head>
@@ -193,6 +204,12 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 <div class="modal-mask" id="dailyModal">
   <div class="modal-box">
     <h3 style="margin-bottom:12px;">新增日常任务</h3>
+    <label class="label-text">选择科目</label>
+    <div class="subject-buttons">
+      <button class="subject-btn chinese" onclick="selectSubject('chinese')">📖语文</button>
+      <button class="subject-btn math" onclick="selectSubject('math')">📐数学</button>
+      <button class="subject-btn english" onclick="selectSubject('english')">🔤英语</button>
+    </div>
     <label class="label-text">任务名称</label>
     <input id="dailyTitle" placeholder="例如：背10个单词"/>
     <label class="label-text">奖励星星数</label>
@@ -244,6 +261,7 @@ let supabase = null;
 let currentRole = "";
 let pendingPlantId = null;
 let pendingTaskIdx = null;
+let selectedSubject = null; // 新增：当前选中科目
 let state = {
   star: 10, water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false,
   daily: [], long: [], wish: []
@@ -254,6 +272,12 @@ const PLANT = {
   sunflower:{name:"向日葵",stages:["🌱","🌾","🌿","🪴","🌻","🌻","🌻"]},
   tomato:{name:"小番茄",stages:["🌱","🌾","🌿","🪴","🍅","🍅","🍅"]},
   succulent:{name:"小多肉",stages:["🌱","🌾","🌿","🪴","🪴","🪴","🪴"]}
+};
+// 科目映射
+const SUBJECT_MAP = {
+  chinese:{name:"语文",cls:"badge-chinese"},
+  math:{name:"数学",cls:"badge-math"},
+  english:{name:"英语",cls:"badge-english"}
 };
 
 window.addEventListener('load', function(){
@@ -316,8 +340,22 @@ function switchTab(name,btn){
   if(btn)btn.classList.add('active');
   ['garden','task','long','shop','mine'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden', t!==name));
 }
-function openModal(id){document.getElementById(id).classList.add('show');}
+function openModal(id){
+  document.getElementById(id).classList.add('show');
+  // 打开弹窗重置科目选择
+  if(id === 'dailyModal'){
+    selectedSubject = null;
+    document.querySelectorAll('.subject-btn').forEach(b=>b.classList.remove('active'));
+  }
+}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
+
+// 科目选择函数
+function selectSubject(subj){
+  selectedSubject = subj;
+  document.querySelectorAll('.subject-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.subject-btn.${subj}`).classList.add('active');
+}
 
 function openPlantPreview(plantId){
   pendingPlantId = plantId;
@@ -389,8 +427,11 @@ async function saveDailyTask(){
   const star=parseInt(document.getElementById('dailyStar').value)||1;
   const minuteLimit = parseInt(document.getElementById('dailyMinuteLimit').value) || 0;
   if(!title)return alert('请输入任务名称');
+  if(!selectedSubject)return alert('请选择科目（语文/数学/英语）');
+
   await supabase.from('daily_tasks').insert([{
     title, star, minute_limit: minuteLimit,
+    subject: selectedSubject,
     create_at: new Date().toISOString(),
     start_at: null, proof_image: null, status: 'active'
   }]);
@@ -598,12 +639,18 @@ function renderAll(){
     let statusBadgeHtml = isTiming ? `<span class="badge-timing">计时中</span>` : '';
     let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
 
+    // 科目标签
+    let subjectBadgeHtml = '';
+    if(t.subject && SUBJECT_MAP[t.subject]){
+      subjectBadgeHtml = `<span class="${SUBJECT_MAP[t.subject].cls}">${SUBJECT_MAP[t.subject].name}</span>`;
+    }
+
     if(isPending){
       // 待审核板块
       if(currentRole === 'parent'){
         pendingHtml+=`<div class="task-row">
           <div class="task-info"><div class="task-icon">📷</div><div>
-            <div class="task-text">${t.title}${limitHtml}<span class="badge-pending">待审核</span></div>
+            <div class="task-text">${t.title}${subjectBadgeHtml}${limitHtml}<span class="badge-pending">待审核</span></div>
             <div class="task-meta">${t.star}⭐ 作业已提交</div>
           </div></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -616,7 +663,7 @@ function renderAll(){
       }else{
         pendingHtml+=`<div class="task-row">
           <div class="task-info"><div class="task-icon">📷</div><div>
-            <div class="task-text">${t.title}<span class="badge-pending">待审核</span></div>
+            <div class="task-text">${t.title}${subjectBadgeHtml}<span class="badge-pending">待审核</span></div>
             <div class="task-meta">✅ 作业已上传，等待家长审核</div>
           </div></div>
         </div>`;
@@ -625,7 +672,7 @@ function renderAll(){
       // 待开始/进行中 全部留在上方区域，点开始不会移动
       if(currentRole === 'parent'){
         activeHtml+=`<div class="task-row">
-        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
+        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${subjectBadgeHtml}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
         <div style="display:flex;gap:6px;align-items:center;">
           ${delBtnHtml}
         </div>
@@ -640,7 +687,7 @@ function renderAll(){
           completeDisabled = false;
         }
         activeHtml+=`<div class="task-row">
-        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
+        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${subjectBadgeHtml}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
         <div style="display:flex;gap:6px;align-items:center;">
           ${startBtnHtml}
           <button class="task-btn" onclick="handleTaskComplete(${i})" ${completeDisabled?'disabled':''}>完成</button>
