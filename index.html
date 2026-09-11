@@ -11,6 +11,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;mar
 .btn-green{background:#34d399;color:#fff;}
 .btn-red{background:#ef4444;color:#fff;}
 .btn-gray{background:#e5e7eb;color:#333;}
+.btn-blue{background:#3b82f6;color:#fff;}
 .btn-sm{padding:10px 16px;font-size:14px;width:auto;}
 .btn-del{background:#9ca3af;color:#fff;padding:8px 10px;border-radius:10px;border:none;font-size:13px;cursor:pointer;}
 input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radius:12px;margin:6px 0;font-size:16px;box-sizing:border-box;}
@@ -33,6 +34,9 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .task-btn{padding:8px 14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;cursor:pointer;}
 .task-btn:disabled{background:#ddd;color:#999;}
 .task-btn-start{background:#34d399;color:#fff;}
+.task-btn-approve{background:#22c55e;color:#fff;}
+.task-btn-reject{background:#f59e0b;color:#fff;}
+.badge-pending{display:inline-block;background:#fef3c7;color:#92400e;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:6px;}
 .plant-big{font-size:80px;text-align:center;margin:20px 0;}
 .stage-dots{display:flex;justify-content:center;gap:8px;margin:16px 0;}
 .stage-dot{width:22px;height:22px;border-radius:50%;background:#ddd;}
@@ -117,7 +121,6 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 class="task-card-title">📅 日常任务</h3>
-        <!-- 只有家长才显示新增按钮 -->
         <button id="addDailyBtn" class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
       </div>
       <div id="dailyList"></div>
@@ -128,7 +131,6 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 class="task-card-title">⏳ 长期任务</h3>
-        <!-- 只有家长才显示新增按钮 -->
         <button id="addLongBtn" class="btn btn-red btn-sm" onclick="openModal('longModal')">+ 新增</button>
       </div>
       <div id="longList"></div>
@@ -148,7 +150,6 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
   <div id="tab-mine" class="hidden">
     <div class="card">
       <h3 class="task-card-title">💖 心愿清单</h3>
-      <!-- 只有家长才显示新增心愿按钮 -->
       <button id="addWishBtn" class="btn btn-red btn-sm" onclick="openModal('wishModal')">+ 新增心愿</button>
       <div id="wishList"></div>
     </div>
@@ -166,6 +167,9 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     <div class="nav-item" onclick="switchTab('mine',this)"><div class="nav-icon">👤</div><div>我的</div></div>
   </div>
 </div>
+
+<!-- 隐藏的图片选择器 -->
+<input type="file" id="proofFileInput" accept="image/*" style="display:none;">
 
 <div class="modal-mask" id="plantPreviewModal">
   <div class="modal-box">
@@ -224,6 +228,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabase = null;
 let currentRole = "";
 let pendingPlantId = null;
+let pendingTaskIdx = null;
 let state = {
   star: 10, water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false,
   daily: [], long: [], wish: []
@@ -238,6 +243,8 @@ const PLANT = {
 
 window.addEventListener('load', function(){
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // 图片选择后自动上传
+  document.getElementById('proofFileInput').addEventListener('change', handleProofUpload);
 });
 
 function selectRole(role){
@@ -251,7 +258,6 @@ async function doLogin(){
   if(currentRole === 'parent' && pwd === '1234' || currentRole === 'child' && pwd === '6666'){
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('mainPage').classList.remove('hidden');
-    // 家长：显示新增按钮和管理区；孩子：隐藏新增按钮
     if(currentRole === 'parent'){
       document.getElementById('adminArea').classList.remove('hidden');
       document.getElementById('addDailyBtn').classList.remove('hidden');
@@ -346,13 +352,10 @@ async function saveDailyTask(){
   const star=parseInt(document.getElementById('dailyStar').value)||1;
   const minuteLimit = parseInt(document.getElementById('dailyMinuteLimit').value) || 0;
   if(!title)return alert('请输入任务名称');
-  const createAt = new Date().toISOString();
   await supabase.from('daily_tasks').insert([{
-    title,
-    star,
-    minute_limit: minuteLimit,
-    create_at: createAt,
-    start_at: null
+    title, star, minute_limit: minuteLimit,
+    create_at: new Date().toISOString(),
+    start_at: null, proof_image: null, status: 'active'
   }]);
   closeModal('dailyModal');
   document.getElementById('dailyTitle').value='';
@@ -364,44 +367,87 @@ async function saveDailyTask(){
 async function startTask(idx){
   const task = state.daily[idx];
   if(!task || task.start_at) return;
-  const startTime = new Date().toISOString();
-  await supabase.from('daily_tasks').update({
-    start_at: startTime
-  }).eq('id', task.id);
+  await supabase.from('daily_tasks').update({start_at: new Date().toISOString()}).eq('id', task.id);
   await loadAllData();
   renderAll();
 }
 
+// 孩子点完成 → 弹出相册选图
 async function handleTaskComplete(idx){
   const task = state.daily[idx];
   if(!task) return;
+  if(task.status === 'pending_review'){
+    alert('任务已提交，等待家长审核中～');
+    return;
+  }
   if(!task.start_at){
     alert('请先点击【开始任务】，再提交完成！');
     return;
   }
+  if(!confirm(`确认完成【${task.title}】？\n接下来请选择作业照片上传`)) return;
+  pendingTaskIdx = idx;
+  document.getElementById('proofFileInput').click();
+}
 
+// 选图后上传
+async function handleProofUpload(e){
+  const file = e.target.files[0];
+  if(!file || pendingTaskIdx === null) return;
+  const task = state.daily[pendingTaskIdx];
+  try {
+    alert('正在上传作业照片...');
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${task.id}-${Date.now()}.${fileExt}`;
+    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
+    if(upErr) throw upErr;
+    const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
+    await supabase.from('daily_tasks').update({
+      proof_image: urlData.publicUrl,
+      status: 'pending_review'
+    }).eq('id', task.id);
+    alert('✅ 作业照片已上传，等待家长审核！');
+  } catch(err){
+    console.error(err);
+    alert('❌ 上传失败：' + err.message);
+  }
+  pendingTaskIdx = null;
+  e.target.value = '';
+  await loadAllData();
+  renderAll();
+}
+
+// 家长查看图片
+function viewProofImage(url){
+  window.open(url, '_blank');
+}
+
+// 家长通过审核
+async function parentApprove(idx){
+  const task = state.daily[idx];
   const startTime = new Date(task.start_at);
   const now = new Date();
   const diffMin = (now - startTime) / 1000 / 60;
-  let getStar = 0;
-
-  if(task.minute_limit === 0 || diffMin <= task.minute_limit){
-    getStar = task.star;
-  }else{
-    getStar = Math.floor(task.star / 2);
-  }
-
-  const overTime = (task.minute_limit !== 0 && diffMin > task.minute_limit);
-  const msg = `确认完成【${task.title}】？\n用时：${Math.round(diffMin)}分钟\n预计获得星星：${getStar}⭐` + (overTime ? "\n（已超时，只能拿一半星星）" : "");
-
-  if(!confirm(msg)) return;
-
+  let getStar = (task.minute_limit === 0 || diffMin <= task.minute_limit) ? task.star : Math.floor(task.star/2);
+  const over = task.minute_limit !== 0 && diffMin > task.minute_limit;
+  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟` + (over?'（超时，半星）':'') + `\n发放 ${getStar} ⭐`)) return;
   state.star += getStar;
   await supabase.from('daily_tasks').delete().eq('id', task.id);
   await saveState();
   await loadAllData();
   renderAll();
-  alert(`完成任务！获得 ${getStar} ⭐`);
+  alert(`✅ 已通过，发放 ${getStar} ⭐`);
+}
+
+// 家长退回
+async function parentReject(idx){
+  const task = state.daily[idx];
+  if(!confirm(`退回【${task.title}】？\n孩子需要重新开始做`)) return;
+  await supabase.from('daily_tasks').update({
+    start_at: null, proof_image: null, status: 'active'
+  }).eq('id', task.id);
+  await loadAllData();
+  renderAll();
+  alert('已退回，孩子可重新开始');
 }
 
 async function saveLongTask(){
@@ -441,8 +487,10 @@ function startNightTimer(){
     if(h === 21 && m === 30){
       if(state.daily.length === 0) return;
       for(const t of state.daily){
-        state.star -= 1;
-        await supabase.from('daily_tasks').delete().eq('id', t.id);
+        if(t.status !== 'pending_review'){
+          state.star -= 1;
+          await supabase.from('daily_tasks').delete().eq('id', t.id);
+        }
       }
       await saveState();
       await loadAllData();
@@ -457,22 +505,17 @@ async function handleDelete(type, idx) {
   try {
     if(type === "daily"){
       const task = state.daily[idx];
-      const {error} = await supabase.from('daily_tasks').delete().eq('id', task.id);
-      if(error) throw error;
+      await supabase.from('daily_tasks').delete().eq('id', task.id);
     }else if(type === "long"){
       const task = state.long[idx];
-      const {error} = await supabase.from('long_tasks').delete().eq('id', task.id);
-      if(error) throw error;
+      await supabase.from('long_tasks').delete().eq('id', task.id);
     }else if(type === "wish"){
       const wish = state.wish[idx];
-      const {error} = await supabase.from('wishes').delete().eq('id', wish.id);
-      if(error) throw error;
+      await supabase.from('wishes').delete().eq('id', wish.id);
     }
-    alert("✅ 删除成功");
     await loadAllData();
     renderAll();
   }catch(err){
-    console.error("删除出错", err);
     alert("❌ 删除失败："+err.message);
   }
 }
@@ -501,27 +544,53 @@ function renderAll(){
 
   let dh='';
   state.daily.forEach((t,i)=>{
-    let limitHtml = '';
-    if(t.minute_limit > 0){
-      limitHtml = `<span class="limit-tag">限时${t.minute_limit}分钟</span>`;
-    }
-    let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
-    let startBtnHtml = '';
-    let completeDisabled = true;
-    if(!t.start_at){
-      startBtnHtml = `<button class="task-btn task-btn-start" onclick="startTask(${i})">开始任务</button>`;
+    const isPending = t.status === 'pending_review';
+
+    if(isPending){
+      // 待审核任务
+      if(currentRole === 'parent'){
+        let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
+        dh+=`<div class="task-row">
+          <div class="task-info"><div class="task-icon">📷</div><div>
+            <div class="task-text">${t.title}${limitHtml}<span class="badge-pending">待审核</span></div>
+            <div class="task-meta">${t.star}⭐ 作业已提交</div>
+          </div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="task-btn btn-blue" onclick="viewProofImage('${t.proof_image}')">看图</button>
+            <button class="task-btn task-btn-approve" onclick="parentApprove(${i})">通过</button>
+            <button class="task-btn task-btn-reject" onclick="parentReject(${i})">退回</button>
+            <button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>
+          </div>
+        </div>`;
+      }else{
+        dh+=`<div class="task-row">
+          <div class="task-info"><div class="task-icon">📷</div><div>
+            <div class="task-text">${t.title}<span class="badge-pending">待审核</span></div>
+            <div class="task-meta">✅ 作业已上传，等待家长审核</div>
+          </div></div>
+        </div>`;
+      }
     }else{
-      startBtnHtml = `<span style="color:#22c55e;font-size:13px;">✅计时已启动</span>`;
-      completeDisabled = false;
+      // 正常进行中任务
+      let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
+      let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
+      let startBtnHtml = '';
+      let completeDisabled = true;
+      if(!t.start_at){
+        startBtnHtml = `<button class="task-btn task-btn-start" onclick="startTask(${i})">开始任务</button>`;
+      }else{
+        startBtnHtml = `<span style="color:#22c55e;font-size:13px;">✅计时中</span>`;
+        completeDisabled = false;
+      }
+      dh+=`<div class="task-row">
+        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          ${startBtnHtml}
+          <button class="task-btn" onclick="handleTaskComplete(${i})" ${completeDisabled?'disabled':''}>完成</button>
+          ${delBtnHtml}
+        </div>
+      </div>`;
     }
-    dh+=`<div class="task-row">
-      <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        ${startBtnHtml}
-        <button class="task-btn" onclick="handleTaskComplete(${i})" ${completeDisabled?'disabled':''}>完成</button>
-        ${delBtnHtml}
-      </div>
-    </div>`;
   });
   document.getElementById('dailyList').innerHTML=dh||'<p style="color:#aaa;text-align:center;">暂无日常任务</p>';
 
