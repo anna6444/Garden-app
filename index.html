@@ -439,6 +439,42 @@ async function handleDelete(type, idx) {
     alert("❌ 删除失败："+err.message);
   }
 }
+  async function handleTaskComplete(taskIndex) {
+  const task = state.daily[taskIndex];
+  const now = new Date();
+  const dueTime = new Date(task.due_time);
+  let getStar = 0;
+
+  // 判断是否超时，按时全额、超时一半，向下取整
+  if (now <= dueTime) {
+    getStar = task.star;
+  } else {
+    getStar = Math.floor(task.star / 2);
+  }
+
+  if (!confirm(`确认提交任务【${task.name}】？\n预计获得星星：${getStar}⭐`)) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from("daily_tasks")
+      .update({
+        status: "pending_review",
+        get_star: getStar,
+        complete_at: now.toISOString()
+      })
+      .eq("id", task.id);
+
+    if (error) throw error;
+    alert(`✅任务提交成功！获得 ${getStar} ⭐，等待家长审核`);
+    await loadAllData();
+    renderAll();
+  } catch (err) {
+    console.error("任务提交失败", err);
+    alert("❌提交失败：" + err.message);
+  }
+}
 
 function renderAll(){
   document.getElementById('starNum').innerText=state.star;
