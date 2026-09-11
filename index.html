@@ -37,6 +37,9 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .task-btn-approve{background:#22c55e;color:#fff;}
 .task-btn-reject{background:#f59e0b;color:#fff;}
 .badge-pending{display:inline-block;background:#fef3c7;color:#92400e;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:6px;}
+.badge-child{background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
+.badge-parent{background:#fce7f3;color:#be185d;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
+.badge-notdone{background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .plant-big{font-size:80px;text-align:center;margin:20px 0;}
 .stage-dots{display:flex;justify-content:center;gap:8px;margin:16px 0;}
 .stage-dot{width:22px;height:22px;border-radius:50%;background:#ddd;}
@@ -201,6 +204,11 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     <input id="longTitle" placeholder="任务名称，如：读完一本书"/>
     <label class="label-text">奖励星星数</label>
     <input id="longStar" type="number" value="1" placeholder="奖励星星数"/>
+    <label class="label-text">任务归属</label>
+    <select id="longOwnerType">
+      <option value="child">👧 孩子任务</option>
+      <option value="parent">👨‍👩‍👧 家长任务</option>
+    </select>
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button class="btn btn-gray" style="flex:1;" onclick="closeModal('longModal')">取消</button>
       <button class="btn btn-red" style="flex:1;" onclick="saveLongTask()">保存</button>
@@ -332,7 +340,7 @@ function feedPlant(){
   saveState();renderAll();
 }
 
-// ✅ 新的重置函数：植物进度 + 物资 + 星星清零 + 清空全部作业图片
+// ✅ 重置函数
 async function resetWeek(){
   if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 星星清零\n3. 删除系统内全部作业照片\n\n此操作不可撤销！'))return;
 
@@ -468,17 +476,30 @@ async function parentReject(idx){
   alert('已退回，孩子可重新开始');
 }
 
+// ==========长期任务【改造后的函数】==========
 async function saveLongTask(){
   const title=document.getElementById('longTitle').value.trim();
   const star=parseInt(document.getElementById('longStar').value)||1;
+  const ownerType = document.getElementById('longOwnerType').value;
   if(!title)return alert('请输入任务名称');
-  await supabase.from('long_tasks').insert([{title,star,last_date:''}]);
-  closeModal('longModal');document.getElementById('longTitle').value='';
+  await supabase.from('long_tasks').insert([{title,star,owner_type:ownerType,last_date:''}]);
+  closeModal('longModal');
+  document.getElementById('longTitle').value='';
   await loadAllData();renderAll();
 }
+
 async function finishLong(idx){
   const task=state.long[idx];
   const today=new Date().toDateString();
+  // 权限校验
+  if(task.owner_type === 'child' && currentRole !== 'parent'){
+    alert('孩子任务，只能由家长确认完成！');
+    return;
+  }
+  if(task.owner_type === 'parent' && currentRole !== 'child'){
+    alert('家长任务，只能由孩子确认完成！');
+    return;
+  }
   if(task.last_date===today)return alert('今天已经打过卡了');
   if(!confirm(`确认今天完成【${task.title}】吗？`))return;
   await supabase.from('long_tasks').update({last_date:today}).eq('id',task.id);
@@ -503,14 +524,16 @@ function startNightTimer(){
     const h = now.getHours();
     const m = now.getMinutes();
     if(h === 21 && m === 30){
-      if(state.daily.length === 0) return;
-      for(const t of state.daily){
-        if(t.status !== 'pending_review'){
-          state.star -= 1;
-          await supabase.from('daily_tasks').delete().eq('id', t.id);
+      // 日常任务处理
+      if(state.daily.length > 0){
+        for(const t of state.daily){
+          if(t.status !== 'pending_review'){
+            state.star -= 1;
+            await supabase.from('daily_tasks').delete().eq('id', t.id);
+          }
         }
+        await saveState();
       }
-      await saveState();
       await loadAllData();
       renderAll();
       alert("⏰21:30到！未完成日常任务已扣星并清空！");
@@ -609,15 +632,39 @@ function renderAll(){
   });
   document.getElementById('dailyList').innerHTML=dh||'<p style="color:#aaa;text-align:center;">暂无日常任务</p>';
 
+  // ==========长期任务渲染【改造】==========
   let lh='';
   const today=new Date().toDateString();
   state.long.forEach((t,i)=>{
     const checked=t.last_date===today;
+    // 判断权限
+    let canCheck = false;
+    if(t.owner_type === 'child' && currentRole === 'parent') canCheck = true;
+    if(t.owner_type === 'parent' && currentRole === 'child') canCheck = true;
+
+    let ownerBadge = t.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
+    let statusBadge = '';
+    if(checked){
+      statusBadge = `<span class="badge-pending">今日已完成</span>`;
+    }else{
+      statusBadge = `<span class="badge-notdone">今日未完成</span>`;
+    }
     let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('long',${i})">删除</button>` : '';
+
+    let btnText = checked ? '今日已打卡' : '确认完成';
+    let btnDisable = checked || !canCheck;
+    let tipText = '';
+    if(!canCheck && !checked){
+      tipText = t.owner_type === 'child' ? '（仅家长可确认）' : '（仅孩子可确认）';
+    }
+
     lh+=`<div class="task-row">
-      <div class="task-info"><div class="task-icon">⏳</div><div><div class="task-text">${t.title}</div><div class="task-meta">${t.star}⭐</div></div></div>
+      <div class="task-info"><div class="task-icon">⏳</div><div>
+        <div class="task-text">${t.title}${ownerBadge}${statusBadge}</div>
+        <div class="task-meta">${t.star}⭐ ${tipText}</div>
+      </div></div>
       <div style="display:flex;gap:6px;">
-        <button class="task-btn" ${checked?'disabled':''} onclick="finishLong(${i})">${checked?'今日已打卡':'打卡'}</button>
+        <button class="task-btn" ${btnDisable?'disabled':''} onclick="finishLong(${i})">${btnText}</button>
         ${delBtnHtml}
       </div>
     </div>`;
