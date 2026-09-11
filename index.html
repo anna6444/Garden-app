@@ -155,7 +155,7 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     </div>
     <div class="card" id="adminArea" class="hidden">
       <h3 class="task-card-title">⚙️ 家长管理</h3>
-      <button class="btn btn-gray" onclick="resetWeek()">🔄 重置本周植物</button>
+      <button class="btn btn-gray" onclick="resetWeek()">🔄 重置本周植物（清空图片+星星清零）</button>
     </div>
   </div>
 
@@ -168,7 +168,6 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
   </div>
 </div>
 
-<!-- 隐藏的图片选择器 -->
 <input type="file" id="proofFileInput" accept="image/*" style="display:none;">
 
 <div class="modal-mask" id="plantPreviewModal">
@@ -243,7 +242,6 @@ const PLANT = {
 
 window.addEventListener('load', function(){
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  // 图片选择后自动上传
   document.getElementById('proofFileInput').addEventListener('change', handleProofUpload);
 });
 
@@ -333,11 +331,36 @@ function feedPlant(){
   if(state.stage>=7){state.stage=7;state.plantDone=true;alert('🎉恭喜！植物培育完成');}
   saveState();renderAll();
 }
+
+// ✅ 新的重置函数：植物进度 + 物资 + 星星清零 + 清空全部作业图片
 async function resetWeek(){
-  if(!confirm('确定重置本周植物吗？'))return;
-  state.plant=null;state.stage=1;state.water=0;state.sun=0;state.fert=0;state.plantDone=false;
-  await saveState();renderAll();alert('已重置，可以重新选择植物');
+  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 星星清零\n3. 删除系统内全部作业照片\n\n此操作不可撤销！'))return;
+
+  state.plant = null;
+  state.stage = 1;
+  state.water = 0;
+  state.sun = 0;
+  state.fert = 0;
+  state.plantDone = false;
+  state.star = 0;
+
+  // 删除 task-proof 桶内全部图片
+  try{
+    const {data:fileList, error:listErr} = await supabase.storage.from('task-proof').list();
+    if(!listErr && fileList && fileList.length > 0){
+      const filePaths = fileList.map(item => item.name);
+      await supabase.storage.from('task-proof').remove(filePaths);
+    }
+  }catch(err){
+    console.warn('清理图片出错', err);
+  }
+
+  await saveState();
+  await loadAllData();
+  renderAll();
+  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片已全部删除。\n可以重新选择植物。');
 }
+
 function buyRes(type){
   if(state.star<6){alert('星星不足，需要6颗星');return;}
   state.star-=6;
@@ -372,7 +395,6 @@ async function startTask(idx){
   renderAll();
 }
 
-// 孩子点完成 → 弹出相册选图
 async function handleTaskComplete(idx){
   const task = state.daily[idx];
   if(!task) return;
@@ -389,7 +411,6 @@ async function handleTaskComplete(idx){
   document.getElementById('proofFileInput').click();
 }
 
-// 选图后上传
 async function handleProofUpload(e){
   const file = e.target.files[0];
   if(!file || pendingTaskIdx === null) return;
@@ -416,12 +437,10 @@ async function handleProofUpload(e){
   renderAll();
 }
 
-// 家长查看图片
 function viewProofImage(url){
   window.open(url, '_blank');
 }
 
-// 家长通过审核
 async function parentApprove(idx){
   const task = state.daily[idx];
   const startTime = new Date(task.start_at);
@@ -438,7 +457,6 @@ async function parentApprove(idx){
   alert(`✅ 已通过，发放 ${getStar} ⭐`);
 }
 
-// 家长退回
 async function parentReject(idx){
   const task = state.daily[idx];
   if(!confirm(`退回【${task.title}】？\n孩子需要重新开始做`)) return;
@@ -545,9 +563,7 @@ function renderAll(){
   let dh='';
   state.daily.forEach((t,i)=>{
     const isPending = t.status === 'pending_review';
-
     if(isPending){
-      // 待审核任务
       if(currentRole === 'parent'){
         let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
         dh+=`<div class="task-row">
@@ -571,7 +587,6 @@ function renderAll(){
         </div>`;
       }
     }else{
-      // 正常进行中任务
       let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
       let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
       let startBtnHtml = '';
