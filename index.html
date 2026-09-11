@@ -41,6 +41,7 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .badge-parent{background:#fce7f3;color:#be185d;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-notdone{background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-submit{display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
+.badge-timing{display:inline-block;background:#dcfce7;color:#15803d;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .plant-big{font-size:80px;text-align:center;margin:20px 0;}
 .stage-dots{display:flex;justify-content:center;gap:8px;margin:16px 0;}
 .stage-dot{width:22px;height:22px;border-radius:50%;background:#ddd;}
@@ -476,7 +477,7 @@ async function parentReject(idx){
   alert('已退回，孩子可重新开始');
 }
 
-// ==========长期任务函数（保持不变）==========
+// ==========长期任务函数（完全保留原样，不修改）==========
 async function saveLongTask(){
   const title=document.getElementById('longTitle').value.trim();
   const star=parseInt(document.getElementById('longStar').value)||1;
@@ -522,18 +523,18 @@ function startNightTimer(){
     const h = now.getHours();
     const m = now.getMinutes();
     if(h === 21 && m === 30){
-      if(state.daily.length > 0){
-        for(const t of state.daily){
-          if(t.status !== 'pending_review'){
-            state.star -= 1;
-            await supabase.from('daily_tasks').delete().eq('id', t.id);
-          }
+      // 只处理active状态任务，pending_review待审核任务跳过不扣星不删除
+      const activeDailyList = state.daily.filter(item => item.status === 'active');
+      if(activeDailyList.length > 0){
+        for(const t of activeDailyList){
+          state.star -= 1;
+          await supabase.from('daily_tasks').delete().eq('id', t.id);
         }
         await saveState();
       }
       await loadAllData();
       renderAll();
-      alert("⏰21:30到！未完成日常任务已扣星并清空！");
+      alert("⏰21:30到！未完成日常任务已扣星并清空！待家长审核的任务保留");
     }
   },30000);
 }
@@ -583,6 +584,7 @@ function renderAll(){
   let dh='';
   state.daily.forEach((t,i)=>{
     const isPending = t.status === 'pending_review';
+    const isTiming = !!t.start_at && !isPending;
     if(isPending){
       if(currentRole === 'parent'){
         let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
@@ -608,6 +610,7 @@ function renderAll(){
       }
     }else{
       let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
+      let statusBadgeHtml = isTiming ? `<span class="badge-timing">计时中</span>` : '';
       let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
       let startBtnHtml = '';
       let completeDisabled = true;
@@ -618,7 +621,7 @@ function renderAll(){
         completeDisabled = false;
       }
       dh+=`<div class="task-row">
-        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
+        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
         <div style="display:flex;gap:6px;align-items:center;">
           ${startBtnHtml}
           <button class="task-btn" onclick="handleTaskComplete(${i})" ${completeDisabled?'disabled':''}>完成</button>
@@ -629,7 +632,7 @@ function renderAll(){
   });
   document.getElementById('dailyList').innerHTML=dh||'<p style="color:#aaa;text-align:center;">暂无日常任务</p>';
 
-  // ==========长期任务渲染（精简：未完成不显示状态标签）==========
+  // ==========长期任务渲染（精简：未完成不显示状态标签，完全锁定不动）==========
   let childHtml = '';
   let parentHtml = '';
   const today=new Date().toDateString();
