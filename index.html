@@ -42,7 +42,6 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .badge-notdone{background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-submit{display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-timing{display:inline-block;background:#dcfce7;color:#15803d;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
-/* 科目标签样式 */
 .badge-chinese{background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-math{background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
 .badge-english{background:#dcfce7;color:#15803d;font-size:12px;padding:2px 8px;border-radius:8px;margin-left:4px;}
@@ -76,7 +75,6 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .label-text{font-size:15px;color:#333;font-weight:bold;margin-top:8px;margin-bottom:4px;display:block;}
 .limit-tag{display:inline-block;background:#fffbeb;color:#92400e;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:6px;}
 .group-title{font-size:17px;font-weight:bold;color:#444;margin:16px 0 8px 0;padding-bottom:4px;border-bottom:1px solid #eee;}
-/* 科目选择按钮组 */
 .subject-buttons{display:flex;gap:8px;margin-bottom:12px;}
 .subject-btn{flex:1;padding:10px;border-radius:12px;border:1px solid #ddd;font-size:15px;cursor:pointer;}
 .subject-btn.chinese{background:#fee2e2;color:#b91c1c;border-color:#fecdd3;}
@@ -105,7 +103,7 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 <div id="mainPage" class="hidden main-content">
   <div class="top-star-card">
     <div class="top-star-title">🌱 种植小花园</div>
-    <div class="star-badge">⭐ <span id="starNum">0</span></div>
+    <div class="star-badge">⭐ <span id="starNum">0</span> <span id="starRoleTip"></span></div>
   </div>
 
   <div id="tab-garden">
@@ -140,7 +138,6 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
         <h3 class="task-card-title">📅 日常任务</h3>
         <button id="addDailyBtn" class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
       </div>
-      <!-- 【改动】分为两块：进行中/待开始；待审核单独放下面 -->
       <div><span class="group-title">待开始 / 进行中任务</span></div>
       <div id="dailyActiveList"></div>
 
@@ -261,9 +258,11 @@ let supabase = null;
 let currentRole = "";
 let pendingPlantId = null;
 let pendingTaskIdx = null;
-let selectedSubject = null; // 新增：当前选中科目
+let selectedSubject = null;
 let state = {
-  star: 10, water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false,
+  star: 10,
+  parent_star: 0,
+  water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false,
   daily: [], long: [], wish: []
 };
 
@@ -273,7 +272,6 @@ const PLANT = {
   tomato:{name:"小番茄",stages:["🌱","🌾","🌿","🪴","🍅","🍅","🍅"]},
   succulent:{name:"小多肉",stages:["🌱","🌾","🌿","🪴","🪴","🪴","🪴"]}
 };
-// 科目映射
 const SUBJECT_MAP = {
   chinese:{name:"语文",cls:"badge-chinese"},
   math:{name:"数学",cls:"badge-math"},
@@ -330,7 +328,8 @@ async function loadAllData(){
 async function saveState(){
   if(!supabase) return;
   await supabase.from('app_state').upsert({
-    id:1, star:state.star, water:state.water, sun:state.sun, fert:state.fert,
+    id:1, star:state.star, parent_star:state.parent_star,
+    water:state.water, sun:state.sun, fert:state.fert,
     plant:state.plant, stage:state.stage, plant_done:state.plantDone
   });
 }
@@ -342,7 +341,6 @@ function switchTab(name,btn){
 }
 function openModal(id){
   document.getElementById(id).classList.add('show');
-  // 打开弹窗重置科目选择
   if(id === 'dailyModal'){
     selectedSubject = null;
     document.querySelectorAll('.subject-btn').forEach(b=>b.classList.remove('active'));
@@ -350,7 +348,6 @@ function openModal(id){
 }
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 
-// 科目选择函数
 function selectSubject(subj){
   selectedSubject = subj;
   document.querySelectorAll('.subject-btn').forEach(b=>b.classList.remove('active'));
@@ -387,7 +384,7 @@ function feedPlant(){
 }
 
 async function resetWeek(){
-  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 星星清零\n3. 删除系统内全部作业照片\n\n此操作不可撤销！'))return;
+  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n\n此操作不可撤销！'))return;
 
   state.plant = null;
   state.stage = 1;
@@ -396,6 +393,7 @@ async function resetWeek(){
   state.fert = 0;
   state.plantDone = false;
   state.star = 0;
+  state.parent_star = 0;
 
   try{
     const {data:fileList, error:listErr} = await supabase.storage.from('task-proof').list();
@@ -414,8 +412,13 @@ async function resetWeek(){
 }
 
 function buyRes(type){
-  if(state.star<6){alert('星星不足，需要6颗星');return;}
-  state.star-=6;
+  const myStar = currentRole === 'parent' ? state.parent_star : state.star;
+  if(myStar < 6){ alert('星星不足，需要6颗星'); return; }
+  if(currentRole === 'parent'){
+    state.parent_star -= 6;
+  }else{
+    state.star -= 6;
+  }
   if(type==='water')state.water++;
   if(type==='sun')state.sun++;
   if(type==='fert')state.fert++;
@@ -503,21 +506,22 @@ async function parentApprove(idx){
   const diffMin = (now - startTime) / 1000 / 60;
   let getStar = (task.minute_limit === 0 || diffMin <= task.minute_limit) ? task.star : Math.floor(task.star/2);
   const over = task.minute_limit !== 0 && diffMin > task.minute_limit;
-  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟` + (over?'（超时，半星）':'') + `\n发放 ${getStar} ⭐`)) return;
+  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟` + (over?'（超时，半星）':'') + `\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
+
   state.star += getStar;
+  state.parent_star += getStar;
   await supabase.from('daily_tasks').delete().eq('id', task.id);
   await saveState();
   await loadAllData();
   renderAll();
-  alert(`✅ 已通过，发放 ${getStar} ⭐`);
+  alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐`);
 }
 
 async function parentReject(idx){
   const task = state.daily[idx];
   if(!confirm(`退回【${task.title}】？\n⚠️本次退回不会重置计时，依旧以最初开始任务的时间为准`)) return;
-  // 只清空图片和审核状态，保留 start_at！
   await supabase.from('daily_tasks').update({
-    proof_image: null, 
+    proof_image: null,
     status: 'active'
   }).eq('id', task.id);
   await loadAllData();
@@ -525,7 +529,6 @@ async function parentReject(idx){
   alert('已退回，孩子可重新提交，计时沿用初次开始时间');
 }
 
-// ==========长期任务函数（完全保留原样，不修改）==========
 async function saveLongTask(){
   const title=document.getElementById('longTitle').value.trim();
   const star=parseInt(document.getElementById('longStar').value)||1;
@@ -550,7 +553,16 @@ async function approveLongTask(idx){
   const today=new Date().toDateString();
   if(task.submit_status !== 'submitted') return;
   await supabase.from('long_tasks').update({last_date:today,submit_status:'normal'}).eq('id',task.id);
-  state.star += task.star;
+  
+  // ========== 修改后的长期任务星星规则 ==========
+  if(task.owner_type === 'child'){
+    // 孩子长期任务：确认完成，只给孩子加星，家长不加
+    state.star += task.star;
+  }else{
+    // 家长长期任务：确认完成，只给家长加星，孩子不加
+    state.parent_star += task.star;
+  }
+
   await saveState();await loadAllData();renderAll();
   alert('✅ 确认完成，+'+task.star+'⭐');
 }
@@ -571,18 +583,26 @@ function startNightTimer(){
     const h = now.getHours();
     const m = now.getMinutes();
     if(h === 21 && m === 30){
-      // 只处理active状态任务，pending_review待审核任务跳过不扣星不删除
       const activeDailyList = state.daily.filter(item => item.status === 'active');
+      const pendingList = state.daily.filter(item => item.status === 'pending_review');
+
       if(activeDailyList.length > 0){
+        state.star = Math.max(0, state.star - 1);
         for(const t of activeDailyList){
-          state.star -= 1;
           await supabase.from('daily_tasks').delete().eq('id', t.id);
         }
-        await saveState();
       }
+      if(pendingList.length > 0){
+        state.parent_star = Math.max(0, state.parent_star - 1);
+      }
+
+      await saveState();
       await loadAllData();
       renderAll();
-      alert("⏰21:30到！未完成日常任务已扣星并清空！待家长审核的任务保留");
+      let msg = "⏰21:30到！";
+      if(activeDailyList.length > 0) msg += "\n孩子有未完成任务，扣1⭐";
+      if(pendingList.length > 0) msg += "\n家长有未审核作业，扣1⭐";
+      alert(msg || "今日全部完成！");
     }
   },30000);
 }
@@ -608,7 +628,10 @@ async function handleDelete(type, idx) {
 }
 
 function renderAll(){
-  document.getElementById('starNum').innerText=state.star;
+  const displayStar = currentRole === 'parent' ? state.parent_star : state.star;
+  document.getElementById('starNum').innerText = displayStar;
+  document.getElementById('starRoleTip').innerText = currentRole==='parent'?'(家长)':'(孩子)';
+
   document.getElementById('resWater').innerText=state.water;
   document.getElementById('resSun').innerText=state.sun;
   document.getElementById('resFert').innerText=state.fert;
@@ -629,7 +652,6 @@ function renderAll(){
     document.getElementById('doneTip').classList.toggle('hidden',!state.plantDone);
   }
 
-  // ==========【核心改动：日常任务拆成两组】==========
   let activeHtml = '';
   let pendingHtml = '';
   state.daily.forEach((t,i)=>{
@@ -639,14 +661,12 @@ function renderAll(){
     let statusBadgeHtml = isTiming ? `<span class="badge-timing">计时中</span>` : '';
     let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
 
-    // 科目标签
     let subjectBadgeHtml = '';
     if(t.subject && SUBJECT_MAP[t.subject]){
       subjectBadgeHtml = `<span class="${SUBJECT_MAP[t.subject].cls}">${SUBJECT_MAP[t.subject].name}</span>`;
     }
 
     if(isPending){
-      // 待审核板块
       if(currentRole === 'parent'){
         pendingHtml+=`<div class="task-row">
           <div class="task-info"><div class="task-icon">📷</div><div>
@@ -669,7 +689,6 @@ function renderAll(){
         </div>`;
       }
     }else{
-      // 待开始/进行中 全部留在上方区域，点开始不会移动
       if(currentRole === 'parent'){
         activeHtml+=`<div class="task-row">
         <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${subjectBadgeHtml}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
@@ -700,7 +719,6 @@ function renderAll(){
   document.getElementById('dailyActiveList').innerHTML=activeHtml||'<p style="color:#aaa;text-align:center;">暂无待开始/进行中任务</p>';
   document.getElementById('dailyPendingList').innerHTML=pendingHtml||'<p style="color:#aaa;text-align:center;">暂无待审核任务</p>';
 
-  // ==========长期任务渲染（精简：未完成不显示状态标签，完全锁定不动）==========
   let childHtml = '';
   let parentHtml = '';
   const today=new Date().toDateString();
@@ -714,7 +732,6 @@ function renderAll(){
     }else if(submitted){
       statusBadge = `<span class="badge-submit">已提交待确认</span>`;
     }
-    // 未完成：不渲染任何标签
 
     let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('long',${i})">删除</button>` : '';
 
