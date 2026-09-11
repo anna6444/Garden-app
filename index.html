@@ -129,7 +129,12 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
         <h3 class="task-card-title">📅 日常任务</h3>
         <button id="addDailyBtn" class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
       </div>
-      <div id="dailyList"></div>
+      <!-- 【改动】分为两块：进行中/待开始；待审核单独放下面 -->
+      <div><span class="group-title">待开始 / 进行中任务</span></div>
+      <div id="dailyActiveList"></div>
+
+      <div><span class="group-title">待家长审核</span></div>
+      <div id="dailyPendingList"></div>
     </div>
   </div>
 
@@ -468,13 +473,15 @@ async function parentApprove(idx){
 
 async function parentReject(idx){
   const task = state.daily[idx];
-  if(!confirm(`退回【${task.title}】？\n孩子需要重新开始做`)) return;
+  if(!confirm(`退回【${task.title}】？\n⚠️本次退回不会重置计时，依旧以最初开始任务的时间为准`)) return;
+  // 只清空图片和审核状态，保留 start_at！
   await supabase.from('daily_tasks').update({
-    start_at: null, proof_image: null, status: 'active'
+    proof_image: null, 
+    status: 'active'
   }).eq('id', task.id);
   await loadAllData();
   renderAll();
-  alert('已退回，孩子可重新开始');
+  alert('已退回，孩子可重新提交，计时沿用初次开始时间');
 }
 
 // ==========长期任务函数（完全保留原样，不修改）==========
@@ -581,14 +588,20 @@ function renderAll(){
     document.getElementById('doneTip').classList.toggle('hidden',!state.plantDone);
   }
 
-  let dh='';
+  // ==========【核心改动：日常任务拆成两组】==========
+  let activeHtml = '';
+  let pendingHtml = '';
   state.daily.forEach((t,i)=>{
     const isPending = t.status === 'pending_review';
     const isTiming = !!t.start_at && !isPending;
+    let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
+    let statusBadgeHtml = isTiming ? `<span class="badge-timing">计时中</span>` : '';
+    let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
+
     if(isPending){
+      // 待审核板块
       if(currentRole === 'parent'){
-        let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
-        dh+=`<div class="task-row">
+        pendingHtml+=`<div class="task-row">
           <div class="task-info"><div class="task-icon">📷</div><div>
             <div class="task-text">${t.title}${limitHtml}<span class="badge-pending">待审核</span></div>
             <div class="task-meta">${t.star}⭐ 作业已提交</div>
@@ -597,11 +610,11 @@ function renderAll(){
             <button class="task-btn btn-blue" onclick="viewProofImage('${t.proof_image}')">看图</button>
             <button class="task-btn task-btn-approve" onclick="parentApprove(${i})">通过</button>
             <button class="task-btn task-btn-reject" onclick="parentReject(${i})">退回</button>
-            <button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>
+            ${delBtnHtml}
           </div>
         </div>`;
       }else{
-        dh+=`<div class="task-row">
+        pendingHtml+=`<div class="task-row">
           <div class="task-info"><div class="task-icon">📷</div><div>
             <div class="task-text">${t.title}<span class="badge-pending">待审核</span></div>
             <div class="task-meta">✅ 作业已上传，等待家长审核</div>
@@ -609,18 +622,24 @@ function renderAll(){
         </div>`;
       }
     }else{
-      let limitHtml = t.minute_limit > 0 ? `<span class="limit-tag">限时${t.minute_limit}分钟</span>` : '';
-      let statusBadgeHtml = isTiming ? `<span class="badge-timing">计时中</span>` : '';
-      let delBtnHtml = currentRole === 'parent' ? `<button class="btn-del" onclick="handleDelete('daily',${i})">删除</button>` : '';
-      let startBtnHtml = '';
-      let completeDisabled = true;
-      if(!t.start_at){
-        startBtnHtml = `<button class="task-btn task-btn-start" onclick="startTask(${i})">开始任务</button>`;
+      // 待开始/进行中 全部留在上方区域，点开始不会移动
+      if(currentRole === 'parent'){
+        activeHtml+=`<div class="task-row">
+        <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          ${delBtnHtml}
+        </div>
+      </div>`;
       }else{
-        startBtnHtml = `<span style="color:#22c55e;font-size:13px;">✅计时中</span>`;
-        completeDisabled = false;
-      }
-      dh+=`<div class="task-row">
+        let startBtnHtml = '';
+        let completeDisabled = true;
+        if(!t.start_at){
+          startBtnHtml = `<button class="task-btn task-btn-start" onclick="startTask(${i})">开始任务</button>`;
+        }else{
+          startBtnHtml = `<span style="color:#22c55e;font-size:13px;">✅计时中</span>`;
+          completeDisabled = false;
+        }
+        activeHtml+=`<div class="task-row">
         <div class="task-info"><div class="task-icon">📅</div><div><div class="task-text">${t.title}${limitHtml}${statusBadgeHtml}</div><div class="task-meta">${t.star}⭐</div></div></div>
         <div style="display:flex;gap:6px;align-items:center;">
           ${startBtnHtml}
@@ -628,9 +647,11 @@ function renderAll(){
           ${delBtnHtml}
         </div>
       </div>`;
+      }
     }
   });
-  document.getElementById('dailyList').innerHTML=dh||'<p style="color:#aaa;text-align:center;">暂无日常任务</p>';
+  document.getElementById('dailyActiveList').innerHTML=activeHtml||'<p style="color:#aaa;text-align:center;">暂无待开始/进行中任务</p>';
+  document.getElementById('dailyPendingList').innerHTML=pendingHtml||'<p style="color:#aaa;text-align:center;">暂无待审核任务</p>';
 
   // ==========长期任务渲染（精简：未完成不显示状态标签，完全锁定不动）==========
   let childHtml = '';
