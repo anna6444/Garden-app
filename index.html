@@ -416,7 +416,6 @@ function startNightTimer(){
 
 // ✅ 修改后的删除函数，带调试alert
 async function handleDelete(type, idx) {
-  alert("点击触发，准备弹出确认框");
   if (!confirm("确定删除这条记录，删除后无法恢复？")) return;
   try {
     if(type === "daily"){
