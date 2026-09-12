@@ -383,6 +383,42 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     </div>
   </div>
 </div>
+<!-- 【新增：任务提交弹窗】3并排按钮：上传图片 / 直接提交 / 取消 -->
+
+<div class="modal-mask" id="taskSubmitModal">
+
+  <div class="modal-box">
+
+    <h3 style="margin-bottom:12px;">📤 提交任务</h3>
+
+    <p id="submitTaskTitle" style="color:#444;margin-bottom:10px;"></p>
+
+    <!-- 图片预览区域 -->
+
+    <div id="submitImgPreviewBox" class="hidden">
+
+      <img id="submitPreviewImg" style="width:100%;border-radius:12px;max-height:300px;object-fit:contain;">
+
+      <p style="color:#666;font-size:13px;margin:6px 0;">已选择图片，可重新上传替换</p>
+
+    </div>
+
+    <input type="file" id="submitProofFile" accept="image/*" style="display:none;">
+
+    <!-- 3个并排按钮 -->
+    <div style="display:flex;gap:10px;margin-top:20px;">
+
+      <button class="btn btn-blue" style="flex:1;" onclick="triggerSelectImage()">上传图片</button>
+
+      <button class="btn btn-green" style="flex:1;" onclick="submitTaskDirect()">直接提交</button>
+
+      <button class="btn btn-gray" style="flex:1;" onclick="closeTaskSubmitModal()">取消</button>
+
+    </div>
+
+  </div>
+
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.7/dist/umd/supabase.min.js"></script>
 <script>
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
@@ -410,8 +446,15 @@ const SUBJECT_MAP = {
   english:{name:"英语",cls:"badge-english"}
 };
 window.addEventListener('load', function(){
+
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   document.getElementById('proofFileInput').addEventListener('change', handleProofUpload);
+
+  // 新增：绑定提交弹窗图片选择事件
+
+  document.getElementById('submitProofFile').addEventListener('change', handleSubmitImageSelect);
+
 });
 function selectRole(role){
   currentRole = role;
@@ -678,20 +721,128 @@ async function startTask(idx){
   renderAll();
 }
 async function handleTaskComplete(idx){
+
   const task = state.daily[idx];
+
   if(!task) return;
-  if(task.status === 'pending_review'){
-    alert('任务已提交，等待家长审核中～');
-    return;
-  }
-    if(!task.start_at){
+
+  if(!task.start_at){
+
     alert('请先点击【开始任务】，再提交完成！');
+
     return;
   }
-  if(!confirm(`确认完成【${task.title}】？\n接下来请选择作业照片上传`)) return;
   pendingTaskIdx = idx;
-  document.getElementById('proofFileInput').click();
+
+  // 打开新弹窗
+
+  document.getElementById('submitTaskTitle').innerText = `任务：${task.title}`;
+
+  // 清空图片预览
+
+  document.getElementById('submitImgPreviewBox').classList.add('hidden');
+
+  document.getElementById('submitPreviewImg').src = "";
+
+  // 打开模态弹窗
+
+  openModal('taskSubmitModal');
+
 }
+
+  // 唤起图片选择
+
+  function triggerSelectImage(){
+
+    document.getElementById('submitProofFile').click();
+
+}
+
+  // 图片选择回调
+  
+async function handleSubmitImageSelect(e){
+
+    const file = e.target.files[0];
+  
+  if(!file || pendingTaskIdx === null) return;
+  
+  const task = state.daily[pendingTaskIdx];
+  
+  try {
+
+      alert('正在上传作业照片...');
+  
+    const fileExt = file.name.split('.').pop();
+  
+    const fileName = `${task.id}-${Date.now()}.${fileExt}`;
+
+      const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file)
+  
+    if(upErr) throw upErr;
+
+      const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
+  
+    // 预览图片
+  
+    document.getElementById('submitPreviewImg').src = urlData.publicUrl;
+
+      document.getElementById('submitImgPreviewBox').classList.remove('hidden');
+  
+    // 临时保存图片url，提交的时候写入数据库
+  
+    window.tempSubmitImgUrl = urlData.publicUrl;
+
+   } catch(err){
+
+     console.error(err);
+
+     alert('❌ 上传失败：' + err.message);
+ 
+  }
+
+    e.target.value = '';
+
+ }
+  // 直接提交（不带图片，或者带上已经上传好的图片）
+
+async function submitTaskDirect(){
+
+  const task = state.daily[pendingTaskIdx];
+
+  const imgUrl = window.tempSubmitImgUrl || null;
+
+  await supabase.from('daily_tasks').update({
+
+    proof_image: imgUrl,
+
+    status: 'pending_review'
+
+  }).eq('id', task.id);
+
+  alert('✅任务提交成功，等待家长审核！');
+
+  closeTaskSubmitModal();
+
+  window.tempSubmitImgUrl = null;
+
+  pendingTaskIdx = null;
+
+  await loadAllData();
+
+  renderAll();
+
+}
+
+// 关闭提交弹窗
+
+function closeTaskSubmitModal(){
+
+  closeModal('taskSubmitModal');
+
+  window.tempSubmitImgUrl = null;
+
+}
+
 async function handleProofUpload(e){
   const file = e.target.files[0];
   if(!file || pendingTaskIdx === null) return;
@@ -728,7 +879,13 @@ async function parentApprove(idx){
   let getStar = (task.minute_limit === 0 || diffMin <= task.minute_limit) ? task.star : Math.floor(task.star/2);
   const over = task.minute_limit !== 0 && diffMin > task.minute_limit;
   const tipText = over?"（超时减半）":"";
-  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟${tipText}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
+  // 新增：判断是否没有上传图片
+  
+const hasImg = !!task.proof_image;
+  
+const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
+
+  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
   state.star += getStar;
   state.parent_star += getStar;
   await addStarLogItem("child",getStar,`日常任务【${task.title}】完成${tipText}`);
@@ -947,10 +1104,14 @@ function renderAll(){
         </div>
         <div>
           ${currentRole==='parent'?`
-            <button class="task-btn task-btn-approve" onclick="parentApprove(${idx})">✅通过</button>
-            <button class="task-btn task-btn-reject" onclick="parentReject(${idx})">↩退回</button>
-            <button class="task-btn btn-del" style="margin-left:4px;" onclick="deleteDailyTask(${idx})">删除</button>
-          `:`<button class="task-btn" onclick="viewProofImage('${task.proof_image}')">查看图片</button>`}
+
+    <button class="task-btn task-btn-approve" onclick="parentApprove(${idx})">✅通过</button>
+
+    <button class="task-btn task-btn-reject" onclick="parentReject(${idx})">↩退回</button>
+
+    <button class="task-btn btn-del" style="margin-left:4px;" onclick="deleteDailyTask(${idx})">删除</button>
+
+  `:`${task.proof_image?`<button class="task-btn" onclick="viewProofImage('${task.proof_image}')">查看图片</button>`:`<span style="color:#888;font-size:13px;">无作业照片</span>`}`}
         </div>
       </div>`;
     }else{
