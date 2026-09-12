@@ -215,14 +215,18 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
       <button class="btn btn-green" onclick="buyRes('water')">💧 兑换水（6⭐）</button>
       <button class="btn btn-green" onclick="buyRes('sun')">☀️ 兑换阳光（6⭐）</button>
       <button class="btn btn-green" onclick="buyRes('fert')">🧪 兑换肥料（6⭐）</button>
-    </div>
+
+      <div style="margin-top:20px;"></div>
+
+      <h3 class="task-card-title">💖 心愿清单</h3>
+ 
+      <button id="addWishBtn" class="btn btn-red btn-sm" onclick="openModal('wishModal')">+ 新增心愿</button>
+
+      <div id="wishList"></div>
+</div>
   </div>
   <div id="tab-mine" class="hidden">
-    <div class="card">
-      <h3 class="task-card-title">💖 心愿清单</h3>
-      <button id="addWishBtn" class="btn btn-red btn-sm" onclick="openModal('wishModal')">+ 新增心愿</button>
-      <div id="wishList"></div>
-    </div>
+    
     <!-- 新增：快捷奖惩卡片 -->
     <div class="card" id="quickRewardCard">
       <h3 class="task-card-title">⚖️快捷奖惩记录</h3>
