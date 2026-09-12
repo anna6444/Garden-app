@@ -136,18 +136,31 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
   </div>
   <!-- =========新增待处理任务统计卡片========= -->
   <div class="task-count-card">
+
     <div class="count-item">
+
       <p class="count-num" id="countPendingDaily">0</p>
-      <p class="count-label">待审核任务</p>
+
+      <p class="count-label" id="label1">待审核任务</p>
+
     </div>
+
     <div class="count-item">
+
       <p class="count-num" id="countPendingLong">0</p>
-      <p class="count-label">待确认长期任务</p>
+
+      <p class="count-label" id="label2">待确认长期任务</p>
+
     </div>
+
     <div class="count-item">
+
       <p class="count-num" id="countTotal">0</p>
-      <p class="count-label">待处理合计</p>
+
+      <p class="count-label" id="label3">待处理合计</p>
+
     </div>
+
   </div>
   <div id="tab-garden">
     <div class="card">
@@ -802,13 +815,93 @@ function renderAll(){
   // 渲染星星数字
   document.getElementById('starNum').innerText = currentRole === "parent" ? state.parent_star : state.star;
   document.getElementById('starRoleTip').innerText = currentRole === "parent" ? "家长星星" : "孩子星星";
-  // 待处理任务统计
-  const pendingDailyCount = state.daily.filter(t => t.status === 'pending_review').length;
-  const pendingLongCount = state.long.filter(t => t.submit_status === 'submitted').length;
-  const totalPending = pendingDailyCount + pendingLongCount;
-  document.getElementById('countPendingDaily').innerText = pendingDailyCount;
-  document.getElementById('countPendingLong').innerText = pendingLongCount;
-  document.getElementById('countTotal').innerText = totalPending;
+  // ==========【新版：区分家长/孩子两端独立统计，严格按需求】==========
+
+  let num1,num2,num3;
+
+  let text1,text2,text3;
+
+
+  if(currentRole === "child"){
+
+    // 🧒 孩子端统计
+
+    // 1.未完成任务：孩子日常active + 孩子长期非submitted
+
+    const childDailyUnfinish = state.daily.filter(t => t.status === "active").length;
+
+    const childLongUnfinish = state.long.filter(t => t.owner_type==="child" && t.submit_status !== "submitted").length;
+
+    num1 = childDailyUnfinish + childLongUnfinish;
+    text1 = "未完成任务";
+
+
+
+    //2.家长待确认：家长长期任务 submitted
+
+    num2 = state.long.filter(t => t.owner_type==="parent" && t.submit_status === "submitted").length;
+    text2 = "家长待确认";
+
+
+
+    //3.已完成任务：孩子日常pending_review +孩子长期submitted（提交打卡就算完成，不等审核）
+
+    const childDailyDone = state.daily.filter(t => t.status === "pending_review").length;
+
+    const childLongDone = state.long.filter(t => t.owner_type==="child" && t.submit_status === "submitted").length;
+
+    num3 = childDailyDone + childLongDone;
+
+    text3 = "已完成任务";
+
+  }else{
+
+    // 👨‍👩‍👧 家长端统计
+
+    //1.未完成任务：家长自己长期任务未提交（非submitted）
+
+    num1 = state.long.filter(t => t.owner_type==="parent" && t.submit_status !== "submitted").length;
+
+    text1 = "未完成任务";
+
+
+
+    //2.孩子待审核：孩子日常pending_review +孩子长期submitted
+
+    const childDailyNeedReview = state.daily.filter(t => t.status === "pending_review").length;
+
+    const childLongNeedReview = state.long.filter(t => t.owner_type==="child" && t.submit_status === "submitted").length;
+
+    num2 = childDailyNeedReview + childLongNeedReview;
+
+    text2 = "孩子待审核";
+
+
+
+    //3.已完成任务：家长自己长期任务，last_date存在=完成
+
+    num3 = state.long.filter(t => t.owner_type==="parent" && !!t.last_date).length;
+
+    text3 = "已完成任务";
+
+  }
+
+
+  // 赋值渲染
+
+  document.getElementById('countPendingDaily').innerText = num1;
+
+  document.getElementById('countPendingLong').innerText = num2;
+
+  document.getElementById('countTotal').innerText = num3;
+
+  document.getElementById('label1').innerText = text1;
+
+  document.getElementById('label2').innerText = text2;
+
+  document.getElementById('label3').innerText = text3;
+
+
   // 植物渲染
   const plantSel = document.getElementById("plantSelect");
   const plantGrow = document.getElementById("plantGrow");
