@@ -667,7 +667,7 @@ async function handleTaskComplete(idx){
     alert('任务已提交，等待家长审核中～');
     return;
   }
-  if(!task.start_at){
+    if(!task.start_at){
     alert('请先点击【开始任务】，再提交完成！');
     return;
   }
@@ -877,11 +877,12 @@ function renderAll(){
   });
   document.getElementById("dailyActiveList").innerHTML = dailyActiveHtml || `<p style="padding:10px;color:#888;">暂无日常任务</p>`;
   document.getElementById("dailyPendingList").innerHTML = dailyPendingHtml || `<p style="padding:10px;color:#888;">无待审核任务</p>`;
-  // 长期任务渲染
-  let longHtml = "";
+  // 长期任务渲染【拆分：孩子任务 / 家长任务】
+  let longChildHtml = "";
+  let longParentHtml = "";
   state.long.forEach((task,idx)=>{
     const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
-    longHtml += `
+    const itemHtml = `
     <div class="task-row">
       <div class="task-info">
         <div class="task-icon">⏳</div>
@@ -899,8 +900,27 @@ function renderAll(){
         ${currentRole==='parent'?`<button class="task-btn btn-del" style="margin-left:4px;" onclick="deleteLongTask(${idx})">删除</button>`:""}
       </div>
     </div>`;
+    if(task.owner_type === "child"){
+      longChildHtml += itemHtml;
+    }else{
+      longParentHtml += itemHtml;
+    }
   });
-  document.getElementById("longList").innerHTML = longHtml || `<p style="padding:10px;color:#888;">暂无长期任务</p>`;
+  let longFinalHtml = "";
+  longFinalHtml += `<div style="margin:12px 0 4px;font-weight:bold;color:#1d4ed8;">👧 孩子长期任务</div>`;
+  if(longChildHtml){
+    longFinalHtml += longChildHtml;
+  }else{
+    longFinalHtml += `<p style="padding:10px;color:#888;">暂无孩子长期任务</p>`;
+  }
+
+  longFinalHtml += `<div style="margin:16px 0 4px;font-weight:bold;color:#be185d;">👨‍👩‍👧 家长长期任务</div>`;
+  if(longParentHtml){
+    longFinalHtml += longParentHtml;
+  }else{
+    longFinalHtml += `<p style="padding:10px;color:#888;">暂无家长长期任务</p>`;
+  }
+  document.getElementById("longList").innerHTML = longFinalHtml;
   // 心愿渲染
   let wishHtml = "";
   state.wish.forEach((wish,idx)=>{
