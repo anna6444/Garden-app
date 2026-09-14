@@ -341,26 +341,68 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
   </div>
 </div>
 <div class="modal-mask" id="dailyModal">
+
   <div class="modal-box">
+
     <h3 style="margin-bottom:12px;">新增日常任务</h3>
+
     <label class="label-text">选择科目</label>
+
     <div class="subject-buttons">
+
       <button class="subject-btn chinese" onclick="selectSubject('chinese')">📖语文</button>
+
       <button class="subject-btn math" onclick="selectSubject('math')">📐数学</button>
+
       <button class="subject-btn english" onclick="selectSubject('english')">🔤英语</button>
+
     </div>
+
+
+    <!-- ==========【新增批量粘贴区域】========== -->
+
+    <label class="label-text">📋批量导入任务（选好科目后粘贴，支持1.xxx 2.xxx格式）</label>
+
+    <textarea id="batchTaskText" rows="4" placeholder="粘贴例子：
+
+1.抄写生字2遍
+
+2.完成练习册第10页
+
+3.朗读课文3遍"></textarea>
+
+    <button class="btn btn-blue" style="margin:8px 0;" onclick="batchCreateDailyTask()">✨批量自动生成任务</button>
+
+    <div style="border-top:1px solid #eee;margin:16px 0;"></div>
+
+    <!-- ==========原有单条任务表单，保留不变========== -->
+
+
+
     <label class="label-text">任务名称</label>
+
     <input id="dailyTitle" placeholder="例如：背10个单词"/>
+
     <label class="label-text">奖励星星数</label>
+
     <input id="dailyStar" type="number" value="2" placeholder="完成任务获得几颗星星"/>
+
     <label class="label-text">限时完成分钟（填0代表不限时间）</label>
+
     <input id="dailyMinuteLimit" type="number" value="0" placeholder="多久内完成可以拿全额星星"/>
+
     <div style="display:flex;gap:10px;margin-top:12px;">
+
       <button class="btn btn-gray" style="flex:1;" onclick="closeModal('dailyModal')">取消</button>
+
       <button class="btn btn-red" style="flex:1;" onclick="saveDailyTask()">保存</button>
+
     </div>
+
   </div>
+
 </div>
+
 <div class="modal-mask" id="longModal">
   <div class="modal-box">
     <h3 style="margin-bottom:12px;">新增长期任务</h3>
@@ -390,13 +432,37 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     </div>
   </div>
 </div>
+
+<!-- 任务时限设置弹窗 -->
+
+<div class="modal-mask" id="setTimeModal">
+
+  <div class="modal-box">
+
+    <h3>⏱ 设置任务时限（分钟）</h3>
+
+    <input type="number" id="editMinuteInput" placeholder="填写分钟数">
+
+    <div style="display:flex;gap:10px;margin-top:12px;">
+
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('setTimeModal')">取消</button>
+
+      <button class="btn btn-red" style="flex:1;" onclick="saveTaskMinuteLimit()">保存</button>
+
+    </div>
+
+  </div>
+
+</div>
+
 <!-- 【新增：任务提交弹窗】3并排按钮：上传图片 / 直接提交 / 取消 -->
 
 <div class="modal-mask" id="taskSubmitModal">
 
   <div class="modal-box">
 
-    <h3 style="margin-bottom:12px;">📤 提交任务</h3>
+    <h3 style="margin-bottom:12px;">
+📤 提交任务</h3>
 
     <p id="submitTaskTitle" style="color:#444;margin-bottom:10px;"></p>
 
@@ -404,22 +470,25 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 
     <div id="submitImgPreviewBox" class="hidden">
 
-      <img id="submitPreviewImg" style="width:100%;border-radius:12px;max-height:300px;object-fit:contain;">
+      <img id="submitPreviewImg" style="width:100%;border-radius:12px;">
 
       <p style="color:#666;font-size:13px;margin:6px 0;">已选择图片，可重新上传替换</p>
 
     </div>
 
-    <input type="file" id="submitProofFile" accept="image/*" style="display:none;">
+    <!-- 隐藏图片选择框，这里补全onchange事件 -->
+
+    <input type="file" id="submitProofFile" accept="image/*" style="display:none;" onchange="handleSubmitImageSelect(event)">
 
     <!-- 3个并排按钮 -->
+
     <div style="display:flex;gap:10px;margin-top:20px;">
 
       <button class="btn btn-blue" style="flex:1;" onclick="triggerSelectImage()">上传图片</button>
 
       <button class="btn btn-green" style="flex:1;" onclick="submitTaskDirect()">直接提交</button>
 
-      <button class="btn btn-gray" style="flex:1;" onclick="closeTaskSubmitModal()">取消</button>
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('taskSubmitModal')">取消</button>
 
     </div>
 
@@ -438,6 +507,7 @@ let selectedSubject = null;
 let state = {
   star: 10,
   parent_star: 0,
+  child_today_done:0,
   water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false,
   daily: [], long: [], wish: []
 };
@@ -720,6 +790,136 @@ async function saveDailyTask(){
   document.getElementById('dailyMinuteLimit').value='0';
   await loadAllData();renderAll();
 }
+
+let editTaskIdx = null;
+ 
+// 打开设置时限弹窗
+
+function openSetTimeModal(idx){
+
+  editTaskIdx = idx;
+
+  const task = state.daily[idx];
+
+  document.getElementById('editMinuteInput').value = task.minute_limit ?? 0;
+
+  openModal('setTimeModal');
+
+}
+
+// 保存修改的时限
+
+async function saveTaskMinuteLimit(){
+
+  const newMin = parseInt(document.getElementById('editMinuteInput').value) || 0;
+
+  const task = state.daily[editTaskIdx];
+
+  await supabase.from('daily_tasks').update({ minute_limit: newMin }).eq('id', task.id);
+
+  closeModal('setTimeModal');
+
+  await loadAllData();
+
+  renderAll();
+
+}
+
+
+//批量解析粘贴文本，自动创建多条日常任务
+async function batchCreateDailyTask(){
+
+  const textRaw = document.getElementById('batchTaskText').value.trim();
+
+  if(!textRaw){
+
+    alert("请粘贴带编号的任务清单！");
+
+    return;
+  }
+  if(!selectedSubject){
+
+    alert("⚠️请先选择科目（语文/数学/英语）！");
+
+    return;
+
+  }
+
+  //正则匹配 1.xxx / 2、xxx 这类编号行
+
+  const lines = textRaw.split(/\n/);
+
+  const taskList = [];
+
+  for(let line of lines){
+
+    const trimLine = line.trim();
+
+    //匹配 1.  2、 3) 编号开头
+ 
+   const matchResult = trimLine.match(/^\d+[.、)]\s*(.+)/);
+
+    if(matchResult && matchResult[1].trim()){
+
+      const taskName = matchResult[1].trim();
+
+      taskList.push(taskName);
+
+    }
+
+  }
+
+  if(taskList.length === 0){
+
+    alert("❌识别不到任务，请按 1.任务名 格式粘贴！");
+
+    return;
+
+  }
+
+  if(!confirm(`识别到${taskList.length}条任务，确定批量创建？\n科目：${SUBJECT_MAP[selectedSubject].name}`)){
+
+    return;
+
+  }
+
+  //循环批量插入数据库，星星默认2，限时0
+
+  for(let taskName of taskList){
+
+    await supabase.from('daily_tasks').insert([{
+
+      title: taskName,
+
+      star: 2,
+
+      minute_limit: 0,
+
+      subject: selectedSubject,
+
+      create_at: new Date().toISOString(),
+
+      start_at: null,
+
+      proof_image: null,
+
+      status: 'active'
+
+    }]);
+
+  }
+
+  alert(`✅成功创建${taskList.length}条任务！`);
+
+  document.getElementById('batchTaskText').value = "";
+
+  await loadAllData();
+
+  renderAll();
+
+}
+
+
 async function startTask(idx){
   const task = state.daily[idx];
   if(!task || task.start_at) return;
@@ -757,82 +957,95 @@ async function handleTaskComplete(idx){
 
 }
 
-  // 唤起图片选择
+//唤起图片选择
 
-  function triggerSelectImage(){
+function triggerSelectImage(){
 
-    document.getElementById('submitProofFile').click();
+  document.getElementById('submitProofFile').click();
+}
+
+
+
+//图片选择回调
+
+async function handleSubmitImageSelect(e){
+
+  const file = e.target.files[0];
+
+  if(!file || pendingTaskIdx === null) return;
+
+  const task = state.daily[pendingTaskIdx];
+
+  try {
+
+    alert('正在上传作业照片...');
+
+    const fileExt = file.name.split('.').pop();
+
+    const fileName = `${task.id}-${Date.now()}.${fileExt}`;
+
+    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
+
+    if(upErr) throw upErr;
+
+    const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
+
+    //预览图片
+
+    document.getElementById('submitPreviewImg').src = urlData.publicUrl;
+
+    document.getElementById('submitImgPreviewBox').classList.remove('hidden');
+
+  } catch(err){
+
+    console.error(err);
+
+    alert('❌ 上传预览失败：' + err.message);
+
+  }
 
 }
 
-  // 图片选择回调
-  
-async function handleSubmitImageSelect(e){
 
-    const file = e.target.files[0];
-  
-  if(!file || pendingTaskIdx === null) return;
-  
-  const task = state.daily[pendingTaskIdx];
-  
-  try {
 
-      alert('正在上传作业照片...');
-  
-    const fileExt = file.name.split('.').pop();
-  
-    const fileName = `${task.id}-${Date.now()}.${fileExt}`;
 
-      const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file)
-  
-    if(upErr) throw upErr;
+//带图片提交
 
-      const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
-  
-    // 预览图片
-  
-    document.getElementById('submitPreviewImg').src = urlData.publicUrl;
-
-      document.getElementById('submitImgPreviewBox').classList.remove('hidden');
-  
-    // 临时保存图片url，提交的时候写入数据库
-  
-    window.tempSubmitImgUrl = urlData.publicUrl;
-
-   } catch(err){
-
-     console.error(err);
-
-     alert('❌ 上传失败：' + err.message);
- 
-  }
-
-    e.target.value = '';
-
- }
-  // 直接提交（不带图片，或者带上已经上传好的图片）
-
-async function submitTaskDirect(){
+async function submitTaskWithImg(){
 
   const task = state.daily[pendingTaskIdx];
 
-  const imgUrl = window.tempSubmitImgUrl || null;
+  const imgSrc = document.getElementById('submitPreviewImg').src;
+
+  const today = new Date().toISOString();
 
   await supabase.from('daily_tasks').update({
 
-    proof_image: imgUrl,
+    submit_status:'submitted',
+
+    submit_date:today,
+
+    proof_image: imgSrc,
 
     status: 'pending_review'
 
   }).eq('id', task.id);
 
-  alert('✅任务提交成功，等待家长审核！');
+  //孩子提交，计数+1
 
-  closeTaskSubmitModal();
+  if(currentRole === "child"){
 
-  window.tempSubmitImgUrl = null;
+    state.child_today_done +=1;
+
+    await saveState();
+
+  }
+ 
+ closeModal('taskSubmitModal');
 
   pendingTaskIdx = null;
+
+  alert("✅带图提交成功，等待家长审核！");
 
   await loadAllData();
 
@@ -840,15 +1053,49 @@ async function submitTaskDirect(){
 
 }
 
-// 关闭提交弹窗
 
-function closeTaskSubmitModal(){
+
+
+//直接提交（无图片）
+
+async function submitTaskDirect(){
+
+  const task = state.daily[pendingTaskIdx];
+
+  const today = new Date().toISOString();
+
+  await supabase.from('daily_tasks').update({
+
+    submit_status:'submitted',
+
+    submit_date:today,
+
+    status: 'pending_review'
+
+  }).eq('id', task.id);
+
+  if(currentRole === "child"){
+
+    state.child_today_done +=1;
+
+    await saveState();
+
+  }
 
   closeModal('taskSubmitModal');
 
-  window.tempSubmitImgUrl = null;
+  pendingTaskIdx = null;
+
+  alert("✅提交成功，等待家长审核！");
+
+  await loadAllData();
+
+  renderAll();
 
 }
+  
+
+
 
 async function handleProofUpload(e){
   const file = e.target.files[0];
@@ -1102,7 +1349,9 @@ function renderAll(){
   let dailyActiveHtml = "";
   let dailyPendingHtml = "";
   state.daily.forEach((task,idx)=>{
+
     const subjInfo = SUBJECT_MAP[task.subject] || {name:"",cls:""};
+
    if(task.status === 'pending_review'){
 
   dailyPendingHtml += `
@@ -1111,7 +1360,8 @@ function renderAll(){
 
     <div class="task-info">
 
-      <div class="task-icon">📌</div>
+      <div class="task-icon">
+📌</div>
 
       <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
 
@@ -1121,11 +1371,12 @@ function renderAll(){
 
     </div>
 
-    <!-- 按钮移到下方靠右 -->
- 
-   <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
 
       ${currentRole==='parent'?`
+
+${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>` : '<span style="color:#888;font-size:13px;">无作业照片</span>'}
 
 <button class="task-btn task-btn-approve" onclick="parentApprove(${idx})">✅通过</button>
 
@@ -1133,14 +1384,14 @@ function renderAll(){
 
 <button class="task-btn btn-del" onclick="deleteDailyTask(${idx})">删除</button>
 
-`:`${task.proof_image?`<button class="task-btn" onclick="viewProofImage('${task.proof_image}')">查看图片</button>`:`<span style="color:#888;font-size:13px;">无作业照片</span>`}`}
+`:`${task.proof_image?`<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>`:`<span style="color:#888;font-size:13px;">无作业照片</span>`}`}
 
     </div>
 
   </div>`;
     }else{
 
-  dailyActiveHtml += `
+ dailyActiveHtml += `
 
   <div class="task-row">
 
@@ -1160,7 +1411,7 @@ function renderAll(){
 
     </div>
 
-    <!-- 按钮移到下方，靠右对齐 -->
+    <!-- 按钮移到下方，靠右对齐，家长多一个【设置时限】按钮 -->
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
 
@@ -1168,11 +1419,17 @@ function renderAll(){
 
       ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
 
-      ${currentRole==='parent'?`<button class="task-btn btn-del"  onclick="deleteDailyTask(${idx})">删除</button>`:""}
+      ${currentRole==='parent'?`
+
+        <button class="task-btn btn-gray" onclick="openSetTimeModal(${idx})">设置时限</button>
+
+        <button class="task-btn btn-del"  onclick="deleteDailyTask(${idx})">删除</button>
+
+      `:""}
 
     </div>
-
-  </div>`;
+ 
+ </div>`;
 }
   });
   document.getElementById("dailyActiveList").innerHTML = dailyActiveHtml || `<p style="padding:10px;color:#888;">暂无日常任务</p>`;
