@@ -314,6 +314,13 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
       <h3 class="task-card-title">⚙️ 家长管理</h3>
       <button class="btn btn-gray" onclick="resetWeek()">🔄 重置本周植物（清空图片+星星清零）</button>
     </div>
+   <!-- 新增：退出登录卡片 -->
+
+   <div class="card">
+
+    <button class="btn btn-red" onclick="logout()">🚪 退出登录</button>
+
+   </div>
   </div>
   <div class="bottom-nav">
     <div class="nav-item active" onclick="switchTab('garden',this)"><div class="nav-icon">🌱</div><div>花园</div></div>
@@ -1255,6 +1262,33 @@ function renderAll(){
   });
   document.getElementById("wishList").innerHTML = wishHtml || `<p style="padding:10px;color:#888;">暂无心愿</p>`;
 }
+  // 退出登录
+  
+function logout(){
+
+  if(!confirm("确定退出登录吗？")) return;
+
+  // 清空身份
+  currentRole = "";
+
+  // 隐藏主页面，显示登录页
+
+  document.getElementById('mainPage').classList.add('hidden');
+
+  document.getElementById('loginPage').classList.remove('hidden');
+
+  // 清空密码输入框
+
+  document.getElementById('pwdInput').value = "";
+
+  // 清除角色选中高亮
+
+  document.getElementById('parentBtn').classList.remove('active');
+
+  document.getElementById('childBtn').classList.remove('active');
+
+}
+
 </script>
 </body>
 </html>
