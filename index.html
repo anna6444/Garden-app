@@ -13,7 +13,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;mar
 .btn-gray{background:#e5e7eb;color:#333;}
 .btn-blue{background:#3b82f6;color:#fff;}
 .btn-sm{padding:10px 16px;font-size:14px;width:auto;}
-.btn-del{background:#9ca3af;color:#fff;padding:8px 10px;border-radius:10px;border:none;font-size:13px;cursor:pointer;}
+.btn-del{background:#9ca3af;color:#fff;padding:8px 10px;border-radius:10px;border:none;font-size:13px;cursor:pointer;margin-left:4px;}
 input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radius:12px;margin:6px 0;font-size:16px;box-sizing:border-box;}
 .hidden{display:none!important;}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;border-radius:24px 24px 0 0;padding:12px 8px;display:flex;justify-content:space-around;box-shadow:0 -4px 12px #00000015;z-index:99;}
@@ -30,13 +30,13 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .count-num{font-size:22px;font-weight:bold;color:#ef4444;}
 .count-label{font-size:13px;color:#666;}
 .task-card-title{font-size:18px;font-weight:bold;color:#333;margin-bottom:8px;}
-.task-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid #f5f5f5;gap:8px;flex-wrap:wrap;}
+.task-row{display:flex;flex-direction:column;align-items:flex-start;padding:14px 0;border-bottom:1px solid #f5f5f5;gap:10px;}
 .task-row:last-child{border-bottom:none;}
 .task-info{display:flex;align-items:center;gap:10px;flex:1;}
 .task-icon{width:40px;height:40px;border-radius:12px;background:#fffbeb;display:flex;align-items:center;justify-content:center;font-size:20px;}
 .task-text{font-size:16px;font-weight:bold;color:#333;}
 .task-meta{font-size:13px;color:#999;margin-top:4px;}
-.task-btn{padding:8px 14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;cursor:pointer;}
+.task-btn{padding:8px 14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;cursor:pointer;white-space:nowrap;}
 .task-btn:disabled{background:#ddd;color:#999;}
 .task-btn-start{background:#34d399;color:#fff;}
 .task-btn-approve{background:#22c55e;color:#fff;}
@@ -1093,45 +1093,77 @@ function renderAll(){
   let dailyPendingHtml = "";
   state.daily.forEach((task,idx)=>{
     const subjInfo = SUBJECT_MAP[task.subject] || {name:"",cls:""};
-    if(task.status === 'pending_review'){
-      dailyPendingHtml += `
-      <div class="task-row">
-        <div class="task-info">
-          <div class="task-icon">📌</div>
-          <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
-            <div class="task-meta">奖励${task.star}⭐<span class="badge-submit">待审核</span></div>
-          </div>
-        </div>
-        <div>
-          ${currentRole==='parent'?`
+   if(task.status === 'pending_review'){
 
-    <button class="task-btn task-btn-approve" onclick="parentApprove(${idx})">✅通过</button>
+  dailyPendingHtml += `
 
-    <button class="task-btn task-btn-reject" onclick="parentReject(${idx})">↩退回</button>
+  <div class="task-row">
 
-    <button class="task-btn btn-del" style="margin-left:4px;" onclick="deleteDailyTask(${idx})">删除</button>
+    <div class="task-info">
 
-  `:`${task.proof_image?`<button class="task-btn" onclick="viewProofImage('${task.proof_image}')">查看图片</button>`:`<span style="color:#888;font-size:13px;">无作业照片</span>`}`}
-        </div>
-      </div>`;
+      <div class="task-icon">📌</div>
+
+      <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
+
+        <div class="task-meta">奖励${task.star}⭐<span class="badge-submit">待审核</span></div>
+
+      </div>
+
+    </div>
+
+    <!-- 按钮移到下方靠右 -->
+ 
+   <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+
+      ${currentRole==='parent'?`
+
+<button class="task-btn task-btn-approve" onclick="parentApprove(${idx})">✅通过</button>
+
+<button class="task-btn task-btn-reject" onclick="parentReject(${idx})">↩退回</button>
+
+<button class="task-btn btn-del" onclick="deleteDailyTask(${idx})">删除</button>
+
+`:`${task.proof_image?`<button class="task-btn" onclick="viewProofImage('${task.proof_image}')">查看图片</button>`:`<span style="color:#888;font-size:13px;">无作业照片</span>`}`}
+
+    </div>
+
+  </div>`;
     }else{
-      dailyActiveHtml += `
-      <div class="task-row">
-        <div class="task-info">
-          <div class="task-icon">📌</div>
-          <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
-            <div class="task-meta">奖励${task.star}⭐ ${task.minute_limit>0?`限时${task.minute_limit}分钟`:"不限时"}
-            ${task.start_at?`<span class="badge-timing">已开始</span>`:""}
-            </div>
-          </div>
+
+  dailyActiveHtml += `
+
+  <div class="task-row">
+
+    <div class="task-info">
+
+      <div class="task-icon">📌</div>
+
+      <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
+
+        <div class="task-meta">奖励${task.star}⭐ ${task.minute_limit>0?`限时${task.minute_limit}分钟`:"不限时"}
+
+        ${task.start_at?`<span class="badge-timing">已开始</span>`:""}
+
         </div>
-        <div>
-          ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="startTask(${idx})">开始任务</button>`:""}
-          ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
-          ${currentRole==='parent'?`<button class="task-btn btn-del" style="margin-left:4px;" onclick="deleteDailyTask(${idx})">删除</button>`:""}
-        </div>
-      </div>`;
-    }
+
+      </div>
+
+    </div>
+
+    <!-- 按钮移到下方，靠右对齐 -->
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+
+      ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="startTask(${idx})">开始任务</button>`:""}
+
+      ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
+
+      ${currentRole==='parent'?`<button class="task-btn btn-del"  onclick="deleteDailyTask(${idx})">删除</button>`:""}
+
+    </div>
+
+  </div>`;
+}
   });
   document.getElementById("dailyActiveList").innerHTML = dailyActiveHtml || `<p style="padding:10px;color:#888;">暂无日常任务</p>`;
   document.getElementById("dailyPendingList").innerHTML = dailyPendingHtml || `<p style="padding:10px;color:#888;">无待审核任务</p>`;
@@ -1141,22 +1173,40 @@ function renderAll(){
   state.long.forEach((task,idx)=>{
     const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
     const itemHtml = `
+
     <div class="task-row">
+
       <div class="task-info">
+
         <div class="task-icon">⏳</div>
+
         <div class="task-text">${task.title} ${ownerLabel}
           <div class="task-meta">奖励${task.star}⭐
+
           ${task.submit_status === 'submitted' ? `<span class="badge-pending">已提交等待确认</span>` : ""}
+
           </div>
+
         </div>
+
       </div>
-      <div>
+
+      <!-- 按钮下方靠右 -->
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+
         ${task.submit_status !== 'submitted' && ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
+
           ?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})">提交打卡</button>`:""}
+
         ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
+
           ?`<button class="task-btn task-btn-approve" onclick="approveLongTask(${idx})">确认完成</button>`:""}
-        ${currentRole==='parent'?`<button class="task-btn btn-del" style="margin-left:4px;" onclick="deleteLongTask(${idx})">删除</button>`:""}
+
+        ${currentRole==='parent'?`<button class="task-btn btn-del"  onclick="deleteLongTask(${idx})">删除</button>`:""}
+
       </div>
+
     </div>`;
     if(task.owner_type === "child"){
       longChildHtml += itemHtml;
@@ -1183,12 +1233,22 @@ function renderAll(){
   let wishHtml = "";
   state.wish.forEach((wish,idx)=>{
     wishHtml += `
+
     <div class="task-row">
+
       <div class="task-info">
+
         <div class="task-icon">💖</div>
+
         <div class="task-text">${wish.content}</div>
       </div>
-      ${currentRole==='parent'?`<button class="btn-del" onclick="handleDelete('wish',${idx})">删除</button>`:""}
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+
+        ${currentRole==='parent'?`<button class="task-btn btn-del" onclick="handleDelete('wish',${idx})">删除</button>`:""}
+
+      </div>
+
     </div>`;
   });
   document.getElementById("wishList").innerHTML = wishHtml || `<p style="padding:10px;color:#888;">暂无心愿</p>`;
