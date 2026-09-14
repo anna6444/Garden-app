@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
 <title>🌱种植小花园</title>
 <style>
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:linear-gradient(180deg,#fff7d7 0%,#f7fff9 100%);min-height:100vh;}
@@ -113,6 +117,23 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 }
 @media (max-width:375px){.stage-preview-grid{grid-template-columns:repeat(7,120px);overflow-x:auto;}}
 </style>
+
+<link rel="manifest" href="./manifest.json">
+
+<script>
+//注册service worker
+
+if('serviceWorker' in navigator){
+
+  navigator.serviceWorker.register('./service-worker.js')
+
+  .then(reg=>console.log("ServiceWorker注册成功",reg))
+
+  .catch(err=>console.log("SW注册失败",err));
+
+}
+
+</script>
 </head>
 <body>
 <div id="loginPage" class="login-page">
