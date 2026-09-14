@@ -526,6 +526,62 @@ window.addEventListener('load', function(){
 
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+
+//读取上次登录角色，自动登录
+
+(async function autoLogin(){
+
+  const savedRole = localStorage.getItem("garden_role");
+
+  if(savedRole){
+ 
+   currentRole = savedRole;
+
+    document.getElementById('parentBtn').classList.toggle('active', currentRole === 'parent');
+
+    document.getElementById('childBtn').classList.toggle('active', currentRole === 'child');
+
+    document.getElementById('loginPage').classList.add('hidden');
+
+    document.getElementById('mainPage').classList.remove('hidden');
+
+    //切换奖惩面板
+
+    document.getElementById('parentRewardPanel').classList.toggle('hidden', currentRole !== 'parent');
+
+    document.getElementById('childRewardPanel').classList.toggle('hidden', currentRole !== 'child');
+
+    if(currentRole === 'parent'){
+ 
+     document.getElementById('adminArea').classList.remove('hidden');
+
+      document.getElementById('addDailyBtn').classList.remove('hidden');
+
+      document.getElementById('addLongBtn').classList.remove('hidden');
+
+      document.getElementById('addWishBtn').classList.remove('hidden');
+
+    }else{
+
+      document.getElementById('adminArea').classList.add('hidden');
+
+      document.getElementById('addDailyBtn').classList.add('hidden');
+
+      document.getElementById('addLongBtn').classList.add('hidden');
+
+      document.getElementById('addWishBtn').classList.add('hidden');
+
+    }
+
+    await loadAllData();
+
+    await loadStarLog();
+
+    renderAll();
+
+  }
+
+})();
   document.getElementById('proofFileInput').addEventListener('change', handleProofUpload);
 
   // 新增：绑定提交弹窗图片选择事件
@@ -558,6 +614,9 @@ async function doLogin(){
       document.getElementById('addWishBtn').classList.add('hidden');
     }
     await loadAllData();
+    //保存登录状态
+    
+localStorage.setItem("garden_role", currentRole);
     await loadStarLog();
     renderAll();
   }else{
@@ -824,6 +883,45 @@ async function saveTaskMinuteLimit(){
   renderAll();
 
 }
+
+// 计算限时任务剩余时间，返回文本，超时返回【已超时】
+
+function getTaskRemainTime(task){
+ 
+ if(!task.start_at || !task.minute_limit || task.minute_limit <=0){
+
+    return ""; // 不限时不显示任何文字
+
+  }
+
+  const startTime = new Date(task.start_at).getTime();
+
+  const totalMs = task.minute_limit * 60 * 1000;
+
+  const endTime = startTime + totalMs;
+
+  const now = Date.now();
+
+  const remainMs = endTime - now;
+
+  if(remainMs <= 0){
+
+    return `<span style="color:red;font-weight:bold;">⏰已超时</span>`;
+
+  }
+
+  // 转分:秒
+
+  const remainSec = Math.floor(remainMs / 1000);
+
+  const min = Math.floor(remainSec / 60);
+
+  const sec = remainSec % 60;
+
+  return `<span style="color:#ef4444;font-weight:bold;">⏳剩余 ${min}分${sec}秒</span>`;
+
+}
+
 
 
 //批量解析粘贴文本，自动创建多条日常任务
@@ -1411,25 +1509,33 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
 
     </div>
 
-    <!-- 按钮移到下方，靠右对齐，家长多一个【设置时限】按钮 -->
+    <!-- 修改：左右布局，左侧倒计时，右侧按钮 -->
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center;width:100%;">
 
-      ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="startTask(${idx})">开始任务</button>`:""}
+      <div>${getTaskRemainTime(task)}</div>
 
-      ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
 
-      ${currentRole==='parent'?`
+        ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="startTask(${idx})">开始任务</button>`:""}
 
-        <button class="task-btn btn-gray" onclick="openSetTimeModal(${idx})">设置时限</button>
+        ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
 
-        <button class="task-btn btn-del"  onclick="deleteDailyTask(${idx})">删除</button>
+        ${currentRole==='parent'?`
 
-      `:""}
+          <button class="task-btn btn-gray" onclick="openSetTimeModal(${idx})">设置时限</button>
+
+          <button class="task-btn btn-del"  onclick="deleteDailyTask(${idx})">删除</button>
+
+        `:""}
+
+      </div>
 
     </div>
  
+
  </div>`;
+
 }
   });
   document.getElementById("dailyActiveList").innerHTML = dailyActiveHtml || `<p style="padding:10px;color:#888;">暂无日常任务</p>`;
@@ -1518,6 +1624,16 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
     </div>`;
   });
   document.getElementById("wishList").innerHTML = wishHtml || `<p style="padding:10px;color:#888;">暂无心愿</p>`;
+// 限时倒计时自动刷新
+
+  if(window.taskTimer) clearInterval(window.taskTimer);
+
+  window.taskTimer = setInterval(()=>{
+ 
+   renderAll();
+
+  },1000);
+
 }
   // 退出登录
   
@@ -1526,8 +1642,10 @@ function logout(){
   if(!confirm("确定退出登录吗？")) return;
 
   // 清空身份
+
   currentRole = "";
 
+  localStorage.removeItem("garden_role");
   // 隐藏主页面，显示登录页
 
   document.getElementById('mainPage').classList.add('hidden');
