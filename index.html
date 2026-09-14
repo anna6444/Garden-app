@@ -930,6 +930,9 @@ async function submitLongTask(idx){
   if(task.last_date===today)return alert('今日已经完成');
   if(task.submit_status === 'submitted') return alert('已经提交，等待对方确认');
   await supabase.from('long_tasks').update({submit_status:'submitted',submit_date:today}).eq('id',task.id);
+  task.submit_status = 'submitted';
+
+  state.child_today_done += 1;
   await loadAllData();renderAll();
   alert('✅ 打卡提交成功，等待对方确认！');
 }
@@ -1195,10 +1198,9 @@ function renderAll(){
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
 
-        ${task.submit_status !== 'submitted' && ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
+        ${ ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
 
-          ?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})">提交打卡</button>`:""}
-
+ ?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date ? 'disabled' : ''}>提交打卡</button>`:""}
         ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
 
           ?`<button class="task-btn task-btn-approve" onclick="approveLongTask(${idx})">确认完成</button>`:""}
