@@ -505,12 +505,13 @@ if('serviceWorker' in navigator){
 
     <div style="display:flex;gap:10px;margin-top:20px;">
 
-      <button class="btn btn-blue" style="flex:1;" onclick="triggerSelectImage()">上传图片</button>
+     <button class="btn btn-blue" style="flex:1;" onclick="triggerSelectImage()">上传图片</button>
 
-      <button class="btn btn-green" style="flex:1;" onclick="submitTaskDirect()">直接提交</button>
+     <button class="btn btn-green" style="flex:1;" onclick="doSubmitTask()">确认提交</button>
 
-      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('taskSubmitModal')">取消</button>
+     <button class="btn btn-gray" style="flex:1;" onclick="closeSubmitModal()">取消</button>
 
+     </div>
     </div>
 
   </div>
@@ -525,6 +526,7 @@ let currentRole = "";
 let pendingPlantId = null;
 let pendingTaskIdx = null;
 let selectedSubject = null;
+let pendingProofImgUrl = ""; //缓存本次选中图片地址
 let state = {
   star: 10,
   parent_star: 0,
@@ -607,9 +609,7 @@ window.addEventListener('load', function(){
 
   // 新增：绑定提交弹窗图片选择事件
 
-  document.getElementById('submitProofFile').addEventListener('change', handleSubmitImageSelect);
-
-});
+  });
 function selectRole(role){
   currentRole = role;
   document.getElementById('parentBtn').classList.toggle('active', role === 'parent');
@@ -871,6 +871,43 @@ async function saveDailyTask(){
   await loadAllData();renderAll();
 }
 
+function closeSubmitModal(){
+
+  closeModal('taskSubmitModal');
+
+  pendingTaskIdx = null;
+
+  pendingProofImgUrl = "";
+
+  window.pendingCompressedFile = null;
+
+  //清空图片预览
+
+  document.getElementById('submitImgPreviewBox').classList.add('hidden');
+
+  document.getElementById('submitPreviewImg').src = "";
+
+}
+//统一提交入口，自动判断有无压缩图片
+
+async function doSubmitTask(){
+
+  if(window.pendingCompressedFile){
+
+    //存在图片，走带图片上传逻辑
+
+    await submitTaskWithImg();
+
+  }else{
+
+    //没有图片，直接提交
+
+    await submitTaskDirect();
+
+  }
+
+}
+
 let editTaskIdx = null;
  
 // 打开设置时限弹窗
@@ -1070,9 +1107,80 @@ async function handleTaskComplete(idx){
 
   document.getElementById('submitPreviewImg').src = "";
 
+  
+  pendingProofImgUrl = ""; //打开弹窗，清空上次缓存图片
   // 打开模态弹窗
 
   openModal('taskSubmitModal');
+
+}
+
+//图片压缩函数：宽最大800px，质量0.7，输出jpg，控制几百KB
+
+function compressImage(file, maxWidth = 800, quality = 0.7) {
+
+  return new Promise((resolve, reject) => {
+
+    const reader = new FileReader();
+
+    reader.onload = function (e) {
+
+      const img = new Image();
+
+      img.src = e.target.result;
+
+      img.onload = function () {
+
+        const canvas = document.createElement('canvas');
+
+        let width = img.width;
+
+        let height = img.height;
+
+        //等比例缩放
+
+        if (width > maxWidth) {
+
+          const scale = maxWidth / width;
+
+          width = maxWidth;
+
+          height = height * scale;
+        }
+
+        canvas.width = width;
+
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        //转成Blob，jpg格式
+
+        canvas.toBlob((blob) => {
+
+          if (!blob) return reject('图片压缩失败');
+
+          //生成压缩后的File对象
+
+          const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+
+          resolve(compressedFile);
+
+        }, 'image/jpeg', quality);
+
+      };
+
+      img.onerror = reject;
+
+    };
+
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+
+  });
 
 }
 
@@ -1084,8 +1192,7 @@ function triggerSelectImage(){
 }
 
 
-
-//图片选择回调
+//图片选择回调：本地压缩预览，不上传supabase
 
 async function handleSubmitImageSelect(e){
 
@@ -1093,13 +1200,56 @@ async function handleSubmitImageSelect(e){
 
   if(!file || pendingTaskIdx === null) return;
 
-  const task = state.daily[pendingTaskIdx];
-
   try {
 
-    alert('正在上传作业照片...');
+     //调用图片压缩函数
 
-    const fileExt = file.name.split('.').pop();
+    const compressedFile = await compressImage(file, 800, 0.7);
+
+    //本地预览（用浏览器本地地址，不上云）
+
+    const localPreviewUrl = URL.createObjectURL(compressedFile);
+
+    document.getElementById('submitPreviewImg').src = localPreviewUrl;
+
+    document.getElementById('submitImgPreviewBox').classList.remove('hidden');
+
+    //把压缩后的文件存到全局变量，提交时再上传
+
+    window.pendingCompressedFile = compressedFile;
+
+  } catch(err){
+
+    console.error(err);
+
+    alert('❌图片压缩预览失败：' + err.message);
+
+  }
+
+}
+
+
+//带图片提交：此时才上传压缩后的图片到supabase
+
+async function submitTaskWithImg(){
+
+  const task = state.daily[pendingTaskIdx];
+
+  const today = new Date().toISOString();
+
+  const file = window.pendingCompressedFile;
+
+  if(!file){
+
+    alert("没有选中图片，请重新选择图片！");
+
+    return;
+
+  }
+
+  try{
+ 
+    const fileExt = "jpg";
 
     const fileName = `${task.id}-${Date.now()}.${fileExt}`;
 
@@ -1109,66 +1259,66 @@ async function handleSubmitImageSelect(e){
 
     const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
 
-    //预览图片
+    pendingProofImgUrl = urlData.publicUrl;
 
-    document.getElementById('submitPreviewImg').src = urlData.publicUrl;
 
-    document.getElementById('submitImgPreviewBox').classList.remove('hidden');
 
-  } catch(err){
 
-    console.error(err);
+    const {error} = await supabase.from('daily_tasks')
 
-    alert('❌ 上传预览失败：' + err.message);
+      .update({
+
+        submit_status:'submitted',
+
+        submit_date:today,
+
+        proof_image: pendingProofImgUrl,
+
+        status: 'pending_review'
+
+      })
+
+      .eq('id',task.id);
+
+    if(error){
+
+      console.error('更新日常任务失败',error);
+
+      alert('提交失败：'+error.message);
+
+      return;
+
+    }
+
+    if(currentRole === "child"){
+
+      state.child_today_done +=1;
+
+      await saveState();
+
+    }
+
+    pendingProofImgUrl = "";
+
+    window.pendingCompressedFile = null;
+
+    closeModal('taskSubmitModal');
+
+    pendingTaskIdx = null;
+
+    alert("✅带图提交成功，等待家长审核！");
+
+    await loadAllData();
+
+    renderAll();
+
+  }catch(e){
+
+    console.error('异常',e);
+
+    alert('提交异常：'+e.message);
 
   }
-
-}
-
-
-
-
-//带图片提交
-
-async function submitTaskWithImg(){
-
-  const task = state.daily[pendingTaskIdx];
-
-  const imgSrc = document.getElementById('submitPreviewImg').src;
-
-  const today = new Date().toISOString();
-
-  await supabase.from('daily_tasks').update({
-
-    submit_status:'submitted',
-
-    submit_date:today,
-
-    proof_image: imgSrc,
-
-    status: 'pending_review'
-
-  }).eq('id', task.id);
-
-  //孩子提交，计数+1
-
-  if(currentRole === "child"){
-
-    state.child_today_done +=1;
-
-    await saveState();
-
-  }
- 
- closeModal('taskSubmitModal');
-
-  pendingTaskIdx = null;
-
-  alert("✅带图提交成功，等待家长审核！");
-
-  await loadAllData();
-
-  renderAll();
 
 }
 
@@ -1183,36 +1333,64 @@ async function submitTaskDirect(){
 
   const today = new Date().toISOString();
 
-  await supabase.from('daily_tasks').update({
+  try{
+ 
+   const {error} = await supabase.from('daily_tasks')
 
-    submit_status:'submitted',
+      .update({
 
-    submit_date:today,
+        submit_status:'submitted',
 
-    status: 'pending_review'
+        submit_date:today,
 
-  }).eq('id', task.id);
+        proof_image: pendingProofImgUrl, //带上已上传图片
+        status: 'pending_review'
+ 
+     })
 
-  if(currentRole === "child"){
+      .eq('id',task.id);
 
-    state.child_today_done +=1;
+    if(error){
 
-    await saveState();
+      console.error('更新日常任务失败',error);
+
+      alert('提交失败：'+error.message);
+
+      return;
+
+    }
+
+    if(currentRole === "child"){
+
+      state.child_today_done +=1;
+
+      await saveState();
+
+    }
+
+    pendingProofImgUrl = ""; //提交成功清空图片缓存
+    closeModal('taskSubmitModal');
+
+    pendingTaskIdx = null;
+
+    alert("✅提交成功，等待家长审核！");
+
+    await loadAllData();
+
+    renderAll();
+
+  }catch(e){
+ 
+   console.error('异常',e);
+
+    alert('提交异常：'+e.message);
 
   }
 
-  closeModal('taskSubmitModal');
-
-  pendingTaskIdx = null;
-
-  alert("✅提交成功，等待家长审核！");
-
-  await loadAllData();
-
-  renderAll();
-
 }
   
+
+
 
 
 
@@ -1245,41 +1423,122 @@ function viewProofImage(url){
   window.open(url, '_blank');
 }
 async function parentApprove(idx){
+
   const task = state.daily[idx];
+
   const startTime = new Date(task.start_at);
+
   const now = new Date();
+
   const diffMin = (now - startTime) / 1000 / 60;
+
   let getStar = (task.minute_limit === 0 || diffMin <= task.minute_limit) ? task.star : Math.floor(task.star/2);
+
   const over = task.minute_limit !== 0 && diffMin > task.minute_limit;
+
   const tipText = over?"（超时减半）":"";
+
   // 新增：判断是否没有上传图片
-  
+
 const hasImg = !!task.proof_image;
-  
+
 const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
 
   if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
+
+
+
+  //====新增：如果存在图片，从存储桶删除图片====
+
+  if(task.proof_image){
+
+    try{
+
+      //从图片url提取文件名
+
+      const urlParts = task.proof_image.split('/');
+
+      const fileName = urlParts[urlParts.length - 1];
+
+      await supabase.storage.from('task-proof').remove([fileName]);
+
+    }catch(err){
+
+      console.warn("审核通过，删除图片失败",err);
+
+    }
+
+  }
+
+
   state.star += getStar;
+
   state.parent_star += getStar;
+
   await addStarLogItem("child",getStar,`日常任务【${task.title}】完成${tipText}`);
+
   await addStarLogItem("parent",getStar,`审核任务【${task.title}】${tipText}`);
+
   await supabase.from('daily_tasks').delete().eq('id', task.id);
+
   await saveState();
+
   await loadAllData();
+
   renderAll();
+
   alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐`);
+
+
 }
+
 async function parentReject(idx){
+
   const task = state.daily[idx];
+
   if(!confirm(`退回【${task.title}】？\n⚠️本次退回不会重置计时，依旧以最初开始任务的时间为准`)) return;
+
+
+
+  //====新增：退回时删除存储桶图片====
+
+  if(task.proof_image){
+
+    try{
+ 
+     const urlParts = task.proof_image.split('/');
+
+      const fileName = urlParts[urlParts.length - 1];
+
+      await supabase.storage.from('task-proof').remove([fileName]);
+
+    }catch(err){
+
+      console.warn("退回任务，删除图片失败",err);
+
+    }
+
+  }
+
+
   await supabase.from('daily_tasks').update({
-    proof_image: null,
+ 
+   proof_image: null,
+
     status: 'active'
+
   }).eq('id', task.id);
+
   await loadAllData();
+
   renderAll();
+
   alert('已退回，孩子可重新提交，计时沿用初次开始时间');
+
 }
+  
+
+
 async function deleteDailyTask(idx){
   const task = state.daily[idx];
   if(!confirm(`⚠️确定删除日常任务【${task.title}】？删除后不可恢复`)) return;
@@ -1297,18 +1556,59 @@ async function saveLongTask(){
   document.getElementById('longTitle').value='';
   await loadAllData();renderAll();
 }
-async function submitLongTask(idx){
-  const task=state.long[idx];
-  const today=new Date().toDateString();
+async function submitLongTask(idx) {
+
+  const task = state.long[idx];
+
+  const today = new Date().toDateString();
+
   if(task.last_date===today)return alert('今日已经完成');
+
   if(task.submit_status === 'submitted') return alert('已经提交，等待对方确认');
-  await supabase.from('long_tasks').update({submit_status:'submitted',submit_date:today}).eq('id',task.id);
-  task.submit_status = 'submitted';
+
+  try {
+
+    const {error} = await supabase.from('long_tasks')
+
+      .update({submit_status:'submitted',submit_date:today})
+
+      .eq('id',task.id);
+
+    if(error){
+
+      console.error('更新长期任务失败', error);
+
+      alert('提交失败：' + error.message);
+
+      return;
+
+    }
+
+    task.submit_status = 'submitted';
+
+    if(currentRole === "child"){
 
   state.child_today_done += 1;
-  await loadAllData();renderAll();
-  alert('✅ 打卡提交成功，等待对方确认！');
+
+  await saveState();
+
 }
+    await loadAllData();
+
+    renderAll();
+
+    alert('✅ 打卡提交成功，等待对方确认！');
+
+  }catch(e){
+ 
+    console.error('异常',e);
+
+    alert('提交发生异常：'+e.message);
+
+  }
+
+}
+
 async function approveLongTask(idx){
   const task=state.long[idx];
   const today=new Date().toDateString();
