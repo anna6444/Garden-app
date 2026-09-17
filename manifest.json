@@ -1,41 +1,20 @@
-﻿{
-
-  "name": "🌱种植小花园",
-
-  "short_name": "种植花园",
-
-  "description": "亲子任务打卡小花园",
-
+{
+  "name": "种植小花园",
+  "short_name": "小花园",
   "start_url": "./index.html",
-
   "display": "standalone",
-
   "background_color": "#fff7d7",
-
-  "theme_color": "#ef4444",
-
+  "theme_color": "#4b7f23",
   "icons": [
- 
-   {
-  
-    "src": "icon-192.png",
-
-      "sizes": "192x192",
-
-      "type": "image/png"
-
-    },
-
     {
-  
-    "src": "icon-512.png",
-
-      "sizes": "512x512",
-
+      "src": "./icon-192.png",
+      "sizes": "192x192",
       "type": "image/png"
-
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
-
   ]
-
 }
