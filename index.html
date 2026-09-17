@@ -218,6 +218,8 @@ if('serviceWorker' in navigator){
       <div id="dailyActiveList"></div>
       <div><span class="group-title">待家长审核</span></div>
       <div id="dailyPendingList"></div>
+      <div><span class="group-title">✅ 今日已审核通过</span></div>
+      <div id="dailyApprovedList"></div>
     </div>
   </div>
   <div id="tab-long" class="hidden">
@@ -517,8 +519,35 @@ if('serviceWorker' in navigator){
   </div>
 
 </div>
+<!-- 大图预览弹窗 -->
+
+<div class="modal-mask" id="imgPreviewModal">
+
+  <div class="modal-box">
+
+    <img id="bigProofImg" style="width:100%;border-radius:16px;">
+
+    <button class="btn" onclick="closeImgPreviewModal()" style="margin-top:12px">关闭</button>
+
+  </div>
+
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.7/dist/umd/supabase.min.js"></script>
+
 <script>
+function triggerSelectImage(){
+
+  document.getElementById('submitProofFile').click();
+
+}
+
+
+
+function closeImgPreviewModal(){
+
+  closeModal('imgPreviewModal');
+
+}
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
 let supabase = null;
@@ -528,11 +557,19 @@ let pendingTaskIdx = null;
 let selectedSubject = null;
 let pendingProofImgUrl = ""; //缓存本次选中图片地址
 let state = {
+
   star: 10,
+
   parent_star: 0,
+
   child_today_done:0,
-  water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false,
-  daily: [], long: [], wish: []
+
+  water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false
+,
+  daily: [], long: [], wish: [],
+
+  lastAutoDeductDate: "" // 新增：记录上次执行夜间扣星的日期，防止同一天重复扣
+
 };
 const STAGE_NAMES = ["种子发芽","长出小苗","长叶片","抽枝长茎","含苞待放","开花啦","结果丰收"];
 const PLANT = {
@@ -602,6 +639,7 @@ window.addEventListener('load', function(){
 
     renderAll();
 
+
   }
 
 })();
@@ -644,21 +682,42 @@ localStorage.setItem("garden_role", currentRole);
     alert('密码错误');
   }
 }
+
+
 async function loadAllData(){
+
   if(!supabase) return;
+
   try{
+
     const {data:stateData} = await supabase.from('app_state').select('*').eq('id',1).single();
+
     if(stateData) state = {...state, ...stateData};
+
     const {data:daily} = await supabase.from('daily_tasks').select('*');
+
     state.daily = daily || [];
+
     const {data:long} = await supabase.from('long_tasks').select('*');
+
     state.long = long || [];
+
     const {data:wishes} = await supabase.from('wishes').select('*');
+
     state.wish = wishes || [];
+
   }catch(e){
-    console.warn("加载基础数据异常",e);
+ 
+   console.warn("加载基础数据异常",e);
+
   }
+
+  // =========新增：加载完数据后，运行自动扣星逻辑=========
+
+  await autoDeductStarTask();
+
 }
+
 async function saveState(){
   if(!supabase) return;
   try{
@@ -808,33 +867,82 @@ function feedPlant(){
   saveState();renderAll();
 }
 async function resetWeek(){
-  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n4. 清空星星日志流水\n\n此操作不可撤销！'))return;
+
+  if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n4. 删除云端所有星星日志记录\n\n此操作不可撤销！'))return;
+
   state.plant = null;
+
   state.stage = 1;
+
   state.water = 0;
+
   state.sun = 0;
+
   state.fert = 0;
+
   state.plantDone = false;
+
   state.star = 0;
+
   state.parent_star = 0;
+
+  // 清理存储桶全部作业图片
+
   try{
+
     const {data:fileList, error:listErr} = await supabase.storage.from('task-proof').list();
+
     if(!listErr && fileList && fileList.length > 0){
+
       const filePaths = fileList.map(item => item.name);
+
       await supabase.storage.from('task-proof').remove(filePaths);
+
     }
+
   }catch(err){
+
     console.warn('清理图片出错', err);
+
   }
+
+  // =========修复：先读取所有日志ID，循环逐条删除（绕过RLS批量删除限制）==========
+
   try{
-    await supabase.from('star_logs').delete().neq("id","00000000-0000-0000-0000-000000000000");
-  }catch(e){console.warn("清空星星日志异常",e);}
+
+    // 先查出全部星星日志
+
+    const {data:allLogs} = await supabase.from('star_logs').select('id');
+
+    if(allLogs && allLogs.length>0){
+
+      for(let logItem of allLogs){
+
+        await supabase.from('star_logs').delete().eq('id', logItem.id);
+
+      }
+
+    }
+
+  }catch(e){
+
+    console.warn("清空星星日志异常",e);
+
+  }
+
   await saveState();
+
   await loadAllData();
+
   await loadStarLog();
+
   renderAll();
-  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片、星星日志流水已全部删除。\n可以重新选择植物。');
+
+  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片、全部星星日志已删除。\n可以重新选择植物。');
+
 }
+
+
 async function buyRes(type){
   const myStar = currentRole === 'parent' ? state.parent_star : state.star;
   if(myStar < 6){ alert('星星不足，需要6颗星'); return; }
@@ -880,6 +988,17 @@ function closeSubmitModal(){
   pendingProofImgUrl = "";
 
   window.pendingCompressedFile = null;
+
+  //释放本地预览blob内存
+
+  if(window.pendingPreviewUrl){
+
+    URL.revokeObjectURL(window.pendingPreviewUrl);
+
+    window.pendingPreviewUrl = null;
+
+  }
+
 
   //清空图片预览
 
@@ -1041,7 +1160,11 @@ async function batchCreateDailyTask(){
 
   //循环批量插入数据库，星星默认2，限时0
 
-  for(let taskName of taskList){
+  let successCount = 0;
+
+for(let taskName of taskList){
+
+  try{
 
     await supabase.from('daily_tasks').insert([{
 
@@ -1062,9 +1185,19 @@ async function batchCreateDailyTask(){
       status: 'active'
 
     }]);
+ 
+    successCount++;
+
+  }catch(e){
+
+    console.error("创建任务失败",e,taskName);
 
   }
 
+}
+
+
+alert(`✅成功创建${successCount}/${taskList.length}条任务！`);
   alert(`✅成功创建${taskList.length}条任务！`);
 
   document.getElementById('batchTaskText').value = "";
@@ -1194,6 +1327,7 @@ function triggerSelectImage(){
 
 //图片选择回调：本地压缩预览，不上传supabase
 
+
 async function handleSubmitImageSelect(e){
 
   const file = e.target.files[0];
@@ -1206,18 +1340,18 @@ async function handleSubmitImageSelect(e){
 
     const compressedFile = await compressImage(file, 800, 0.7);
 
-    //本地预览（用浏览器本地地址，不上云）
-
+    // 先撤销旧的预览地址，释放内存
+    if(window.pendingPreviewUrl){
+      URL.revokeObjectURL(window.pendingPreviewUrl);
+      window.pendingPreviewUrl = null;
+    }
+    // 生成本地预览地址（不上云）
     const localPreviewUrl = URL.createObjectURL(compressedFile);
-
+    window.pendingPreviewUrl = localPreviewUrl;
     document.getElementById('submitPreviewImg').src = localPreviewUrl;
-
     document.getElementById('submitImgPreviewBox').classList.remove('hidden');
-
-    //把压缩后的文件存到全局变量，提交时再上传
-
+    // 把压缩后的文件存到全局变量，提交时再上传
     window.pendingCompressedFile = compressedFile;
-
   } catch(err){
 
     console.error(err);
@@ -1227,7 +1361,6 @@ async function handleSubmitImageSelect(e){
   }
 
 }
-
 
 //带图片提交：此时才上传压缩后的图片到supabase
 
@@ -1334,7 +1467,7 @@ async function submitTaskDirect(){
   const today = new Date().toISOString();
 
   try{
- 
+
    const {error} = await supabase.from('daily_tasks')
 
       .update({
@@ -1343,13 +1476,13 @@ async function submitTaskDirect(){
 
         submit_date:today,
 
-        proof_image: pendingProofImgUrl, //带上已上传图片
+        proof_image: null, //直接提交，无图片，强制null
+
         status: 'pending_review'
- 
+
      })
 
       .eq('id',task.id);
-
     if(error){
 
       console.error('更新日常任务失败',error);
@@ -1420,8 +1553,27 @@ async function handleProofUpload(e){
   renderAll();
 }
 function viewProofImage(url){
-  window.open(url, '_blank');
+
+  document.getElementById('bigProofImg').src = url;
+
+  document.getElementById('imgPreviewModal').classList.add('show');
+
 }
+
+//关闭大图弹窗
+
+
+function closeImgPreviewModal(){
+
+  document.getElementById('imgPreviewModal').classList.remove('show');
+
+  const imgDom = document.getElementById('bigProofImg');
+
+  imgDom.src = "";
+
+}
+
+
 async function parentApprove(idx){
 
   const task = state.daily[idx];
@@ -1472,24 +1624,18 @@ const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
 
 
   state.star += getStar;
-
   state.parent_star += getStar;
-
   await addStarLogItem("child",getStar,`日常任务【${task.title}】完成${tipText}`);
-
   await addStarLogItem("parent",getStar,`审核任务【${task.title}】${tipText}`);
-
-  await supabase.from('daily_tasks').delete().eq('id', task.id);
-
+  // 不再立刻删除，改为标记为审核通过，留到晚上21:30统一清理
+  await supabase.from('daily_tasks').update({
+    status: 'approved',
+    approved_date: new Date().toISOString()
+  }).eq('id', task.id);
   await saveState();
-
   await loadAllData();
-
   renderAll();
-
   alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐`);
-
-
 }
 
 async function parentReject(idx){
@@ -1546,6 +1692,7 @@ async function deleteDailyTask(idx){
   await loadAllData();
   renderAll();
 }
+
 async function saveLongTask(){
   const title=document.getElementById('longTitle').value.trim();
   const star=parseInt(document.getElementById('longStar').value)||1;
@@ -1614,15 +1761,35 @@ async function approveLongTask(idx){
   const today=new Date().toDateString();
   if(task.submit_status !== 'submitted') return;
   await supabase.from('long_tasks').update({last_date:today,submit_status:'normal'}).eq('id',task.id);
+
+  
   
   const roleType = task.owner_type;
+
   if(task.owner_type === 'child'){
+
     state.star += task.star;
+
   }else{
+
     state.parent_star += task.star;
+
   }
+
+  await saveState(); //先保存星星状态
+
+  try{
+
   await addStarLogItem(roleType, task.star,`长期任务【${task.title}】打卡完成`);
-  await saveState();await loadAllData();renderAll();
+
+}catch(e){
+
+  console.warn("长期任务，写入星星日志失败",e);
+
+}
+  await loadAllData();
+
+  renderAll();
   alert('✅ 确认完成，+'+task.star+'⭐');
 }
 async function deleteLongTask(idx){
@@ -1648,8 +1815,112 @@ async function handleDelete(type, idx) {
   await loadAllData();
   renderAll();
 }
-function renderAll(){
+
+// 夜间21:30自动扣星逻辑：未提交任务每条扣1星，仅每日执行一次
+
+async function autoDeductStarTask() {
+
+  const now = new Date();
+
+  const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // 如果今天已经扣过，直接退出，防止重复扣星
+
+  if (state.lastAutoDeductDate === todayStr) {
+
+    return;
+
+  }
+
+
+
+  // 👉判断当前时间 >=21:30 才允许扣星；如果是白天，直接跳过
+
+  const hour = now.getHours();
+
+  const minute = now.getMinutes();
+
+  const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
+
+  if (!isAfter2130) return;
+
+ // ========== 夜间统一清理：删除已审核通过的任务 ==========
+  try{
+    const {data:approvedList} = await supabase.from('daily_tasks').select('id').eq('status','approved');
+    if(approvedList && approvedList.length > 0){
+      for(const item of approvedList){
+        await supabase.from('daily_tasks').delete().eq('id', item.id);
+      }
+      await loadAllData();
+      renderAll();
+    }
+  }catch(e){
+    console.warn("夜间清理已审核任务失败", e);
+  }
+
+
+
+  // =========筛选需要扣星的任务=========
+
+  // 日常任务：status = active（未开始/开始但未提交，未提交完成）
+
+  const unfinishDailyList = state.daily.filter(t => t.status === 'active');
+
+  // 长期任务：孩子任务，submit_status != submitted，没有完成记录last_date
+
+  const unfinishLongList = state.long.filter(t =>
+
+    t.owner_type === "child"
+
+    && t.submit_status !== "submitted"
+
+    && !t.last_date
+  );
+
+  // 合并所有待扣星任务
+
+  const allUnfinishTask = [...unfinishDailyList, ...unfinishLongList];
+
+  const deductCount = allUnfinishTask.length;
+
+  if (deductCount <= 0) {
+
+    // 没有任务要扣，也标记今日已执行，避免每次打开页面都判断
+
+    state.lastAutoDeductDate = todayStr;
+
+    await saveState();
+
+    return;
+
+  }
+
+
+
+  // 扣星星，允许负数
+
+  const deductNum = -1 * deductCount;
+
+  state.star += deductNum;
+
+
+  // 写入星星日志
+
+  await addStarLogItem("child", deductNum, `⏰夜间自动扣星：${deductCount}条任务未完成`);
+
+
+  // 更新：标记今天已经执行扣星
+
+  state.lastAutoDeductDate = todayStr;
+  await saveState();
+
+  alert(`⏰夜间自动扣星执行完成！\n未完成任务一共${deductCount}条，共扣${deductNum}⭐`);
+
+}
+
+async function renderAll(){
   // 渲染星星数字
+
   document.getElementById('starNum').innerText = currentRole === "parent" ? state.parent_star : state.star;
   document.getElementById('starRoleTip').innerText = currentRole === "parent" ? "家长星星" : "孩子星星";
   // ==========【新版：区分家长/孩子两端独立统计，严格按需求】==========
@@ -1659,45 +1930,63 @@ function renderAll(){
   let text1,text2,text3;
 
 
-  if(currentRole === "child"){
+if(currentRole === "child"){
 
     // 🧒 孩子端统计
 
-    // 1.未完成任务：孩子日常active + 孩子长期非submitted
+    // 1.未完成任务：日常active + 孩子长期：不是已提交 AND 没有last_date（没有完成记录）
 
     const childDailyUnfinish = state.daily.filter(t => t.status === "active").length;
 
-    const childLongUnfinish = state.long.filter(t => t.owner_type==="child" && t.submit_status !== "submitted").length;
+    const childLongUnfinish = state.long.filter(t =>
+ 
+        t.owner_type==="child"
+ 
+        && t.submit_status !== "submitted"
+ 
+        && !t.last_date
+    ).length;
 
     num1 = childDailyUnfinish + childLongUnfinish;
+
     text1 = "未完成任务";
 
 
 
-    //2.家长待确认：家长长期任务 submitted
 
-    num2 = state.long.filter(t => t.owner_type==="parent" && t.submit_status === "submitted").length;
+    //2.家长待确认：家长长期任务 submitted
+ 
+   num2 = state.long.filter(t => t.owner_type==="parent" && t.submit_status === "submitted").length;
+
     text2 = "家长待确认";
 
 
 
-    //3.已完成任务：孩子日常pending_review +孩子长期submitted（提交打卡就算完成，不等审核）
+    //3.已完成任务：孩子待审核日常 + 孩子长期有last_date（确认完成）
 
     const childDailyDone = state.daily.filter(t => t.status === "pending_review").length;
 
-    const childLongDone = state.long.filter(t => t.owner_type==="child" && t.submit_status === "submitted").length;
+    const childLongDone = state.long.filter(t => t.owner_type==="child" && !!t.last_date).length;
 
     num3 = childDailyDone + childLongDone;
 
     text3 = "已完成任务";
 
-  }else{
+}else{
 
     // 👨‍👩‍👧 家长端统计
 
-    //1.未完成任务：家长自己长期任务未提交（非submitted）
+    //1.未完成任务：家长自己长期任务：不是submitted，并且没有last_date
 
-    num1 = state.long.filter(t => t.owner_type==="parent" && t.submit_status !== "submitted").length;
+    num1 = state.long.filter(t =>
+ 
+        t.owner_type==="parent"
+ 
+        && t.submit_status !== "submitted"
+ 
+        && !t.last_date
+
+    ).length;
 
     text1 = "未完成任务";
 
@@ -1715,14 +2004,14 @@ function renderAll(){
 
 
 
+
     //3.已完成任务：家长自己长期任务，last_date存在=完成
 
     num3 = state.long.filter(t => t.owner_type==="parent" && !!t.last_date).length;
 
     text3 = "已完成任务";
 
-  }
-
+}
 
   // 赋值渲染
 
@@ -1767,11 +2056,27 @@ function renderAll(){
   // 日常任务渲染
   let dailyActiveHtml = "";
   let dailyPendingHtml = "";
+  let dailyApprovedHtml = "";
   state.daily.forEach((task,idx)=>{
 
     const subjInfo = SUBJECT_MAP[task.subject] || {name:"",cls:""};
 
-   if(task.status === 'pending_review'){
+    if(task.status === 'approved'){
+     dailyApprovedHtml += `
+     <div class="task-row">
+       <div class="task-info">
+         <div class="task-icon">✅</div>
+         <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
+           <div class="task-meta">奖励${task.star}⭐ <span class="badge-submit">已审核通过</span></div>
+         </div>
+       </div>
+       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+         ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>` : '<span style="color:#888;font-size:13px;">无作业照片</span>'}
+         ${currentRole==='parent'?`<button class="task-btn btn-del" onclick="deleteDailyTask(${idx})">删除</button>`:""}
+       </div>
+     </div>`;
+
+ } else   if(task.status === 'pending_review'){
 
   dailyPendingHtml += `
 
@@ -1831,10 +2136,8 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
     </div>
 
     <!-- 修改：左右布局，左侧倒计时，右侧按钮 -->
-
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center;width:100%;">
-
-      <div>${getTaskRemainTime(task)}</div>
+      <div data-countdown-taskid="${task.id}">${getTaskRemainTime(task)}</div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
 
@@ -1861,6 +2164,8 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
   });
   document.getElementById("dailyActiveList").innerHTML = dailyActiveHtml || `<p style="padding:10px;color:#888;">暂无日常任务</p>`;
   document.getElementById("dailyPendingList").innerHTML = dailyPendingHtml || `<p style="padding:10px;color:#888;">无待审核任务</p>`;
+  document.getElementById("dailyApprovedList").innerHTML = dailyApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无审核通过的作业</p>`;
+
   // 长期任务渲染【拆分：孩子任务 / 家长任务】
   let longChildHtml = "";
   let longParentHtml = "";
@@ -1945,16 +2250,20 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
     </div>`;
   });
   document.getElementById("wishList").innerHTML = wishHtml || `<p style="padding:10px;color:#888;">暂无心愿</p>`;
-// 限时倒计时自动刷新
 
-  if(window.taskTimer) clearInterval(window.taskTimer);
+// 只启动一次倒计时刷新（不再重建整个页面）
+  if(!window.taskTimer){
+    window.taskTimer = setInterval(updateCountdowns, 1000);
+  }
+}
 
-  window.taskTimer = setInterval(()=>{
- 
-   renderAll();
-
-  },1000);
-
+// 只更新倒计时文字，不重建页面
+function updateCountdowns(){
+  document.querySelectorAll('[data-countdown-taskid]').forEach(el=>{
+    const taskId = el.getAttribute('data-countdown-taskid');
+    const task = state.daily.find(t=>t.id===taskId);
+    if(task) el.innerHTML = getTaskRemainTime(task);
+  });
 }
   // 退出登录
   
@@ -1962,11 +2271,22 @@ function logout(){
 
   if(!confirm("确定退出登录吗？")) return;
 
+  //退出登录清除定时器
+
+  if(window.taskTimer){
+
+    clearInterval(window.taskTimer);
+
+    window.taskTimer = null;
+
+  }
+
   // 清空身份
 
   currentRole = "";
 
   localStorage.removeItem("garden_role");
+
   // 隐藏主页面，显示登录页
 
   document.getElementById('mainPage').classList.add('hidden');
@@ -1982,7 +2302,6 @@ function logout(){
   document.getElementById('parentBtn').classList.remove('active');
 
   document.getElementById('childBtn').classList.remove('active');
-
 }
 
 </script>
