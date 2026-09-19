@@ -2,16 +2,19 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-<title>🌱种植小花园</title>
+<title>🌱种植小花园
+
+</title>
 <!-- ✅苹果桌面图标 新增这一行 -->
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <style>
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:linear-gradient(180deg,#fff7d7 0%,#f7fff9 100%);min-height:100vh;}
+html, body { touch-action: manipulation; }
 .card{background:#fff;border-radius:24px;padding:18px;margin:10px 0;box-shadow:0 4px 12px #00000015;}
 .btn{padding:12px;border:none;border-radius:12px;font-size:16px;cursor:pointer;width:100%;margin:6px 0;}
 .btn-green{background:#34d399;color:#fff;}
@@ -118,6 +121,40 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
   padding-right:4px;
 }
 @media (max-width:375px){.stage-preview-grid{grid-template-columns:repeat(7,120px);overflow-x:auto;}}
+
+/* ========== 分类布局样式 ========== */
+.category-layout{display:flex;gap:10px;align-items:flex-start;}
+.category-sidebar{width:78px;flex-shrink:0;background:#fff;border-radius:20px;padding:8px 4px;box-shadow:0 2px 8px #00000010;position:sticky;top:16px;}
+.category-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;border-radius:14px;cursor:pointer;position:relative;transition:0.2s;margin-bottom:4px;}
+.category-item.active{background:#fffbeb;}
+.category-item.active .cat-name{color:#ef4444;font-weight:bold;}
+.cat-icon{font-size:20px;}
+.cat-name{font-size:12px;color:#666;}
+.cat-dot{position:absolute;top:6px;right:8px;width:8px;height:8px;background:#ef4444;border-radius:50%;}
+.category-content{flex:1;min-width:0;}
+@media (max-width:400px){
+  .category-sidebar{width:64px;}
+  .cat-icon{font-size:18px;}
+  .cat-name{font-size:11px;}
+}
+
+/* ========== 总览页样式 ========== */
+.overview-card{text-align:center;}
+.progress-ring-wrap{position:relative;width:140px;height:140px;margin:10px auto 16px;}
+.progress-ring{transform:rotate(-90deg);}
+.progress-ring-circle-bg{stroke:#eee;}
+.progress-ring-circle{stroke:#34d399;stroke-linecap:round;transition:stroke-dashoffset 0.5s;}
+.progress-ring-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:26px;font-weight:bold;color:#333;}
+.progress-ring-sub{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:12px;color:#999;}
+.bar-item{margin:12px 0;text-align:left;}
+.bar-top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;color:#555;}
+.bar-track{height:12px;background:#f0f0f0;border-radius:6px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:6px;transition:width 0.4s;}
+.bar-fill.chinese{background:#f87171;}
+.bar-fill.math{background:#60a5fa;}
+.bar-fill.english{background:#4ade80;}
+.bar-fill.child{background:#60a5fa;}
+.bar-fill.parent{background:#f472b6;}
 </style>
 
 <link rel="manifest" href="./manifest.json">
@@ -211,26 +248,122 @@ if('serviceWorker' in navigator){
     </div>
   </div>
   <div id="tab-task" class="hidden">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h3 class="task-card-title">📅 日常任务</h3>
-        <button id="addDailyBtn" class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
+    <div class="category-layout">
+      <div class="category-sidebar">
+        <div class="category-item active" id="cat-all" onclick="selectSubjectTab('all')">
+          <div class="cat-icon">📋</div>
+          <div class="cat-name">全部</div>
+          <div class="cat-dot hidden" id="dot-all"></div>
+        </div>
+        <div class="category-item" id="cat-chinese" onclick="selectSubjectTab('chinese')">
+          <div class="cat-icon">📖</div>
+          <div class="cat-name">语文</div>
+          <div class="cat-dot hidden" id="dot-chinese"></div>
+        </div>
+        <div class="category-item" id="cat-math" onclick="selectSubjectTab('math')">
+          <div class="cat-icon">📐</div>
+          <div class="cat-name">数学</div>
+          <div class="cat-dot hidden" id="dot-math"></div>
+        </div>
+        <div class="category-item" id="cat-english" onclick="selectSubjectTab('english')">
+          <div class="cat-icon">🔤</div>
+          <div class="cat-name">英语</div>
+          <div class="cat-dot hidden" id="dot-english"></div>
+        </div>
       </div>
-      <div><span class="group-title">待开始 / 进行中任务</span></div>
-      <div id="dailyActiveList"></div>
-      <div><span class="group-title">待家长审核</span></div>
-      <div id="dailyPendingList"></div>
-      <div><span class="group-title">✅ 今日已审核通过</span></div>
-      <div id="dailyApprovedList"></div>
+            <div class="category-content">
+        <!-- 总览页：只在"全部"时显示 -->
+        <div id="dailyOverview" class="card overview-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 class="task-card-title" style="text-align:left;margin:0;">📊 今日完成总览</h3>
+            <button id="addDailyBtn" class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
+          </div>
+          <div class="progress-ring-wrap">
+            <svg class="progress-ring" width="140" height="140">
+              <circle class="progress-ring-circle-bg" cx="70" cy="70" r="60" stroke-width="12" fill="none"/>
+              <circle class="progress-ring-circle" id="ringCircle" cx="70" cy="70" r="60" stroke-width="12" fill="none"/>
+            </svg>
+            <div class="progress-ring-text" id="ringText">0%</div>
+            <div class="progress-ring-sub">总完成度</div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-top"><span>📖 语文</span><span id="barTextChinese">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill chinese" id="barChinese" style="width:0%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-top"><span>📐 数学</span><span id="barTextMath">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill math" id="barMath" style="width:0%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-top"><span>🔤 英语</span><span id="barTextEnglish">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill english" id="barEnglish" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <!-- 任务列表：只在具体科目时显示 -->
+        <div id="dailyTaskListCard" class="card" style="display:none;">
+           <div style="margin-bottom:12px;">
+            <h3 class="task-card-title" id="taskPageTitle">📅 日常任务</h3>
+          </div>
+          <div><span class="group-title">待开始 / 进行中任务</span></div>
+          <div id="dailyActiveList"></div>
+          <div><span class="group-title">待家长审核</span></div>
+          <div id="dailyPendingList"></div>
+          <div><span class="group-title">✅ 今日已审核通过</span></div>
+          <div id="dailyApprovedList"></div>
+        </div>
+      </div>
     </div>
   </div>
-  <div id="tab-long" class="hidden">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h3 class="task-card-title">⏳ 长期任务</h3>
-        <button id="addLongBtn" class="btn btn-red btn-sm" onclick="openModal('longModal')">+ 新增</button>
+    <div id="tab-long" class="hidden">
+    <div class="category-layout">
+      <div class="category-sidebar">
+        <div class="category-item active" id="cat-long-all" onclick="selectLongTab('all')">
+          <div class="cat-icon">📋</div>
+          <div class="cat-name">全部</div>
+          <div class="cat-dot hidden" id="dot-long-all"></div>
+        </div>
+        <div class="category-item" id="cat-long-grow" onclick="selectLongTab('成长')">
+          <div class="cat-icon">🌱</div>
+          <div class="cat-name">成长</div>
+          <div class="cat-dot hidden" id="dot-long-grow"></div>
+        </div>
+        <div class="category-item" id="cat-long-chore" onclick="selectLongTab('家务')">
+          <div class="cat-icon">🧹</div>
+          <div class="cat-name">家务</div>
+          <div class="cat-dot hidden" id="dot-long-chore"></div>
+        </div>
+        <div class="category-item" id="cat-long-sport" onclick="selectLongTab('运动')">
+          <div class="cat-icon">🏃</div>
+          <div class="cat-name">运动</div>
+          <div class="cat-dot hidden" id="dot-long-sport"></div>
+        </div>
       </div>
-      <div id="longList"></div>
+            <div class="category-content">
+        <!-- 长期总览：只在"全部"时显示 -->
+                <div id="longOverview" class="card overview-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 class="task-card-title" style="text-align:left;margin:0;">📊 长期任务总览</h3>
+            <button id="addLongBtn" class="btn btn-red btn-sm" onclick="openModal('longModal')">+ 新增</button>
+          </div>
+          <div class="bar-item">
+            <div class="bar-top"><span>👧 孩子任务</span><span id="barTextChild">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill child" id="barChild" style="width:0%"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-top"><span>👨‍👩‍👧 家长任务</span><span id="barTextParent">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill parent" id="barParent" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <!-- 长期任务列表：只在具体分类时显示 -->
+        <div id="longTaskListCard" class="card" style="display:none;">
+                    <div style="margin-bottom:12px;">
+            <h3 class="task-card-title">⏳ 长期任务</h3>
+          </div>
+          <div id="longList"></div>
+        </div>
+      </div>
     </div>
   </div>
   <div id="tab-shop" class="hidden">
@@ -435,6 +568,12 @@ if('serviceWorker' in navigator){
     <input id="longTitle" placeholder="任务名称，如：读完一本书"/>
     <label class="label-text">奖励星星数</label>
     <input id="longStar" type="number" value="1" placeholder="奖励星星数"/>
+    <label class="label-text">任务类别</label>
+    <select id="longCategory">
+      <option value="成长">🌱 成长（阅读、练字、习惯）</option>
+      <option value="家务">🧹 家务（洗碗、扫地）</option>
+      <option value="运动">🏃 运动（跳绳、跑步）</option>
+    </select>
     <label class="label-text">任务归属</label>
     <select id="longOwnerType">
       <option value="child">👧 孩子任务</option>
@@ -537,6 +676,22 @@ if('serviceWorker' in navigator){
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.7/dist/umd/supabase.min.js"></script>
 
 <script>
+
+
+// 阻止双击缩放（iPhone PWA 专用）
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(e){
+  const now = Date.now();
+  if(now - lastTouchEnd <= 300){
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, { passive: false });
+
+// 阻止 iOS 手势缩放（捏合）
+document.addEventListener('gesturestart', function(e){
+  e.preventDefault();
+});
 function triggerSelectImage(){
 
   document.getElementById('submitProofFile').click();
@@ -558,6 +713,8 @@ let pendingPlantId = null;
 let pendingTaskIdx = null;
 let selectedSubject = null;
 let pendingProofImgUrl = ""; //缓存本次选中图片地址
+let currentSubjectTab = "all";   // 日常任务当前选中的科目
+let currentLongTab = "all";      // 长期任务当前选中的类别
 let state = {
 
   star: 10,
@@ -694,8 +851,13 @@ async function loadAllData(){
 
     const {data:stateData} = await supabase.from('app_state').select('*').eq('id',1).single();
 
-    if(stateData) state = {...state, ...stateData};
-
+    if(stateData){
+  state = {...state, ...stateData};
+  // 数据库列名是全小写，要手动映射到驼峰
+  if(stateData.lastautodeductdate !== undefined){
+    state.lastAutoDeductDate = stateData.lastautodeductdate || "";
+  }
+}
     const {data:daily} = await supabase.from('daily_tasks').select('*');
 
     state.daily = daily || [];
@@ -718,6 +880,7 @@ async function loadAllData(){
 
   await autoDeductStarTask();
 
+  await cleanApprovedTasks();
 }
 
 async function saveState(){
@@ -726,7 +889,8 @@ async function saveState(){
     await supabase.from('app_state').upsert({
       id:1, star:state.star, parent_star:state.parent_star,
       water:state.water, sun:state.sun, fert:state.fert,
-      plant:state.plant, stage:state.stage, plant_done:state.plantDone
+      plant:state.plant, stage:state.stage, plant_done:state.plantDone,
+      lastautodeductdate: state.lastAutoDeductDate || ""
     });
   }catch(e){
     console.warn("saveState异常",e);
@@ -828,6 +992,162 @@ function switchTab(name,btn){
   ['garden','task','long','shop','mine'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden', t!==name));
   if(name==="mine") loadStarLog();
 }
+
+// 切换日常任务的科目分类
+function selectSubjectTab(subj){
+  currentSubjectTab = subj;
+  document.querySelectorAll('#tab-task .category-item').forEach(el=>el.classList.remove('active'));
+  const map = {all:'cat-all',chinese:'cat-chinese',math:'cat-math',english:'cat-english'};
+  const el = document.getElementById(map[subj]);
+  if(el) el.classList.add('active');
+  const titles = {all:'📅 日常任务',chinese:'📖 语文任务',math:'📐 数学任务',english:'🔤 英语任务'};
+  const titleEl = document.getElementById('taskPageTitle');
+  if(titleEl) titleEl.innerText = titles[subj];
+  renderAll();
+}
+
+// 切换长期任务的类别
+function selectLongTab(cat){
+  currentLongTab = cat;
+  document.querySelectorAll('#tab-long .category-item').forEach(el=>el.classList.remove('active'));
+  const map = {all:'cat-long-all','成长':'cat-long-grow','家务':'cat-long-chore','运动':'cat-long-sport'};
+  const el = document.getElementById(map[cat]);
+  if(el) el.classList.add('active');
+  renderAll();
+}
+
+// 计算百分比
+function calcPercent(done, total){
+  if(total === 0) return 0;
+  return Math.round((done / total) * 100);
+}
+
+// 渲染日常任务总览
+function renderDailyOverview(){
+  const dailyOverview = document.getElementById('dailyOverview');
+  const taskListCard = document.getElementById('dailyTaskListCard');
+  if(!dailyOverview || !taskListCard) return;
+
+  if(currentSubjectTab !== 'all'){
+    dailyOverview.style.display = 'none';
+    taskListCard.style.display = 'block';
+    return;
+  }
+  dailyOverview.style.display = 'block';
+  taskListCard.style.display = 'none';
+
+  // 统计各科目完成情况
+  const stats = {
+    chinese:{done:0, total:0},
+    math:{done:0, total:0},
+    english:{done:0, total:0}
+  };
+  state.daily.forEach(t=>{
+    if(!t.subject || !stats[t.subject]) return;
+    stats[t.subject].total++;
+    if(t.status === 'approved') stats[t.subject].done++;
+  });
+
+  // 三条进度条
+  ['chinese','math','english'].forEach(subj=>{
+    const s = stats[subj];
+    const pct = calcPercent(s.done, s.total);
+    const barId = 'bar' + subj.charAt(0).toUpperCase() + subj.slice(1);
+    const textId = 'barText' + subj.charAt(0).toUpperCase() + subj.slice(1);
+    const bar = document.getElementById(barId);
+    const txt = document.getElementById(textId);
+    if(bar) bar.style.width = pct + '%';
+    if(txt) txt.innerText = `${s.done}/${s.total}`;
+  });
+
+  // 总进度饼图
+  const totalAll = stats.chinese.total + stats.math.total + stats.english.total;
+  const doneAll = stats.chinese.done + stats.math.done + stats.english.done;
+  const totalPct = calcPercent(doneAll, totalAll);
+  const circle = document.getElementById('ringCircle');
+  const ringText = document.getElementById('ringText');
+  if(circle){
+    const radius = 60;
+    const circumference = 2 * Math.PI * radius;
+    circle.style.strokeDasharray = circumference;
+    circle.style.strokeDashoffset = circumference * (1 - totalPct / 100);
+  }
+  if(ringText) ringText.innerText = totalPct + '%';
+}
+
+// 渲染长期任务总览
+function renderLongOverview(){
+  const longOverview = document.getElementById('longOverview');
+  const longListCard = document.getElementById('longTaskListCard');
+  if(!longOverview || !longListCard) return;
+
+  if(currentLongTab !== 'all'){
+    longOverview.style.display = 'none';
+    longListCard.style.display = 'block';
+    return;
+  }
+  longOverview.style.display = 'block';
+  longListCard.style.display = 'none';
+
+  const today = new Date().toDateString();
+  let childTotal = 0, childDone = 0;
+  let parentTotal = 0, parentDone = 0;
+  state.long.forEach(t=>{
+    const isDone = (t.last_date === today);
+    if(t.owner_type === 'child'){
+      childTotal++;
+      if(isDone) childDone++;
+    }else{
+      parentTotal++;
+      if(isDone) parentDone++;
+    }
+  });
+
+  const childPct = calcPercent(childDone, childTotal);
+  const parentPct = calcPercent(parentDone, parentTotal);
+
+  const barChild = document.getElementById('barChild');
+  const barParent = document.getElementById('barParent');
+  const barTextChild = document.getElementById('barTextChild');
+  const barTextParent = document.getElementById('barTextParent');
+  if(barChild) barChild.style.width = childPct + '%';
+  if(barParent) barParent.style.width = parentPct + '%';
+  if(barTextChild) barTextChild.innerText = `${childDone}/${childTotal}`;
+  if(barTextParent) barTextParent.innerText = `${parentDone}/${parentTotal}`;
+}
+
+
+// 刷新左侧分类的红点提示
+function updateCategoryDots(){
+  // 日常任务：每个科目是否有未完成或待审核的任务
+  const dailyBySubj = {chinese:false, math:false, english:false};
+  state.daily.forEach(t=>{
+    if(!t.subject) return;
+    if(t.status === 'active' || t.status === 'pending_review'){
+      dailyBySubj[t.subject] = true;
+    }
+  });
+  ['chinese','math','english'].forEach(subj=>{
+    const dot = document.getElementById('dot-' + subj);
+    if(dot) dot.classList.toggle('hidden', !dailyBySubj[subj]);
+  });
+
+  // 长期任务：每个类别是否有未完成的任务（今天未完成）
+  const today = new Date().toDateString();
+  const longByCat = {'成长':false, '家务':false, '运动':false};
+  state.long.forEach(t=>{
+    const cat = t.category || '成长';
+    if(t.submit_status !== 'submitted' && t.last_date !== today){
+      if(longByCat[cat] !== undefined) longByCat[cat] = true;
+    }
+  });
+  const map = {'成长':'dot-long-grow','家务':'dot-long-chore','运动':'dot-long-sport'};
+  Object.keys(map).forEach(cat=>{
+    const dot = document.getElementById(map[cat]);
+    if(dot) dot.classList.toggle('hidden', !longByCat[cat]);
+  });
+}
+
 function openModal(id){
   document.getElementById(id).classList.add('show');
   if(id === 'dailyModal'){
@@ -1699,8 +2019,12 @@ async function saveLongTask(){
   const title=document.getElementById('longTitle').value.trim();
   const star=parseInt(document.getElementById('longStar').value)||1;
   const ownerType = document.getElementById('longOwnerType').value;
+  const category = document.getElementById('longCategory').value;
   if(!title)return alert('请输入任务名称');
-  await supabase.from('long_tasks').insert([{title,star,owner_type:ownerType,last_date:'',submit_status:'normal'}]);
+  await supabase.from('long_tasks').insert([{
+    title, star, owner_type:ownerType, category:category,
+    last_date:'', submit_status:'normal'
+  }]);
   closeModal('longModal');
   document.getElementById('longTitle').value='';
   await loadAllData();renderAll();
@@ -1819,105 +2143,71 @@ async function handleDelete(type, idx) {
 }
 
 // 夜间21:30自动扣星逻辑：未提交任务每条扣1星，仅每日执行一次
-
 async function autoDeductStarTask() {
-
   const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
 
-  const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-
-  // 如果今天已经扣过，直接退出，防止重复扣星
-
+  // 如果今天已经扣过，直接退出
   if (state.lastAutoDeductDate === todayStr) {
-
     return;
-
   }
 
-
-
-  // 👉判断当前时间 >=21:30 才允许扣星；如果是白天，直接跳过
-
   const hour = now.getHours();
-
   const minute = now.getMinutes();
-
   const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
-
   if (!isAfter2130) return;
 
- // ========== 夜间统一清理：删除已审核通过的任务 ==========
+  // ===== 日常任务：扣孩子的星，写孩子的日志 =====
+  const unfinishDailyList = state.daily.filter(t => t.status === 'active');
+  for(const task of unfinishDailyList){
+    state.star -= 1;
+    await addStarLogItem("child", -1, `⏰夜间扣星：日常任务【${task.title}】未完成`);
+  }
+
+  // ===== 长期任务：按 owner_type 分角色扣 =====
+  const unfinishLongList = state.long.filter(t =>
+    t.submit_status !== "submitted"
+    && t.last_date !== new Date().toDateString()
+  );
+
+  for(const task of unfinishLongList){
+    if(task.owner_type === "child"){
+      state.star -= 1;
+      await addStarLogItem("child", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
+    }else{
+      state.parent_star -= 1;
+      await addStarLogItem("parent", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
+    }
+  }
+
+  // 无论有没有任务，都标记今天已执行
+  state.lastAutoDeductDate = todayStr;
+  await saveState();
+}
+
+
+// ========== 独立清理函数：21:30后删除「未提交」和「已审核通过」的日常任务 ==========
+async function cleanApprovedTasks(){
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
+  if(!isAfter2130) return;
+
   try{
-    const {data:approvedList} = await supabase.from('daily_tasks').select('id').eq('status','approved');
-    if(approvedList && approvedList.length > 0){
-      for(const item of approvedList){
+    const {data:toDeleteList} = await supabase.from('daily_tasks')
+      .select('id,status')
+      .in('status',['active','approved']);
+    if(toDeleteList && toDeleteList.length > 0){
+      for(const item of toDeleteList){
         await supabase.from('daily_tasks').delete().eq('id', item.id);
       }
       await loadAllData();
       renderAll();
     }
   }catch(e){
-    console.warn("夜间清理已审核任务失败", e);
+    console.warn("夜间清理日常任务失败", e);
   }
-
-
-
-  // =========筛选需要扣星的任务=========
-
-  // 日常任务：status = active（未开始/开始但未提交，未提交完成）
-
-  const unfinishDailyList = state.daily.filter(t => t.status === 'active');
-
-  // 长期任务：孩子任务，submit_status != submitted，没有完成记录last_date
-
-  const unfinishLongList = state.long.filter(t =>
-
-    t.owner_type === "child"
-
-    && t.submit_status !== "submitted"
-
-    && !t.last_date
-  );
-
-  // 合并所有待扣星任务
-
-  const allUnfinishTask = [...unfinishDailyList, ...unfinishLongList];
-
-  const deductCount = allUnfinishTask.length;
-
-  if (deductCount <= 0) {
-
-    // 没有任务要扣，也标记今日已执行，避免每次打开页面都判断
-
-    state.lastAutoDeductDate = todayStr;
-
-    await saveState();
-
-    return;
-
-  }
-
-
-
-  // 扣星星，允许负数
-
-  const deductNum = -1 * deductCount;
-
-  state.star += deductNum;
-
-
-  // 写入星星日志
-
-  await addStarLogItem("child", deductNum, `⏰夜间自动扣星：${deductCount}条任务未完成`);
-
-
-  // 更新：标记今天已经执行扣星
-
-  state.lastAutoDeductDate = todayStr;
-  await saveState();
-
-  alert(`⏰夜间自动扣星执行完成！\n未完成任务一共${deductCount}条，共扣${deductNum}⭐`);
-
 }
 
 async function renderAll(){
@@ -2055,12 +2345,13 @@ if(currentRole === "child"){
     document.getElementById("resFert").innerText = state.fert;
     document.getElementById("doneTip").classList.toggle("hidden", !state.plantDone);
   }
-  // 日常任务渲染
+  
+ // 日常任务渲染
   let dailyActiveHtml = "";
   let dailyPendingHtml = "";
   let dailyApprovedHtml = "";
   state.daily.forEach((task,idx)=>{
-
+    if(currentSubjectTab !== 'all' && task.subject !== currentSubjectTab) return;
     const subjInfo = SUBJECT_MAP[task.subject] || {name:"",cls:""};
 
     if(task.status === 'approved'){
@@ -2172,6 +2463,10 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
   let longChildHtml = "";
   let longParentHtml = "";
   state.long.forEach((task,idx)=>{
+    if(currentLongTab !== 'all'){
+      const cat = task.category || '成长';
+      if(cat !== currentLongTab) return;
+    }
     const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
     const itemHtml = `
 
@@ -2198,7 +2493,8 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
 
         ${ ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
 
- ?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date ? 'disabled' : ''}>提交打卡</button>`:""}
+
+?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>`:""}
         ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
 
           ?`<button class="task-btn task-btn-approve" onclick="approveLongTask(${idx})">确认完成</button>`:""}
@@ -2252,10 +2548,16 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
     </div>`;
   });
   document.getElementById("wishList").innerHTML = wishHtml || `<p style="padding:10px;color:#888;">暂无心愿</p>`;
-
+  updateCategoryDots();
+  renderDailyOverview();
+  renderLongOverview();
 // 只启动一次倒计时刷新（不再重建整个页面）
   if(!window.taskTimer){
     window.taskTimer = setInterval(updateCountdowns, 1000);
+  }
+// 每分钟检查一次是否需要清理日常任务
+  if(!window.cleanTimer){
+    window.cleanTimer = setInterval(cleanApprovedTasks, 60000);
   }
 }
 
@@ -2267,13 +2569,22 @@ function updateCountdowns(){
     if(task) el.innerHTML = getTaskRemainTime(task);
   });
 }
+
+// 判断当前是否过了21:30
+function isAfter2130(){
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  return (hour > 21) || (hour === 21 && minute >= 30);
+}
   // 退出登录
   
 function logout(){
 
   if(!confirm("确定退出登录吗？")) return;
 
-  //退出登录清除定时器
+  
+ //退出登录清除定时器
 
   if(window.taskTimer){
 
@@ -2282,6 +2593,12 @@ function logout(){
     window.taskTimer = null;
 
   }
+  if(window.cleanTimer){
+    clearInterval(window.cleanTimer);
+    window.cleanTimer = null;
+  }
+
+
 
   // 清空身份
 
