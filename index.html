@@ -533,14 +533,29 @@ if('serviceWorker' in navigator){
 
     <div style="border-top:1px solid #eee;margin:16px 0;"></div>
 
+    
+    <label class="label-text">任务类型</label>
+    <div class="subject-buttons" style="margin-bottom:12px;">
+      <button type="button" class="subject-btn" id="typeNormalBtn" onclick="selectTaskType('normal')" style="flex:1;border-color:#fecdd3;color:#b91c1c;">📝 普通任务</button>
+      <button type="button" class="subject-btn" id="typeDictationBtn" onclick="selectTaskType('dictation')" style="flex:1;border-color:#bfdbfe;color:#1d4ed8;">🔊 听写任务</button>
+    </div>
+
     <!-- ==========原有单条任务表单，保留不变========== -->
 
 
+
+    
 
     <label class="label-text">任务名称</label>
 
     <input id="dailyTitle" placeholder="例如：背10个单词"/>
 
+
+    <label class="label-text" id="dailyDescLabel">任务说明（可选）</label>
+    <textarea id="dailyDesc" placeholder="可选，简要说明任务"></textarea>
+    <p id="dictationHint" style="display:none;color:#3b82f6;font-size:13px;margin:4px 0;">
+      💡 听写任务：把单词写在上面这个"任务说明"里，用英文句号 . 分隔。例如：apple.banana.cat.dog
+    </p>
     <label class="label-text">奖励星星数</label>
 
     <input id="dailyStar" type="number" value="2" placeholder="完成任务获得几颗星星"/>
@@ -585,6 +600,54 @@ if('serviceWorker' in navigator){
     </div>
   </div>
 </div>
+
+<!-- 录音打卡弹窗 -->
+<div class="modal-mask" id="audioRecordModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;">🎤 录音打卡</h3>
+    <p id="recordTaskTitle" style="color:#444;margin-bottom:10px;"></p>
+    <div style="text-align:center;padding:16px 0;">
+      <div id="recordTimer" style="font-size:28px;font-weight:bold;color:#ef4444;margin-bottom:12px;">00:00</div>
+      <div id="recordStatus" style="color:#888;margin-bottom:16px;font-size:14px;">点击下方按钮开始录音</div>
+      <button class="btn btn-red" id="recordBtn" onclick="toggleRecording()" style="width:auto;padding:12px 24px;">🎤 开始录音</button>
+    </div>
+    <div id="recordPreviewBox" class="hidden" style="margin:12px 0;">
+      <p style="color:#666;font-size:14px;margin-bottom:6px;">试听已录制的录音：</p>
+      <audio id="recordPreviewAudio" controls style="width:100%;"></audio>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="cancelRecording()">取消</button>
+      <button class="btn btn-green" style="flex:1;" id="recordSubmitBtn" onclick="uploadRecordingAndSubmit()" disabled>提交录音</button>
+    </div>
+  </div>
+</div>
+
+<!-- 播放录音弹窗 -->
+<div class="modal-mask" id="audioPlayModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;">🔊 播放录音</h3>
+    <audio id="audioPlayer" controls style="width:100%;"></audio>
+    <button class="btn" onclick="closeAudioPlayer()" style="margin-top:12px">关闭</button>
+  </div>
+</div>
+
+<!-- 听写弹窗 -->
+<div class="modal-mask" id="dictationModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;">🔊 听写练习</h3>
+    <p id="dictationTaskTitle" style="color:#444;margin-bottom:12px;font-weight:bold;"></p>
+    <div style="text-align:center;padding:16px 0;">
+      <div style="color:#888;font-size:14px;margin-bottom:8px;">第 <span id="dictationProgress">1</span> / <span id="dictationTotal">1</span> 个</div>
+      <div id="dictationWordDisplay" style="font-size:24px;font-weight:bold;color:#3b82f6;margin:12px 0;min-height:32px;">—</div>
+      <button class="btn btn-blue" id="replayBtn" onclick="replayCurrentWord()" style="width:auto;padding:12px 24px;margin-top:8px;">🔁 重播当前单词</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="closeDictation()">退出</button>
+      <button class="btn btn-green" style="flex:1;" id="nextWordBtn" onclick="nextDictationWord()">▶ 下一个</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-mask" id="wishModal">
   <div class="modal-box">
     <h3 style="margin-bottom:12px;">新增心愿</h3>
@@ -712,6 +775,8 @@ let currentRole = "";
 let pendingPlantId = null;
 let pendingTaskIdx = null;
 let selectedSubject = null;
+let selectedTaskType = 'normal'; // normal 或 dictation
+
 let pendingProofImgUrl = ""; //缓存本次选中图片地址
 let currentSubjectTab = "all";   // 日常任务当前选中的科目
 let currentLongTab = "all";      // 长期任务当前选中的类别
@@ -1152,15 +1217,55 @@ function openModal(id){
   document.getElementById(id).classList.add('show');
   if(id === 'dailyModal'){
     selectedSubject = null;
-    document.querySelectorAll('.subject-btn').forEach(b=>b.classList.remove('active'));
+    selectedTaskType = 'normal';
+    document.querySelectorAll('.subject-btn').forEach(b=>{
+      if(b.id !== 'typeNormalBtn' && b.id !== 'typeDictationBtn'){
+        b.classList.remove('active');
+      }
+    });
+    // 重置类型按钮样式
+    const normalBtn = document.getElementById('typeNormalBtn');
+    const dictationBtn = document.getElementById('typeDictationBtn');
+    if(normalBtn){
+      normalBtn.style.borderWidth = '2px';
+      normalBtn.style.fontWeight = 'bold';
+    }
+    if(dictationBtn){
+      dictationBtn.style.borderWidth = '1px';
+      dictationBtn.style.fontWeight = 'normal';
+    }
+    const hint = document.getElementById('dictationHint');
+    if(hint) hint.style.display = 'none';
   }
 }
+
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 function selectSubject(subj){
   selectedSubject = subj;
   document.querySelectorAll('.subject-btn').forEach(b=>b.classList.remove('active'));
   document.querySelector(`.subject-btn.${subj}`).classList.add('active');
 }
+// 切换任务类型（普通 / 听写）
+function selectTaskType(type){
+  selectedTaskType = type;
+  const normalBtn = document.getElementById('typeNormalBtn');
+  const dictationBtn = document.getElementById('typeDictationBtn');
+  const hint = document.getElementById('dictationHint');
+  if(type === 'normal'){
+    normalBtn.style.borderWidth = '2px';
+    normalBtn.style.fontWeight = 'bold';
+    dictationBtn.style.borderWidth = '1px';
+    dictationBtn.style.fontWeight = 'normal';
+    if(hint) hint.style.display = 'none';
+  }else{
+    dictationBtn.style.borderWidth = '2px';
+    dictationBtn.style.fontWeight = 'bold';
+    normalBtn.style.borderWidth = '1px';
+    normalBtn.style.fontWeight = 'normal';
+    if(hint) hint.style.display = 'block';
+  }
+}
+
 function openPlantPreview(plantId){
   pendingPlantId = plantId;
   const plant = PLANT[plantId];
@@ -1282,22 +1387,40 @@ async function buyRes(type){
   renderAll();
   alert('兑换成功！');
 }
+
 async function saveDailyTask(){
   const title=document.getElementById('dailyTitle').value.trim();
   const star=parseInt(document.getElementById('dailyStar').value)||1;
   const minuteLimit = parseInt(document.getElementById('dailyMinuteLimit').value) || 0;
+  const desc = document.getElementById('dailyDesc').value.trim();
   if(!title)return alert('请输入任务名称');
   if(!selectedSubject)return alert('请选择科目（语文/数学/英语）');
+
+  const isDictation = (selectedTaskType === 'dictation');
+
+  if(isDictation){
+    if(!desc) return alert('听写任务请在"任务说明"里填写单词，用英文句号分隔');
+    // 简单校验一下格式，至少有一个词
+    const words = desc.split('.').map(w => w.trim()).filter(w => w);
+    if(words.length === 0){
+      return alert('请至少输入一个单词，用英文句号分隔');
+    }
+  }
+
   await supabase.from('daily_tasks').insert([{
     title, star, minute_limit: minuteLimit,
     subject: selectedSubject,
+    description: desc,
+    is_dictation: isDictation,
     create_at: new Date().toISOString(),
     start_at: null, proof_image: null, status: 'active'
   }]);
   closeModal('dailyModal');
   document.getElementById('dailyTitle').value='';
+  document.getElementById('dailyDesc').value='';
   document.getElementById('dailyStar').value='2';
   document.getElementById('dailyMinuteLimit').value='0';
+  selectedTaskType = 'normal';
   await loadAllData();renderAll();
 }
 
@@ -1520,7 +1643,7 @@ for(let taskName of taskList){
 
 
 alert(`✅成功创建${successCount}/${taskList.length}条任务！`);
-  alert(`✅成功创建${taskList.length}条任务！`);
+  
 
   document.getElementById('batchTaskText').value = "";
 
@@ -2029,6 +2152,244 @@ async function saveLongTask(){
   document.getElementById('longTitle').value='';
   await loadAllData();renderAll();
 }
+
+// ================== 录音打卡功能 ==================
+let mediaRecorder = null;
+let audioChunks = [];
+let recordedBlob = null;
+let recordTimerInterval = null;
+let recordStartTime = 0;
+let pendingLongTaskIdx = null;
+
+// 打开录音弹窗
+function openRecordModal(idx){
+  pendingLongTaskIdx = idx;
+  const task = state.long[idx];
+  document.getElementById('recordTaskTitle').innerText = `任务：${task.title}`;
+  recordedBlob = null;
+  audioChunks = [];
+  document.getElementById('recordTimer').innerText = "00:00";
+  document.getElementById('recordStatus').innerText = "点击下方按钮开始录音";
+  const btn = document.getElementById('recordBtn');
+  btn.innerText = "🎤 开始录音";
+  btn.classList.remove('hidden');
+  btn.classList.add('btn-red');
+  btn.classList.remove('btn-gray');
+  document.getElementById('recordPreviewBox').classList.add('hidden');
+  document.getElementById('recordSubmitBtn').disabled = true;
+  openModal('audioRecordModal');
+}
+
+// 开始/停止录音
+async function toggleRecording(){
+  const btn = document.getElementById('recordBtn');
+  if(!mediaRecorder || mediaRecorder.state === 'inactive'){
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream, {
+        audioBitsPerSecond: 32000
+      });
+      audioChunks = [];
+      mediaRecorder.ondataavailable = e => {
+        if(e.data.size > 0) audioChunks.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(recordedBlob);
+        document.getElementById('recordPreviewAudio').src = url;
+        document.getElementById('recordPreviewBox').classList.remove('hidden');
+        document.getElementById('recordSubmitBtn').disabled = false;
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorder.start();
+      recordStartTime = Date.now();
+      recordTimerInterval = setInterval(updateRecordTimer, 200);
+      btn.innerText = "⏹ 停止录音";
+      btn.classList.remove('btn-red');
+      btn.classList.add('btn-gray');
+      document.getElementById('recordStatus').innerText = "录音中...";
+    } catch(err){
+      alert('无法访问麦克风：' + err.message);
+    }
+  } else {
+    mediaRecorder.stop();
+    clearInterval(recordTimerInterval);
+    btn.classList.add('hidden');
+    document.getElementById('recordStatus').innerText = "录音已完成，可以试听或提交";
+  }
+}
+
+function updateRecordTimer(){
+  const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('recordTimer').innerText = `${mm}:${ss}`;
+}
+
+// 重新录制：清空已录内容，回到开始状态
+function resetRecording(){
+  const audio = document.getElementById('recordPreviewAudio');
+  if(audio.src){
+    URL.revokeObjectURL(audio.src);
+    audio.src = "";
+  }
+  recordedBlob = null;
+  audioChunks = [];
+  const btn = document.getElementById('recordBtn');
+  btn.classList.remove('hidden');
+  btn.classList.add('btn-red');
+  btn.classList.remove('btn-gray');
+  btn.innerText = "🎤 开始录音";
+  document.getElementById('recordTimer').innerText = "00:00";
+  document.getElementById('recordStatus').innerText = "点击下方按钮开始录音";
+  document.getElementById('recordPreviewBox').classList.add('hidden');
+  document.getElementById('recordSubmitBtn').disabled = true;
+}
+
+function cancelRecording(){
+  if(mediaRecorder && mediaRecorder.state === 'recording'){
+    mediaRecorder.stop();
+  }
+  clearInterval(recordTimerInterval);
+  const audio = document.getElementById('recordPreviewAudio');
+  if(audio.src){
+    URL.revokeObjectURL(audio.src);
+    audio.src = "";
+  }
+  recordedBlob = null;
+  audioChunks = [];
+  pendingLongTaskIdx = null;
+  closeModal('audioRecordModal');
+}
+
+// 上传录音并提交
+async function uploadRecordingAndSubmit(){
+  if(!recordedBlob || pendingLongTaskIdx === null){
+    alert('请先录制一段录音');
+    return;
+  }
+  const task = state.long[pendingLongTaskIdx];
+  const fileName = `long_audio_${task.id}_${Date.now()}.webm`;
+  try {
+    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
+    if(upErr) throw upErr;
+    const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
+    const audioUrl = urlData.publicUrl;
+
+    const today = new Date().toDateString();
+    const { error } = await supabase.from('long_tasks').update({
+      submit_status: 'submitted',
+      submit_date: today,
+      audio_url: audioUrl
+    }).eq('id', task.id);
+    if(error) throw error;
+
+    cancelRecording();
+    await loadAllData();
+    renderAll();
+    alert('✅ 录音打卡已提交，等待家长确认！');
+  } catch(err){
+    console.error(err);
+    alert('❌ 提交失败：' + err.message);
+  }
+}
+
+// 播放录音
+function playAudio(url){
+  document.getElementById('audioPlayer').src = url;
+  openModal('audioPlayModal');
+}
+function closeAudioPlayer(){
+  const player = document.getElementById('audioPlayer');
+  player.pause();
+  player.src = "";
+  closeModal('audioPlayModal');
+}
+// ================== 录音功能结束 ==================
+
+// ================== 听写功能 ==================
+let dictationWords = [];      // 当前听写的单词列表
+let dictationIndex = 0;       // 当前播报到第几个（从0开始）
+let dictationTaskRef = null;  // 当前听写对应的任务
+
+// 打开听写弹窗
+function openDictationModal(idx){
+  const task = state.daily[idx];
+  if(!task) return;
+  const words = (task.description || '').split('.').map(w => w.trim()).filter(w => w);
+  if(words.length === 0){
+    alert('这个任务没有可听写的单词');
+    return;
+  }
+  dictationWords = words;
+  dictationIndex = 0;
+  dictationTaskRef = task;
+  document.getElementById('dictationTaskTitle').innerText = '任务：' + task.title;
+  document.getElementById('dictationTotal').innerText = words.length;
+  updateDictationUI();
+  openModal('dictationModal');
+  // 稍等一下再播报，让弹窗先渲染出来
+  setTimeout(speakCurrentWord, 400);
+}
+
+// 播报当前单词（用 speechSynthesis）
+function speakCurrentWord(){
+  if(!dictationWords.length) return;
+  const word = dictationWords[dictationIndex];
+  // 如果浏览器不支持语音合成，就用界面显示
+  if(!('speechSynthesis' in window)){
+    alert('你的浏览器不支持语音播报，请换用 Chrome 或 Safari');
+    return;
+  }
+  window.speechSynthesis.cancel(); // 先取消之前可能还在播的
+  const utter = new SpeechSynthesisUtterance(word);
+  // 默认使用英语发音，如果是语文听写，可以改成中文
+  const subject = dictationTaskRef ? dictationTaskRef.subject : 'english';
+  if(subject === 'chinese'){
+    utter.lang = 'zh-CN';
+  }else{
+    utter.lang = 'en-US';
+  }
+  utter.rate = 0.9;
+  window.speechSynthesis.speak(utter);
+}
+
+// 重播当前单词
+function replayCurrentWord(){
+  speakCurrentWord();
+}
+
+// 下一个单词
+function nextDictationWord(){
+  if(dictationIndex < dictationWords.length - 1){
+    dictationIndex++;
+    updateDictationUI();
+    speakCurrentWord();
+  }else{
+    // 已经是最后一个
+    if(confirm('已经是最后一个单词了，是否结束听写？')){
+      closeDictation();
+    }
+  }
+}
+
+// 更新界面上显示的进度
+function updateDictationUI(){
+  document.getElementById('dictationProgress').innerText = (dictationIndex + 1);
+  document.getElementById('dictationWordDisplay').innerText = '—';
+}
+
+// 关闭听写弹窗
+function closeDictation(){
+  if(window.speechSynthesis){
+    window.speechSynthesis.cancel();
+  }
+  dictationWords = [];
+  dictationIndex = 0;
+  dictationTaskRef = null;
+  closeModal('dictationModal');
+}
+// ================== 听写功能结束 ==================
 async function submitLongTask(idx) {
 
   const task = state.long[idx];
@@ -2086,38 +2447,42 @@ async function approveLongTask(idx){
   const task=state.long[idx];
   const today=new Date().toDateString();
   if(task.submit_status !== 'submitted') return;
-  await supabase.from('long_tasks').update({last_date:today,submit_status:'normal'}).eq('id',task.id);
 
-  
-  
-  const roleType = task.owner_type;
-
-  if(task.owner_type === 'child'){
-
-    state.star += task.star;
-
-  }else{
-
-    state.parent_star += task.star;
-
+  // 如果有录音，先删除
+  if(task.audio_url){
+    try {
+      const urlParts = task.audio_url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      await supabase.storage.from('task-proof').remove([fileName]);
+    } catch(err){
+      console.warn('删除录音失败', err);
+    }
   }
 
-  await saveState(); //先保存星星状态
+  await supabase.from('long_tasks').update({
+    last_date: today,
+    submit_status: 'normal',
+    audio_url: null
+  }).eq('id', task.id);
 
+  const roleType = task.owner_type;
+  if(task.owner_type === 'child'){
+    state.star += task.star;
+  }else{
+    state.parent_star += task.star;
+  }
+  await saveState();
   try{
-
-  await addStarLogItem(roleType, task.star,`长期任务【${task.title}】打卡完成`);
-
-}catch(e){
-
-  console.warn("长期任务，写入星星日志失败",e);
-
-}
+    await addStarLogItem(roleType, task.star,`长期任务【${task.title}】打卡完成`);
+  }catch(e){
+    console.warn("长期任务，写入星星日志失败",e);
+  }
   await loadAllData();
-
   renderAll();
   alert('✅ 确认完成，+'+task.star+'⭐');
 }
+
+
 async function deleteLongTask(idx){
   const task = state.long[idx];
   if(!confirm(`⚠️确定删除长期任务【${task.title}】？删除后不可恢复`)) return;
@@ -2416,7 +2781,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
 
       <div class="task-icon">📌</div>
 
-      <div class="task-text">${task.title}<span class="${subjInfo.cls}">${subjInfo.name}</span>
+      <div class="task-text">${task.title}${task.is_dictation ? ' <span style="background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">听写</span>' : ''}<span class="${subjInfo.cls}">${subjInfo.name}</span>
 
         <div class="task-meta">奖励${task.star}⭐ ${task.minute_limit>0?`限时${task.minute_limit}分钟`:"不限时"}
 
@@ -2434,6 +2799,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
 
+        ${task.is_dictation && currentRole === 'child' ? `<button class="task-btn btn-blue" onclick="openDictationModal(${idx})">🔊 听写练习</button>` : ''}
         ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="startTask(${idx})">开始任务</button>`:""}
 
         ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
@@ -2494,7 +2860,9 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
         ${ ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
 
 
-?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>`:""}
+?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>
+  ${(task.owner_type === 'child' && (task.category || '成长') === '成长') ? `<button class="task-btn btn-blue" onclick="openRecordModal(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>🎤 录音打卡</button>` : ''}`:""}
+        ${task.audio_url ? `<button class="task-btn btn-blue" onclick="playAudio('${task.audio_url}')">🔊 播放录音</button>` : ''}
         ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
 
           ?`<button class="task-btn task-btn-approve" onclick="approveLongTask(${idx})">确认完成</button>`:""}
