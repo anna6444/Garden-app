@@ -32,22 +32,21 @@ self.addEventListener("activate", (event) => {
 // 请求拦截
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  // Supabase数据库、存储桶图片：直接走网络，不缓存
+
+  // Supabase 数据库、存储桶：直接走网络，不缓存
   if(req.url.includes("supabase.co")){
     event.respondWith(fetch(req));
     return;
   }
-  // 静态资源：缓存优先，后台更新
+
+  // 静态资源：网络优先，失败才用缓存
   event.respondWith(
-    caches.match(req)
-      .then(cachedRes => {
-        const fetchPromise = fetch(req).then(networkRes => {
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(req, networkRes.clone());
-          });
-          return networkRes;
-        });
-        return cachedRes || fetchPromise;
+    fetch(req)
+      .then(networkRes => {
+        const clone = networkRes.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(req, clone));
+        return networkRes;
       })
+      .catch(() => caches.match(req))
   );
 });
