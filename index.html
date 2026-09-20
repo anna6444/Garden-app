@@ -1218,6 +1218,12 @@ function openModal(id){
   if(id === 'dailyModal'){
     selectedSubject = null;
     selectedTaskType = 'normal';
+    // 清空上次输入
+    document.getElementById('dailyTitle').value = '';
+    document.getElementById('dailyDesc').value = '';
+    document.getElementById('dailyStar').value = '2';
+    document.getElementById('dailyMinuteLimit').value = '0';
+    document.getElementById('batchTaskText').value = '';
     document.querySelectorAll('.subject-btn').forEach(b=>{
       if(b.id !== 'typeNormalBtn' && b.id !== 'typeDictationBtn'){
         b.classList.remove('active');
@@ -1407,14 +1413,19 @@ async function saveDailyTask(){
     }
   }
 
-  await supabase.from('daily_tasks').insert([{
-    title, star, minute_limit: minuteLimit,
-    subject: selectedSubject,
-    description: desc,
-    is_dictation: isDictation,
-    create_at: new Date().toISOString(),
-    start_at: null, proof_image: null, status: 'active'
-  }]);
+      await supabase.from('daily_tasks').insert([{
+      title: taskName,
+      star: 2,
+      minute_limit: 0,
+      subject: selectedSubject,
+      description: '',
+      is_dictation: false,
+      create_at: new Date().toISOString(),
+      start_at: null,
+      proof_image: null,
+      status: 'active'
+    }]);
+
   closeModal('dailyModal');
   document.getElementById('dailyTitle').value='';
   document.getElementById('dailyDesc').value='';
@@ -2180,28 +2191,32 @@ function openRecordModal(idx){
   openModal('audioRecordModal');
 }
 
-// 开始/停止录音
+// 开始/停止录音（用 WAV 格式，跨平台通用）
 async function toggleRecording(){
   const btn = document.getElementById('recordBtn');
-  if(!mediaRecorder || mediaRecorder.state === 'inactive'){
+  const isRecording = window.recIsRecording === true;
+  if(!isRecording){
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream, {
-        audioBitsPerSecond: 32000
-      });
-      audioChunks = [];
-      mediaRecorder.ondataavailable = e => {
-        if(e.data.size > 0) audioChunks.push(e.data);
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      window.recAudioCtx = audioCtx;
+      window.recStream = stream;
+      window.recInputRate = audioCtx.sampleRate; // 通常是 44100 或 48000
+      window.recPcmChunks = [];
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      window.recProcessor = processor;
+
+      processor.onaudioprocess = (e) => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        window.recPcmChunks.push(new Float32Array(inputData));
       };
-      mediaRecorder.onstop = () => {
-        recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const url = URL.createObjectURL(recordedBlob);
-        document.getElementById('recordPreviewAudio').src = url;
-        document.getElementById('recordPreviewBox').classList.remove('hidden');
-        document.getElementById('recordSubmitBtn').disabled = false;
-        stream.getTracks().forEach(t => t.stop());
-      };
-      mediaRecorder.start();
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      window.recIsRecording = true;
       recordStartTime = Date.now();
       recordTimerInterval = setInterval(updateRecordTimer, 200);
       btn.innerText = "⏹ 停止录音";
@@ -2212,11 +2227,94 @@ async function toggleRecording(){
       alert('无法访问麦克风：' + err.message);
     }
   } else {
-    mediaRecorder.stop();
+    window.recIsRecording = false;
+    // 停止：关闭 context 并打包 WAV
+    try {
+      if(window.recProcessor) window.recProcessor.disconnect();
+      if(window.recStream) window.recStream.getTracks().forEach(t => t.stop());
+      if(window.recAudioCtx) window.recAudioCtx.close();
+    } catch(e){}
+
     clearInterval(recordTimerInterval);
     btn.classList.add('hidden');
-    document.getElementById('recordStatus').innerText = "录音已完成，可以试听或提交";
+    document.getElementById('recordStatus').innerText = "正在生成音频...";
+
+    setTimeout(() => {
+      // 合并 PCM
+      const chunks = window.recPcmChunks || [];
+      let totalLen = 0;
+      for(const c of chunks) totalLen += c.length;
+      const allSamples = new Float32Array(totalLen);
+      let off = 0;
+      for(const c of chunks){ allSamples.set(c, off); off += c.length; }
+
+      // 重采样到 16kHz，减小体积
+      const inputRate = window.recInputRate || 44100;
+      const targetRate = 16000;
+      const resampled = resampleAudio(allSamples, inputRate, targetRate);
+
+      // 生成 WAV
+      const wavBlob = encodeWav(resampled, targetRate);
+      recordedBlob = wavBlob;
+      const url = URL.createObjectURL(wavBlob);
+      document.getElementById('recordPreviewAudio').src = url;
+      document.getElementById('recordPreviewBox').classList.remove('hidden');
+      document.getElementById('recordSubmitBtn').disabled = false;
+      document.getElementById('recordStatus').innerText = "录音已完成，可以试听或提交";
+    }, 200);
   }
+}
+
+// 重采样：把任意采样率转成目标采样率
+function resampleAudio(samples, fromRate, toRate){
+  if(fromRate === toRate) return samples;
+  const ratio = fromRate / toRate;
+  const newLen = Math.floor(samples.length / ratio);
+  const result = new Float32Array(newLen);
+  for(let i = 0; i < newLen; i++){
+    const srcIdx = i * ratio;
+    const srcInt = Math.floor(srcIdx);
+    const frac = srcIdx - srcInt;
+    const s1 = samples[srcInt] || 0;
+    const s2 = samples[srcInt + 1] || s1;
+    result[i] = s1 + (s2 - s1) * frac;
+  }
+  return result;
+}
+
+// 把 PCM 采样打包成 WAV 文件
+function encodeWav(samples, sampleRate){
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  function writeString(offset, str){
+    for(let i = 0; i < str.length; i++){
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  }
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);      // PCM
+  view.setUint16(22, 1, true);      // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);     // 16bit
+  writeString(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+
+  let off = 44;
+  for(let i = 0; i < samples.length; i++){
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    off += 2;
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
 }
 
 function updateRecordTimer(){
@@ -2228,6 +2326,7 @@ function updateRecordTimer(){
 
 // 重新录制：清空已录内容，回到开始状态
 function resetRecording(){
+  window.recIsRecording = false;
   const audio = document.getElementById('recordPreviewAudio');
   if(audio.src){
     URL.revokeObjectURL(audio.src);
@@ -2247,9 +2346,18 @@ function resetRecording(){
 }
 
 function cancelRecording(){
-  if(mediaRecorder && mediaRecorder.state === 'recording'){
-    mediaRecorder.stop();
-  }
+  window.recIsRecording = false;
+  // 清理 WAV 录音资源
+  try {
+    if(window.recProcessor) window.recProcessor.disconnect();
+    if(window.recStream) window.recStream.getTracks().forEach(t => t.stop());
+    if(window.recAudioCtx) window.recAudioCtx.close();
+  } catch(e){}
+  window.recProcessor = null;
+  window.recStream = null;
+  window.recAudioCtx = null;
+  window.recPcmChunks = [];
+
   clearInterval(recordTimerInterval);
   const audio = document.getElementById('recordPreviewAudio');
   if(audio.src){
@@ -2269,7 +2377,8 @@ async function uploadRecordingAndSubmit(){
     return;
   }
   const task = state.long[pendingLongTaskIdx];
-  const fileName = `long_audio_${task.id}_${Date.now()}.webm`;
+ 
+  const fileName = `long_audio_${task.id}_${Date.now()}.wav`;
   try {
     const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
     if(upErr) throw upErr;
@@ -2558,6 +2667,10 @@ async function cleanApprovedTasks(){
   const minute = now.getMinutes();
   const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
   if(!isAfter2130) return;
+
+    // 今天已经清理过，跳过
+  const todayStr = now.toISOString().split('T')[0];
+  if(window.lastCleanDate === todayStr) return;
 
   try{
     const {data:toDeleteList} = await supabase.from('daily_tasks')
