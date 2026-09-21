@@ -2991,11 +2991,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
 
         ${ ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
-
-
-?`<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>
-${(task.owner_type === 'child' && (task.category || '成长') === '成长') ? `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>🎤 录音打卡</button>` : ''}
-
+?`<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>${(task.owner_type === 'child' && (task.category || '成长') === '成长') ? `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>🎤 录音打卡</button>` : ''}`:""}
         ${task.audio_url ? `<button class="task-btn btn-blue" onclick="playAudio('${task.audio_url}')">🔊 播放录音</button>` : ''}
         ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
 
