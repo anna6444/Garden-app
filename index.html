@@ -155,6 +155,25 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .bar-fill.english{background:#4ade80;}
 .bar-fill.child{background:#60a5fa;}
 .bar-fill.parent{background:#f472b6;}
+.child-mode .add-daily-btn-only-parent { display: none; }
+
+/* ========== 全屏倒计时 ========== */
+.countdown-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:9999;display:flex;align-items:center;justify-content:center;}
+.countdown-overlay.hidden{display:none;}
+.countdown-inner{text-align:center;color:#fff;padding:20px;width:100%;max-width:420px;}
+.countdown-task-title{font-size:18px;margin-bottom:24px;color:#ddd;}
+.countdown-ring-wrap{position:relative;width:260px;height:260px;margin:0 auto;}
+.countdown-ring{transform:rotate(-90deg);}
+.countdown-track{stroke:#1f2937;}
+.countdown-progress{stroke:#34d399;stroke-linecap:round;transition:stroke-dashoffset 0.9s linear,stroke 0.3s;}
+.countdown-progress.warn{stroke:#f59e0b;}
+.countdown-progress.danger{stroke:#ef4444;}
+.countdown-time{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:54px;font-weight:bold;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:2px;}
+.countdown-hint{margin:24px 0 16px;color:#aaa;font-size:15px;min-height:22px;}
+.countdown-collapse{background:#333;color:#fff;border:none;padding:12px 24px;border-radius:20px;font-size:15px;cursor:pointer;}
+.countdown-bubble{position:fixed;top:14px;right:14px;background:#000;color:#fff;border-radius:22px;padding:10px 16px;font-size:16px;font-weight:bold;font-variant-numeric:tabular-nums;z-index:9998;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;}
+.countdown-bubble.show{display:block;}
+
 </style>
 
 <link rel="manifest" href="./manifest.json">
@@ -274,9 +293,9 @@ if('serviceWorker' in navigator){
             <div class="category-content">
         <!-- 总览页：只在"全部"时显示 -->
         <div id="dailyOverview" class="card overview-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 class="task-card-title" style="text-align:left;margin:0;">📊 今日完成总览</h3>
-            <button id="addDailyBtn" class="btn btn-red btn-sm" onclick="openModal('dailyModal')">+ 新增</button>
+            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openModal('dailyModal')">+ 新增</button>
           </div>
           <div class="progress-ring-wrap">
             <svg class="progress-ring" width="140" height="140">
@@ -300,10 +319,12 @@ if('serviceWorker' in navigator){
           </div>
         </div>
 
-        <!-- 任务列表：只在具体科目时显示 -->
+               <!-- 任务列表：只在具体科目时显示 -->
         <div id="dailyTaskListCard" class="card" style="display:none;">
-           <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <h3 class="task-card-title" id="taskPageTitle">📅 日常任务</h3>
+          
+            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openModal('dailyModal')">+ 新增</button>
           </div>
           <div><span class="group-title">待开始 / 进行中任务</span></div>
           <div id="dailyActiveList"></div>
@@ -617,7 +638,7 @@ if('serviceWorker' in navigator){
     </div>
     <div style="display:flex;gap:10px;margin-top:16px;">
       <button class="btn btn-gray" style="flex:1;" onclick="cancelRecording()">取消</button>
-      <button class="btn btn-green" style="flex:1;" id="recordSubmitBtn" onclick="uploadRecordingAndSubmit()" disabled>提交录音</button>
+     <button class="btn btn-green" style="flex:1;" id="recordSubmitBtn" onclick="this.disabled=true; this.innerText='提交中...'; uploadRecordingAndSubmit()" disabled>提交录音</button> 
     </div>
   </div>
 </div>
@@ -713,8 +734,7 @@ if('serviceWorker' in navigator){
 
      <button class="btn btn-blue" style="flex:1;" onclick="triggerSelectImage()">上传图片</button>
 
-     <button class="btn btn-green" style="flex:1;" onclick="doSubmitTask()">确认提交</button>
-
+     <button class="btn btn-green" style="flex:1;" onclick="this.disabled=true; this.innerText='提交中...'; doSubmitTask()">确认提交</button>
      <button class="btn btn-gray" style="flex:1;" onclick="closeSubmitModal()">取消</button>
 
      </div>
@@ -780,9 +800,12 @@ let selectedTaskType = 'normal'; // normal 或 dictation
 let pendingProofImgUrl = ""; //缓存本次选中图片地址
 let currentSubjectTab = "all";   // 日常任务当前选中的科目
 let currentLongTab = "all";      // 长期任务当前选中的类别
+let approvingTasks = {};   // 防止确认按钮重复点击
+
+
 let state = {
 
-  star: 10,
+  star: 0,
 
   parent_star: 0,
 
@@ -829,34 +852,24 @@ window.addEventListener('load', function(){
 
     document.getElementById('mainPage').classList.remove('hidden');
 
-    //切换奖惩面板
+    document.body.classList.toggle('child-mode', currentRole !== 'parent');
+//切换奖惩面板
 
     document.getElementById('parentRewardPanel').classList.toggle('hidden', currentRole !== 'parent');
 
     document.getElementById('childRewardPanel').classList.toggle('hidden', currentRole !== 'child');
 
-    if(currentRole === 'parent'){
- 
-     document.getElementById('adminArea').classList.remove('hidden');
-
-      document.getElementById('addDailyBtn').classList.remove('hidden');
-
+        if(currentRole === 'parent'){
+      document.getElementById('adminArea').classList.remove('hidden');
+      document.querySelectorAll('.add-daily-btn-only-parent').forEach(b => b.classList.remove('hidden'));
       document.getElementById('addLongBtn').classList.remove('hidden');
-
       document.getElementById('addWishBtn').classList.remove('hidden');
-
     }else{
-
       document.getElementById('adminArea').classList.add('hidden');
-
-      document.getElementById('addDailyBtn').classList.add('hidden');
-
+      document.querySelectorAll('.add-daily-btn-only-parent').forEach(b => b.classList.add('hidden'));
       document.getElementById('addLongBtn').classList.add('hidden');
-
       document.getElementById('addWishBtn').classList.add('hidden');
-
     }
-
     await loadAllData();
 
     await loadStarLog();
@@ -882,20 +895,24 @@ async function doLogin(){
   if(currentRole === 'parent' && pwd === '1234' || currentRole === 'child' && pwd === '6666'){
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('mainPage').classList.remove('hidden');
-    // 切换奖惩面板显示
+    document.body.classList.toggle('child-mode', currentRole !== 'parent');
+
+   // 切换奖惩面板显示
     document.getElementById('parentRewardPanel').classList.toggle('hidden', currentRole !== 'parent');
     document.getElementById('childRewardPanel').classList.toggle('hidden', currentRole !== 'child');
+    
     if(currentRole === 'parent'){
       document.getElementById('adminArea').classList.remove('hidden');
-      document.getElementById('addDailyBtn').classList.remove('hidden');
+      document.querySelectorAll('.add-daily-btn-only-parent').forEach(b => b.classList.remove('hidden'));
       document.getElementById('addLongBtn').classList.remove('hidden');
       document.getElementById('addWishBtn').classList.remove('hidden');
     }else{
       document.getElementById('adminArea').classList.add('hidden');
-      document.getElementById('addDailyBtn').classList.add('hidden');
+      document.querySelectorAll('.add-daily-btn-only-parent').forEach(b => b.classList.add('hidden'));
       document.getElementById('addLongBtn').classList.add('hidden');
       document.getElementById('addWishBtn').classList.add('hidden');
     }
+
     await loadAllData();
     //保存登录状态
     
@@ -906,47 +923,39 @@ localStorage.setItem("garden_role", currentRole);
     alert('密码错误');
   }
 }
-
-
 async function loadAllData(){
-
   if(!supabase) return;
-
+  let stateLoadedOK = false;
   try{
-
     const {data:stateData} = await supabase.from('app_state').select('*').eq('id',1).single();
-
     if(stateData){
-  state = {...state, ...stateData};
-  // 数据库列名是全小写，要手动映射到驼峰
-  if(stateData.lastautodeductdate !== undefined){
-    state.lastAutoDeductDate = stateData.lastautodeductdate || "";
-  }
-}
+      state = {...state, ...stateData};
+      if(stateData.lastautodeductdate !== undefined){
+        state.lastAutoDeductDate = stateData.lastautodeductdate || "";
+      }
+      stateLoadedOK = true;
+    }
     const {data:daily} = await supabase.from('daily_tasks').select('*');
-
     state.daily = daily || [];
-
     const {data:long} = await supabase.from('long_tasks').select('*');
-
     state.long = long || [];
-
     const {data:wishes} = await supabase.from('wishes').select('*');
-
     state.wish = wishes || [];
-
   }catch(e){
- 
-   console.warn("加载基础数据异常",e);
-
+    console.warn("加载基础数据异常",e);
   }
-
-  // =========新增：加载完数据后，运行自动扣星逻辑=========
-
-  await autoDeductStarTask();
-
+  if(!stateLoadedOK){
+    console.warn('app_state 读取失败，跳过扣星和清理');
+    return;
+  }
+  // 只有家长端执行夜间扣星，避免并发
+  if(currentRole === 'parent'){
+    await autoDeductStarTask();
+  }
   await cleanApprovedTasks();
 }
+
+
 
 async function saveState(){
   if(!supabase) return;
@@ -1412,21 +1421,21 @@ async function saveDailyTask(){
       return alert('请至少输入一个单词，用英文句号分隔');
     }
   }
-
-      await supabase.from('daily_tasks').insert([{
-      title: taskName,
-      star: 2,
-      minute_limit: 0,
-      subject: selectedSubject,
-      description: '',
-      is_dictation: false,
-      create_at: new Date().toISOString(),
-      start_at: null,
-      proof_image: null,
-      status: 'active'
-    }]);
-
+  const { error: insertErr } = await supabase.from('daily_tasks').insert([{
+    title, star, minute_limit: minuteLimit,
+    subject: selectedSubject,
+    description: desc,
+    is_dictation: isDictation,
+    create_at: new Date().toISOString(),
+    start_at: null, proof_image: null, status: 'active'
+  }]);
+  if(insertErr){
+    console.error('新增任务失败', insertErr);
+    alert('❌ 新增任务失败：' + insertErr.message);
+    return;
+  }
   closeModal('dailyModal');
+      
   document.getElementById('dailyTitle').value='';
   document.getElementById('dailyDesc').value='';
   document.getElementById('dailyStar').value='2';
@@ -1622,26 +1631,18 @@ for(let taskName of taskList){
 
   try{
 
-    await supabase.from('daily_tasks').insert([{
-
+     await supabase.from('daily_tasks').insert([{
       title: taskName,
-
       star: 2,
-
       minute_limit: 0,
-
       subject: selectedSubject,
-
+      description: '',
+      is_dictation: false,
       create_at: new Date().toISOString(),
-
       start_at: null,
-
       proof_image: null,
-
       status: 'active'
-
     }]);
- 
     successCount++;
 
   }catch(e){
@@ -1668,9 +1669,14 @@ alert(`✅成功创建${successCount}/${taskList.length}条任务！`);
 async function startTask(idx){
   const task = state.daily[idx];
   if(!task || task.start_at) return;
-  await supabase.from('daily_tasks').update({start_at: new Date().toISOString()}).eq('id', task.id);
+  const startIso = new Date().toISOString();
+  await supabase.from('daily_tasks').update({start_at: startIso}).eq('id', task.id);
   await loadAllData();
   renderAll();
+  // 有限时任务才打开全屏倒计时
+  if(task.minute_limit > 0){
+    openFullscreenCountdown({ ...task, start_at: startIso });
+  }
 }
 async function handleTaskComplete(idx){
 
@@ -1683,7 +1689,11 @@ async function handleTaskComplete(idx){
     alert('请先点击【开始任务】，再提交完成！');
 
     return;
-  }
+ 
+ }
+  
+
+ closeFullscreenCountdown();
   pendingTaskIdx = idx;
 
   // 打开新弹窗
@@ -1897,6 +1907,7 @@ async function submitTaskWithImg(){
 
     alert("✅带图提交成功，等待家长审核！");
 
+    closeFullscreenCountdown();   
     await loadAllData();
 
     renderAll();
@@ -1964,6 +1975,7 @@ async function submitTaskDirect(){
 
     alert("✅提交成功，等待家长审核！");
 
+    closeFullscreenCountdown();
     await loadAllData();
 
     renderAll();
@@ -2029,70 +2041,52 @@ function closeImgPreviewModal(){
 
 }
 
-
 async function parentApprove(idx){
-
   const task = state.daily[idx];
+  if(!task) return;
 
   const startTime = new Date(task.start_at);
-
   const now = new Date();
-
   const diffMin = (now - startTime) / 1000 / 60;
-
   let getStar = (task.minute_limit === 0 || diffMin <= task.minute_limit) ? task.star : Math.floor(task.star/2);
-
   const over = task.minute_limit !== 0 && diffMin > task.minute_limit;
-
   const tipText = over?"（超时减半）":"";
-
-  // 新增：判断是否没有上传图片
-
-const hasImg = !!task.proof_image;
-
-const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
-
+  const hasImg = !!task.proof_image;
+  const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
   if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
 
+  // 防止重复点击：任务正在处理中，直接退出
+  if(approvingTasks[task.id]) return;
+  approvingTasks[task.id] = true;
 
-
-  //====新增：如果存在图片，从存储桶删除图片====
-
-  if(task.proof_image){
-
-    try{
-
-      //从图片url提取文件名
-
-      const urlParts = task.proof_image.split('/');
-
-      const fileName = urlParts[urlParts.length - 1];
-
-      await supabase.storage.from('task-proof').remove([fileName]);
-
-    }catch(err){
-
-      console.warn("审核通过，删除图片失败",err);
-
+  try {
+    if(task.proof_image){
+      try{
+        const urlParts = task.proof_image.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        await supabase.storage.from('task-proof').remove([fileName]);
+      }catch(err){
+        console.warn("审核通过，删除图片失败",err);
+      }
     }
 
+    state.star += getStar;
+    state.parent_star += getStar;
+    await addStarLogItem("child",getStar,`日常任务【${task.title}】完成${tipText}`);
+    await addStarLogItem("parent",getStar,`审核任务【${task.title}】${tipText}`);
+    await supabase.from('daily_tasks').update({
+      status: 'approved',
+      approved_date: new Date().toISOString()
+    }).eq('id', task.id);
+    await saveState();
+    await loadAllData();
+    renderAll();
+    alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐`);
+  } finally {
+    delete approvingTasks[task.id];
   }
-
-
-  state.star += getStar;
-  state.parent_star += getStar;
-  await addStarLogItem("child",getStar,`日常任务【${task.title}】完成${tipText}`);
-  await addStarLogItem("parent",getStar,`审核任务【${task.title}】${tipText}`);
-  // 不再立刻删除，改为标记为审核通过，留到晚上21:30统一清理
-  await supabase.from('daily_tasks').update({
-    status: 'approved',
-    approved_date: new Date().toISOString()
-  }).eq('id', task.id);
-  await saveState();
-  await loadAllData();
-  renderAll();
-  alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐`);
 }
+
 
 async function parentReject(idx){
 
@@ -2188,6 +2182,7 @@ function openRecordModal(idx){
   btn.classList.remove('btn-gray');
   document.getElementById('recordPreviewBox').classList.add('hidden');
   document.getElementById('recordSubmitBtn').disabled = true;
+  document.getElementById('recordSubmitBtn').innerText = '提交录音';
   openModal('audioRecordModal');
 }
 
@@ -2343,6 +2338,8 @@ function resetRecording(){
   document.getElementById('recordStatus').innerText = "点击下方按钮开始录音";
   document.getElementById('recordPreviewBox').classList.add('hidden');
   document.getElementById('recordSubmitBtn').disabled = true;
+  document.getElementById('recordSubmitBtn').innerText = '提交录音';
+
 }
 
 function cancelRecording(){
@@ -2554,42 +2551,54 @@ async function submitLongTask(idx) {
 
 async function approveLongTask(idx){
   const task=state.long[idx];
-  const today=new Date().toDateString();
+  if(!task) return;
   if(task.submit_status !== 'submitted') return;
 
-  // 如果有录音，先删除
-  if(task.audio_url){
-    try {
-      const urlParts = task.audio_url.split('/');
-      const fileName = urlParts[urlParts.length - 1];
-      await supabase.storage.from('task-proof').remove([fileName]);
-    } catch(err){
-      console.warn('删除录音失败', err);
+  // 防止重复点击：任务正在处理中，直接退出
+  if(approvingTasks[task.id]) return;
+  approvingTasks[task.id] = true;
+
+  try {
+    const lastDate = task.submit_date || new Date().toDateString();
+
+    // 如果有录音，先删除
+    if(task.audio_url){
+      try {
+        const urlParts = task.audio_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        await supabase.storage.from('task-proof').remove([fileName]);
+      } catch(err){
+        console.warn('删除录音失败', err);
+      }
     }
-  }
 
-  await supabase.from('long_tasks').update({
-    last_date: today,
-    submit_status: 'normal',
-    audio_url: null
-  }).eq('id', task.id);
+    await supabase.from('long_tasks').update({
+      last_date: lastDate,
+      submit_status: 'normal',
+      audio_url: null
+    }).eq('id', task.id);
 
-  const roleType = task.owner_type;
-  if(task.owner_type === 'child'){
-    state.star += task.star;
-  }else{
-    state.parent_star += task.star;
+    const roleType = task.owner_type;
+    if(task.owner_type === 'child'){
+      state.star += task.star;
+    }else{
+      state.parent_star += task.star;
+    }
+    await saveState();
+    try{
+      await addStarLogItem(roleType, task.star,`长期任务【${task.title}】打卡完成`);
+    }catch(e){
+      console.warn("长期任务，写入星星日志失败",e);
+    }
+    await loadAllData();
+    renderAll();
+    alert('✅ 确认完成，+'+task.star+'⭐');
+  } finally {
+    // 无论成功失败，最后都释放锁
+    delete approvingTasks[task.id];
   }
-  await saveState();
-  try{
-    await addStarLogItem(roleType, task.star,`长期任务【${task.title}】打卡完成`);
-  }catch(e){
-    console.warn("长期任务，写入星星日志失败",e);
-  }
-  await loadAllData();
-  renderAll();
-  alert('✅ 确认完成，+'+task.star+'⭐');
 }
+
 
 
 async function deleteLongTask(idx){
@@ -2619,10 +2628,13 @@ async function handleDelete(type, idx) {
 // 夜间21:30自动扣星逻辑：未提交任务每条扣1星，仅每日执行一次
 async function autoDeductStarTask() {
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = now.getFullYear() + '-' +
+                  String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                  String(now.getDate()).padStart(2, '0');
 
   // 如果今天已经扣过，直接退出
   if (state.lastAutoDeductDate === todayStr) {
+    console.log('夜间扣星：今天已执行过，跳过');
     return;
   }
 
@@ -2630,6 +2642,12 @@ async function autoDeductStarTask() {
   const minute = now.getMinutes();
   const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
   if (!isAfter2130) return;
+
+  console.log('夜间扣星：开始执行，今天未扣过');
+
+  // 先标记为已执行，避免中途失败后重复执行
+  state.lastAutoDeductDate = todayStr;
+  await saveState();
 
   // ===== 日常任务：扣孩子的星，写孩子的日志 =====
   const unfinishDailyList = state.daily.filter(t => t.status === 'active');
@@ -2641,7 +2659,7 @@ async function autoDeductStarTask() {
   // ===== 长期任务：按 owner_type 分角色扣 =====
   const unfinishLongList = state.long.filter(t =>
     t.submit_status !== "submitted"
-    && t.last_date !== new Date().toDateString()
+    && t.last_date !== now.toDateString()
   );
 
   for(const task of unfinishLongList){
@@ -2654,8 +2672,7 @@ async function autoDeductStarTask() {
     }
   }
 
-  // 无论有没有任务，都标记今天已执行
-  state.lastAutoDeductDate = todayStr;
+  // 保存扣星后的最新状态
   await saveState();
 }
 
@@ -2669,7 +2686,9 @@ async function cleanApprovedTasks(){
   if(!isAfter2130) return;
 
     // 今天已经清理过，跳过
-  const todayStr = now.toISOString().split('T')[0];
+    const todayStr = now.getFullYear() + '-' +
+                  String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                  String(now.getDate()).padStart(2, '0');
   if(window.lastCleanDate === todayStr) return;
 
   try{
@@ -2683,6 +2702,7 @@ async function cleanApprovedTasks(){
       await loadAllData();
       renderAll();
     }
+    window.lastCleanDate = todayStr; // ⬅️ 加这一行，标记今天已清理
   }catch(e){
     console.warn("夜间清理日常任务失败", e);
   }
@@ -2873,10 +2893,10 @@ if(currentRole === "child"){
 
 ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>` : '<span style="color:#888;font-size:13px;">无作业照片</span>'}
 
-<button class="task-btn task-btn-approve" onclick="parentApprove(${idx})">✅通过</button>
 
-<button class="task-btn task-btn-reject" onclick="parentReject(${idx})">↩退回</button>
 
+<button class="task-btn task-btn-approve" onclick="this.disabled=true; parentApprove(${idx})">✅通过</button>
+<button class="task-btn task-btn-reject" onclick="this.disabled=true; parentReject(${idx})">↩退回</button>
 <button class="task-btn btn-del" onclick="deleteDailyTask(${idx})">删除</button>
 
 `:`${task.proof_image?`<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>`:`<span style="color:#888;font-size:13px;">无作业照片</span>`}`}
@@ -2913,7 +2933,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
 
         ${task.is_dictation && currentRole === 'child' ? `<button class="task-btn btn-blue" onclick="openDictationModal(${idx})">🔊 听写练习</button>` : ''}
-        ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="startTask(${idx})">开始任务</button>`:""}
+        ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; startTask(${idx})">开始任务</button>`:""}
 
         ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
 
@@ -2973,12 +2993,13 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
         ${ ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
 
 
-?`<button class="task-btn task-btn-start" onclick="submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>
-  ${(task.owner_type === 'child' && (task.category || '成长') === '成长') ? `<button class="task-btn btn-blue" onclick="openRecordModal(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>🎤 录音打卡</button>` : ''}`:""}
+?`<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>
+${(task.owner_type === 'child' && (task.category || '成长') === '成长') ? `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>🎤 录音打卡</button>` : ''}
+
         ${task.audio_url ? `<button class="task-btn btn-blue" onclick="playAudio('${task.audio_url}')">🔊 播放录音</button>` : ''}
         ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
 
-          ?`<button class="task-btn task-btn-approve" onclick="approveLongTask(${idx})">确认完成</button>`:""}
+        ?`<button class="task-btn task-btn-approve" onclick="this.disabled=true; approveLongTask(${idx})">确认完成</button>`:""}  
 
         ${currentRole==='parent'?`<button class="task-btn btn-del"  onclick="deleteLongTask(${idx})">删除</button>`:""}
 
@@ -3051,6 +3072,97 @@ function updateCountdowns(){
   });
 }
 
+// ================== 全屏倒计时 ==================
+let countdownOverlayTimer = null;
+let countdownActiveTask = null;
+
+// 打开全屏倒计时
+function openFullscreenCountdown(task){
+  if(!task || !task.start_at || !task.minute_limit || task.minute_limit <= 0) return;
+  countdownActiveTask = task;
+  document.getElementById('countdownTaskTitle').innerText = task.title;
+  document.getElementById('countdownOverlay').classList.remove('hidden');
+  document.getElementById('countdownBubble').classList.remove('show');
+  updateFullscreenCountdown();
+  if(countdownOverlayTimer) clearInterval(countdownOverlayTimer);
+  countdownOverlayTimer = setInterval(updateFullscreenCountdown, 1000);
+}
+
+// 每秒刷新圆环和数字
+function updateFullscreenCountdown(){
+  if(!countdownActiveTask) return;
+  const task = countdownActiveTask;
+  const startTime = new Date(task.start_at).getTime();
+  const totalMs = task.minute_limit * 60 * 1000;
+  const endTime = startTime + totalMs;
+  const now = Date.now();
+  const remainMs = endTime - now;
+  const circle = document.getElementById('countdownProgress');
+  const timeEl = document.getElementById('countdownTime');
+  const hintEl = document.getElementById('countdownHint');
+  const bubble = document.getElementById('countdownBubble');
+  const radius = 115;
+  const circumference = 2 * Math.PI * radius;
+
+  if(remainMs <= 0){
+    timeEl.innerText = '00:00';
+    bubble.innerText = '00:00';
+    circle.style.strokeDasharray = circumference;
+    circle.style.strokeDashoffset = 0;
+    circle.classList.remove('warn');
+    circle.classList.add('danger');
+    hintEl.innerText = '⏰ 时间到！可以继续提交作业哦～';
+    return;
+  }
+
+  const remainSec = Math.floor(remainMs / 1000);
+  const min = Math.floor(remainSec / 60);
+  const sec = remainSec % 60;
+  const text = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  timeEl.innerText = text;
+  bubble.innerText = text;
+
+  const pct = remainMs / totalMs;
+  circle.style.strokeDasharray = circumference;
+  circle.style.strokeDashoffset = circumference * (1 - pct);
+
+  circle.classList.remove('warn','danger');
+  if(pct <= 0.2){
+    circle.classList.add('danger');
+    hintEl.innerText = '⏰ 时间快到了！';
+  } else if(pct <= 0.5){
+    circle.classList.add('warn');
+    hintEl.innerText = '加油，还有一半时间！';
+  } else {
+    hintEl.innerText = '抓紧时间完成哦！';
+  }
+}
+
+// 收起：隐藏全屏，显示小气泡
+function collapseCountdown(){
+  document.getElementById('countdownOverlay').classList.add('hidden');
+  if(countdownActiveTask){
+    document.getElementById('countdownBubble').classList.add('show');
+  }
+}
+
+// 点小气泡：重新展开
+function expandCountdown(){
+  if(!countdownActiveTask) return;
+  document.getElementById('countdownOverlay').classList.remove('hidden');
+  document.getElementById('countdownBubble').classList.remove('show');
+}
+
+// 关闭：停止计时器并清除
+function closeFullscreenCountdown(){
+  if(countdownOverlayTimer) clearInterval(countdownOverlayTimer);
+  countdownOverlayTimer = null;
+  countdownActiveTask = null;
+  document.getElementById('countdownOverlay').classList.add('hidden');
+  document.getElementById('countdownBubble').classList.remove('show');
+}
+// ================== 全屏倒计时结束 ==================
+
 // 判断当前是否过了21:30
 function isAfter2130(){
   const now = new Date();
@@ -3105,5 +3217,24 @@ function logout(){
 }
 
 </script>
+
+<!-- 全屏倒计时 -->
+<div id="countdownOverlay" class="countdown-overlay hidden">
+  <div class="countdown-inner">
+    <p id="countdownTaskTitle" class="countdown-task-title"></p>
+    <div class="countdown-ring-wrap">
+      <svg class="countdown-ring" width="260" height="260" viewBox="0 0 260 260">
+        <circle class="countdown-track" cx="130" cy="130" r="115" stroke-width="14" fill="none"/>
+        <circle class="countdown-progress" id="countdownProgress" cx="130" cy="130" r="115" stroke-width="14" fill="none"/>
+      </svg>
+      <div class="countdown-time" id="countdownTime">00:00</div>
+    </div>
+    <p class="countdown-hint" id="countdownHint">抓紧时间完成哦！</p>
+    <button class="countdown-collapse" onclick="collapseCountdown()">收起倒计时</button>
+  </div>
+</div>
+
+<!-- 收起后的小气泡 -->
+<div id="countdownBubble" class="countdown-bubble" onclick="expandCountdown()">00:00</div>
 </body>
 </html>
