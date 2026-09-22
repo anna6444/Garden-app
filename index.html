@@ -295,7 +295,7 @@ if('serviceWorker' in navigator){
         <div id="dailyOverview" class="card overview-card">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 class="task-card-title" style="text-align:left;margin:0;">📊 今日完成总览</h3>
-            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openModal('dailyModal')">+ 新增</button>
+            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openBatchModal()">+ 批量新增</button>
           </div>
           <div class="progress-ring-wrap">
             <svg class="progress-ring" width="140" height="140">
@@ -323,8 +323,8 @@ if('serviceWorker' in navigator){
         <div id="dailyTaskListCard" class="card" style="display:none;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <h3 class="task-card-title" id="taskPageTitle">📅 日常任务</h3>
-          
-            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openModal('dailyModal')">+ 新增</button>
+           <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openSingleTaskModal()">+ 新增</button>
+            
           </div>
           <div><span class="group-title">待开始 / 进行中任务</span></div>
           <div id="dailyActiveList"></div>
@@ -523,39 +523,11 @@ if('serviceWorker' in navigator){
 
   <div class="modal-box">
 
-    <h3 style="margin-bottom:12px;">新增日常任务</h3>
+        <h3 style="margin-bottom:12px;">新增单条任务</h3>
+    <p id="singleTaskSubjectTip" style="color:#3b82f6;font-size:14px;margin-bottom:12px;font-weight:bold;"></p>
 
-    <label class="label-text">选择科目</label>
-
-    <div class="subject-buttons">
-
-      <button class="subject-btn chinese" onclick="selectSubject('chinese')">📖语文</button>
-
-      <button class="subject-btn math" onclick="selectSubject('math')">📐数学</button>
-
-      <button class="subject-btn english" onclick="selectSubject('english')">🔤英语</button>
-
-    </div>
-
-
-    <!-- ==========【新增批量粘贴区域】========== -->
-
-    <label class="label-text">📋批量导入任务（选好科目后粘贴，支持1.xxx 2.xxx格式）</label>
-
-    <textarea id="batchTaskText" rows="4" placeholder="粘贴例子：
-
-1.抄写生字2遍
-
-2.完成练习册第10页
-
-3.朗读课文3遍"></textarea>
-
-    <button class="btn btn-blue" style="margin:8px 0;" onclick="batchCreateDailyTask()">✨批量自动生成任务</button>
-
-    <div style="border-top:1px solid #eee;margin:16px 0;"></div>
-
-    
     <label class="label-text">任务类型</label>
+
     <div class="subject-buttons" style="margin-bottom:12px;">
       <button type="button" class="subject-btn" id="typeNormalBtn" onclick="selectTaskType('normal')" style="flex:1;border-color:#fecdd3;color:#b91c1c;">📝 普通任务</button>
       <button type="button" class="subject-btn" id="typeDictationBtn" onclick="selectTaskType('dictation')" style="flex:1;border-color:#bfdbfe;color:#1d4ed8;">🔊 听写任务</button>
@@ -595,6 +567,35 @@ if('serviceWorker' in navigator){
 
   </div>
 
+</div>
+
+
+<!-- 批量新增任务弹窗 -->
+<div class="modal-mask" id="batchModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px;">批量新增任务</h3>
+
+    <label class="label-text">选择科目</label>
+    <div class="subject-buttons">
+      <button class="subject-btn chinese" id="batchSubjChinese" onclick="selectBatchSubject('chinese')">📖语文</button>
+      <button class="subject-btn math" id="batchSubjMath" onclick="selectBatchSubject('math')">📐数学</button>
+      <button class="subject-btn english" id="batchSubjEnglish" onclick="selectBatchSubject('english')">🔤英语</button>
+    </div>
+
+    <label class="label-text">📋批量导入任务（支持 1.xxx 2.xxx 格式）</label>
+    <textarea id="batchTaskText" rows="6" placeholder="粘贴例子：
+
+1.抄写生字2遍
+
+2.完成练习册第10页
+
+3.朗读课文3遍"></textarea>
+
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('batchModal')">取消</button>
+      <button class="btn btn-blue" style="flex:1;" onclick="batchCreateDailyTask()">✨批量生成</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-mask" id="longModal">
@@ -734,7 +735,7 @@ if('serviceWorker' in navigator){
 
      <button class="btn btn-blue" style="flex:1;" onclick="triggerSelectImage()">上传图片</button>
 
-     <button class="btn btn-green" style="flex:1;" onclick="this.disabled=true; this.innerText='提交中...'; doSubmitTask()">确认提交</button>
+     <button class="btn btn-green" style="flex:1;" id="taskSubmitConfirmBtn" onclick="this.disabled=true; this.innerText='提交中...'; doSubmitTask()">确认提交</button>
      <button class="btn btn-gray" style="flex:1;" onclick="closeSubmitModal()">取消</button>
 
      </div>
@@ -1225,19 +1226,12 @@ function updateCategoryDots(){
 function openModal(id){
   document.getElementById(id).classList.add('show');
   if(id === 'dailyModal'){
-    selectedSubject = null;
     selectedTaskType = 'normal';
     // 清空上次输入
     document.getElementById('dailyTitle').value = '';
     document.getElementById('dailyDesc').value = '';
     document.getElementById('dailyStar').value = '2';
     document.getElementById('dailyMinuteLimit').value = '0';
-    document.getElementById('batchTaskText').value = '';
-    document.querySelectorAll('.subject-btn').forEach(b=>{
-      if(b.id !== 'typeNormalBtn' && b.id !== 'typeDictationBtn'){
-        b.classList.remove('active');
-      }
-    });
     // 重置类型按钮样式
     const normalBtn = document.getElementById('typeNormalBtn');
     const dictationBtn = document.getElementById('typeDictationBtn');
@@ -1251,6 +1245,11 @@ function openModal(id){
     }
     const hint = document.getElementById('dictationHint');
     if(hint) hint.style.display = 'none';
+  }
+  if(id === 'batchModal'){
+    selectedSubject = null;
+    document.getElementById('batchTaskText').value = '';
+    document.querySelectorAll('#batchModal .subject-btn').forEach(b=>b.classList.remove('active'));
   }
 }
 
@@ -1279,6 +1278,33 @@ function selectTaskType(type){
     normalBtn.style.fontWeight = 'normal';
     if(hint) hint.style.display = 'block';
   }
+}
+
+// 从分类页打开单条任务弹窗（科目已由分类决定）
+function openSingleTaskModal(){
+  if(currentSubjectTab === 'all'){
+    alert('请先选择语文、数学或英语分类');
+    return;
+  }
+  selectedSubject = currentSubjectTab;
+  const names = {chinese:'📖 语文', math:'📐 数学', english:'🔤 英语'};
+  const tipEl = document.getElementById('singleTaskSubjectTip');
+  if(tipEl) tipEl.innerText = '当前科目：' + (names[currentSubjectTab] || currentSubjectTab);
+  openModal('dailyModal');
+}
+
+// 从全部页打开批量任务弹窗
+function openBatchModal(){
+  openModal('batchModal');
+}
+
+// 批量弹窗里选择科目
+function selectBatchSubject(subj){
+  selectedSubject = subj;
+  document.querySelectorAll('#batchModal .subject-btn').forEach(b=>b.classList.remove('active'));
+  const map = {chinese:'batchSubjChinese', math:'batchSubjMath', english:'batchSubjEnglish'};
+  const el = document.getElementById(map[subj]);
+  if(el) el.classList.add('active');
 }
 
 function openPlantPreview(plantId){
@@ -1470,6 +1496,15 @@ function closeSubmitModal(){
   document.getElementById('submitImgPreviewBox').classList.add('hidden');
 
   document.getElementById('submitPreviewImg').src = "";
+
+  // 重置提交按钮状态
+  const btn = document.getElementById('taskSubmitConfirmBtn');
+  if(btn){
+    btn.disabled = false;
+    btn.innerText = '确认提交';
+  }
+
+
 
 }
 //统一提交入口，自动判断有无压缩图片
@@ -1708,7 +1743,15 @@ async function handleTaskComplete(idx){
 
   
   pendingProofImgUrl = ""; //打开弹窗，清空上次缓存图片
-  // 打开模态弹窗
+   // 重置提交按钮状态（防止上次提交后按钮卡在禁用状态）
+  const btn = document.getElementById('taskSubmitConfirmBtn');
+  if(btn){
+    btn.disabled = false;
+    btn.innerText = '确认提交';
+  }
+
+
+// 打开模态弹窗
 
   openModal('taskSubmitModal');
 
@@ -1897,16 +1940,11 @@ async function submitTaskWithImg(){
 
     }
 
-    pendingProofImgUrl = "";
-
+        pendingProofImgUrl = "";
     window.pendingCompressedFile = null;
-
-    closeModal('taskSubmitModal');
-
+    closeSubmitModal();
     pendingTaskIdx = null;
-
     alert("✅带图提交成功，等待家长审核！");
-
     closeFullscreenCountdown();   
     await loadAllData();
 
@@ -1968,13 +2006,10 @@ async function submitTaskDirect(){
 
     }
 
-    pendingProofImgUrl = ""; //提交成功清空图片缓存
-    closeModal('taskSubmitModal');
-
+        pendingProofImgUrl = "";
+    closeSubmitModal();
     pendingTaskIdx = null;
-
     alert("✅提交成功，等待家长审核！");
-
     closeFullscreenCountdown();
     await loadAllData();
 
