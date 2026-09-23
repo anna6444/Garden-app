@@ -13,9 +13,9 @@
 <!-- ✅苹果桌面图标 新增这一行 -->
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <style>
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:linear-gradient(180deg,#fff7d7 0%,#f7fff9 100%);min-height:100vh;}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:0 auto;padding:16px;background:linear-gradient(180deg,#fdfbf7 0%,#f4f9f9 100%);min-height:100vh;}
 html, body { touch-action: manipulation; }
-.card{background:#fff;border-radius:24px;padding:18px;margin:10px 0;box-shadow:0 4px 12px #00000015;}
+.card{background:#fff;border-radius:20px;padding:20px;margin:12px 0;box-shadow:0 4px 16px rgba(0,0,0,0.06);transition:transform 0.2s;}
 .btn{padding:12px;border:none;border-radius:12px;font-size:16px;cursor:pointer;width:100%;margin:6px 0;}
 .btn-green{background:#34d399;color:#fff;}
 .btn-red{background:#ef4444;color:#fff;}
@@ -39,13 +39,15 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .count-num{font-size:22px;font-weight:bold;color:#ef4444;}
 .count-label{font-size:13px;color:#666;}
 .task-card-title{font-size:18px;font-weight:bold;color:#333;margin-bottom:8px;}
-.task-row{display:flex;flex-direction:column;align-items:flex-start;padding:14px 0;border-bottom:1px solid #f5f5f5;gap:10px;}
+.task-row{display:flex;flex-direction:column;align-items:flex-start;padding:16px 0;border-bottom:1px solid #f0f0f0;gap:12px;transition:background 0.2s;}
+.task-row:hover{background:#fafafa;border-radius:12px;padding-left:8px;padding-right:8px;}
 .task-row:last-child{border-bottom:none;}
 .task-info{display:flex;align-items:center;gap:10px;flex:1;}
 .task-icon{width:40px;height:40px;border-radius:12px;background:#fffbeb;display:flex;align-items:center;justify-content:center;font-size:20px;}
 .task-text{font-size:16px;font-weight:bold;color:#333;}
 .task-meta{font-size:13px;color:#999;margin-top:4px;}
-.task-btn{padding:8px 14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;cursor:pointer;white-space:nowrap;}
+.task-btn{padding:10px 16px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;cursor:pointer;white-space:nowrap;font-weight:500;transition:opacity 0.2s;}
+.task-btn:hover{opacity:0.85;}
 .task-btn:disabled{background:#ddd;color:#999;}
 .task-btn-start{background:#34d399;color:#fff;}
 .task-btn-approve{background:#22c55e;color:#fff;}
@@ -173,6 +175,59 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .countdown-collapse{background:#333;color:#fff;border:none;padding:12px 24px;border-radius:20px;font-size:15px;cursor:pointer;}
 .countdown-bubble{position:fixed;top:14px;right:14px;background:#000;color:#fff;border-radius:22px;padding:10px 16px;font-size:16px;font-weight:bold;font-variant-numeric:tabular-nums;z-index:9998;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);display:none;}
 .countdown-bubble.show{display:block;}
+
+/* ========== 平板/横屏适配优化（仪表盘布局） ========== */
+@media (orientation: landscape) and (min-width: 700px){
+  /* 1. 放宽页面最大宽度，增加内边距 */
+  body { max-width: 1100px; padding: 20px; }
+  
+  /* 2. 左侧分类栏稍微加宽 */
+  .category-layout { grid-template-columns: 90px 1fr; }
+  .category-sidebar { width: 90px; }
+  
+  /* 3. 核心布局：左边统计卡片，右边任务列表，并排显示！ */
+  .category-content {
+    display: grid;
+    grid-template-columns: 320px 1fr; 
+    gap: 16px;
+    align-items: start;
+  }
+  
+  /* 强制在横屏下同时显示统计和任务列表，形成仪表盘效果 */
+  #dailyOverview, #longOverview,
+  #dailyTaskListCard, #longTaskListCard {
+    display: block !important;
+    margin: 0;
+  }
+  
+  /* 4. 任务行在宽屏下改为【左右排列】，文字在左，按钮在右 */
+  .task-row {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  /* 取消按钮容器的 100% 宽度，防止按钮换行到下方 */
+  .task-row > div:last-child {
+    width: auto !important;
+    margin-top: 0 !important;
+  }
+  
+  /* 5. 底部导航变成悬浮胶囊样式，不再贴边 */
+  .bottom-nav {
+    max-width: 600px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 24px;
+    bottom: 20px;
+    padding: 10px 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  }
+
+  /* 6. 全屏倒计时适配 */
+  .countdown-ring-wrap { width: 220px; height: 220px; }
+  .countdown-ring { width: 220px; height: 220px; }
+  .countdown-time { font-size: 46px; }
+}
 
 </style>
 
@@ -2076,52 +2131,78 @@ function closeImgPreviewModal(){
 
 }
 
+
 async function parentApprove(idx){
   const task = state.daily[idx];
   if(!task) return;
 
-  const startTime = new Date(task.start_at);
-  const now = new Date();
-  const diffMin = (now - startTime) / 1000 / 60;
-  let getStar = (task.minute_limit === 0 || diffMin <= task.minute_limit) ? task.star : Math.floor(task.star/2);
-  const over = task.minute_limit !== 0 && diffMin > task.minute_limit;
-  const tipText = over?"（超时减半）":"";
+  // 防止重复点击
+  if(approvingTasks[task.id]){
+    alert('正在处理中，请稍等…');
+    return;
+  }
+
+  let diffMin = 0;
+  let over = false;
+
+  if(task.start_at){
+    const startTime = new Date(task.start_at);
+    const now = new Date();
+    diffMin = (now - startTime) / 1000 / 60;
+    over = task.minute_limit !== 0 && diffMin > task.minute_limit;
+  }
+
+  const getStar = (!over) ? task.star : Math.floor(task.star / 2);
+  const tipText = over ? "（超时减半）" : "";
   const hasImg = !!task.proof_image;
   const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
-  if(!confirm(`审核通过【${task.title}】？\n用时${Math.round(diffMin)}分钟${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
 
-  // 防止重复点击：任务正在处理中，直接退出
-  if(approvingTasks[task.id]) return;
+  const timeTip = task.start_at ? `用时${Math.round(diffMin)}分钟` : '（无计时记录）';
+
+  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
+
   approvingTasks[task.id] = true;
 
   try {
+    // 先删图片，再更新数据库
     if(task.proof_image){
       try{
         const urlParts = task.proof_image.split('/');
         const fileName = urlParts[urlParts.length - 1];
         await supabase.storage.from('task-proof').remove([fileName]);
       }catch(err){
-        console.warn("审核通过，删除图片失败",err);
+        console.warn("审核通过，删除图片失败", err);
       }
     }
 
     state.star += getStar;
     state.parent_star += getStar;
-    await addStarLogItem("child",getStar,`日常任务【${task.title}】完成${tipText}`);
-    await addStarLogItem("parent",getStar,`审核任务【${task.title}】${tipText}`);
-    await supabase.from('daily_tasks').update({
+    await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
+    await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
+
+    const { error } = await supabase.from('daily_tasks').update({
       status: 'approved',
       approved_date: new Date().toISOString()
     }).eq('id', task.id);
+
+    if(error){
+      console.error('审核更新失败', error);
+      alert('❌ 审核失败：' + error.message);
+      // 回滚星星
+      state.star -= getStar;
+      state.parent_star -= getStar;
+      return;
+    }
+
     await saveState();
     await loadAllData();
     renderAll();
     alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐`);
+
   } finally {
     delete approvingTasks[task.id];
   }
 }
-
 
 async function parentReject(idx){
 
@@ -2169,14 +2250,21 @@ async function parentReject(idx){
 }
   
 
-
 async function deleteDailyTask(idx){
   const task = state.daily[idx];
+  if(!task) return;
   if(!confirm(`⚠️确定删除日常任务【${task.title}】？删除后不可恢复`)) return;
-  await supabase.from('daily_tasks').delete().eq('id', task.id);
+
+  const { error } = await supabase.from('daily_tasks').delete().eq('id', task.id);
+  if(error){
+    console.error('删除日常任务失败', error);
+    alert('❌ 删除失败：' + error.message);
+    return;
+  }
   await loadAllData();
   renderAll();
 }
+
 
 async function saveLongTask(){
   const title=document.getElementById('longTitle').value.trim();
@@ -2634,15 +2722,22 @@ async function approveLongTask(idx){
   }
 }
 
-
-
 async function deleteLongTask(idx){
   const task = state.long[idx];
+  if(!task) return;
   if(!confirm(`⚠️确定删除长期任务【${task.title}】？删除后不可恢复`)) return;
-  await supabase.from('long_tasks').delete().eq('id', task.id);
+
+  const { error } = await supabase.from('long_tasks').delete().eq('id', task.id);
+  if(error){
+    console.error('删除长期任务失败', error);
+    alert('❌ 删除失败：' + error.message);
+    return;
+  }
   await loadAllData();
   renderAll();
 }
+
+
 async function saveWish(){
   const content=document.getElementById('wishContent').value.trim();
   if(!content)return alert('请输入心愿内容');
@@ -2712,7 +2807,8 @@ async function autoDeductStarTask() {
 }
 
 
-// ========== 独立清理函数：21:30后删除「未提交」和「已审核通过」的日常任务 ==========
+
+ // ========== 独立清理函数：21:30后删除「未提交」和「已审核通过」的日常任务 ==========
 async function cleanApprovedTasks(){
   const now = new Date();
   const hour = now.getHours();
@@ -2720,28 +2816,69 @@ async function cleanApprovedTasks(){
   const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
   if(!isAfter2130) return;
 
-    // 今天已经清理过，跳过
-    const todayStr = now.getFullYear() + '-' +
-                  String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                  String(now.getDate()).padStart(2, '0');
+  const todayStr = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0');
+
+  // 今天已经成功清理过，跳过
   if(window.lastCleanDate === todayStr) return;
 
+  // 防止同时多次触发（focus 和 setInterval 可能同时跑到）
+  if(window.cleaningNow) return;
+  window.cleaningNow = true;
+
   try{
-    const {data:toDeleteList} = await supabase.from('daily_tasks')
-      .select('id,status')
-      .in('status',['active','approved']);
-    if(toDeleteList && toDeleteList.length > 0){
-      for(const item of toDeleteList){
-        await supabase.from('daily_tasks').delete().eq('id', item.id);
-      }
-      await loadAllData();
-      renderAll();
+    // 1. 先查出所有要删的任务
+    const { data: toDeleteList, error: selectErr } = await supabase
+      .from('daily_tasks')
+      .select('id,title,status')
+      .in('status', ['active', 'approved']);
+
+    if(selectErr) throw selectErr;
+
+    console.log('夜间清理：查到要删的任务条数 =', toDeleteList ? toDeleteList.length : 0);
+
+    if(!toDeleteList || toDeleteList.length === 0){
+      // 没有任何要删的，也算今天清理成功
+      window.lastCleanDate = todayStr;
+      return;
     }
-    window.lastCleanDate = todayStr; // ⬅️ 加这一行，标记今天已清理
+
+    // 2. 一条一条删，失败的记下来
+    const failedList = [];
+    for(const item of toDeleteList){
+      const { error: delErr } = await supabase
+        .from('daily_tasks')
+        .delete()
+        .eq('id', item.id);
+
+      if(delErr){
+        console.error('夜间清理：删除失败', item, delErr);
+        failedList.push(item);
+      }
+    }
+
+    // 3. 重新加载数据 & 刷新页面
+    await loadAllData();
+    renderAll();
+
+    // 4. 只有全部删除成功才标记今天已清理
+    if(failedList.length === 0){
+      window.lastCleanDate = todayStr;
+      console.log('夜间清理：全部成功 ✅');
+    }else{
+      console.warn('夜间清理：有任务删除失败，今天稍后会再试', failedList);
+      // 注意：故意不设置 lastCleanDate，让下一次 setInterval / focus 再试一次
+    }
+
   }catch(e){
     console.warn("夜间清理日常任务失败", e);
+  }finally{
+    window.cleaningNow = false;
   }
 }
+
+
 
 async function renderAll(){
   // 渲染星星数字
@@ -2787,17 +2924,13 @@ if(currentRole === "child"){
 
 
 
-    //3.已完成任务：孩子待审核日常 + 孩子长期有last_date（确认完成）
-
-    const childDailyDone = state.daily.filter(t => t.status === "pending_review").length;
-
+        //3.已完成任务：孩子待审核 + 已审核通过的日常任务 + 孩子长期有last_date（确认完成）
+    const childDailyDone = state.daily.filter(t => t.status === "pending_review" || t.status === "approved").length;
     const childLongDone = state.long.filter(t => t.owner_type==="child" && !!t.last_date).length;
-
     num3 = childDailyDone + childLongDone;
+    text3 = "已提交/已完成"; // 改一下标签，更准确
 
-    text3 = "已完成任务";
-
-}else{
+   }else{
 
     // 👨‍👩‍👧 家长端统计
 
@@ -2829,14 +2962,12 @@ if(currentRole === "child"){
 
 
 
-
-    //3.已完成任务：家长自己长期任务，last_date存在=完成
-
-    num3 = state.long.filter(t => t.owner_type==="parent" && !!t.last_date).length;
-
-    text3 = "已完成任务";
-
-}
+        //3.已完成任务：家长已审核通过的孩子日常任务 + 家长自己的长期任务
+    const parentApprovedDaily = state.daily.filter(t => t.status === "approved").length;
+    const parentDoneLong = state.long.filter(t => t.owner_type==="parent" && !!t.last_date).length;
+    num3 = parentApprovedDaily + parentDoneLong;
+    text3 = "已处理/已完成"; // 改一下标签，更准确
+    }
 
   // 赋值渲染
 
@@ -3246,6 +3377,16 @@ function logout(){
 
   document.getElementById('childBtn').classList.remove('active');
 }
+
+// ========== 页面回到前台时，补一次夜间清理检查 ==========
+window.addEventListener('focus', function(){
+  try { cleanApprovedTasks(); } catch(e){ console.warn(e); }
+});
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden){
+    try { cleanApprovedTasks(); } catch(e){ console.warn(e); }
+  }
+});
 
 </script>
 
