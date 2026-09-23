@@ -437,7 +437,12 @@ if('serviceWorker' in navigator){
                     <div style="margin-bottom:12px;">
             <h3 class="task-card-title">⏳ 长期任务</h3>
           </div>
-          <div id="longList"></div>
+          <div><span class="group-title">待开始 / 未完成长期任务</span></div>
+<div id="longUnfinishedList"></div>
+<div><span class="group-title">⏳ 待审核长期任务</span></div>
+<div id="longPendingList"></div>
+<div><span class="group-title">✅ 今日已完成 / 已审核</span></div>
+<div id="longApprovedList"></div>
         </div>
       </div>
     </div>
@@ -2136,7 +2141,6 @@ async function parentApprove(idx){
   const task = state.daily[idx];
   if(!task) return;
 
-  // 防止重复点击
   if(approvingTasks[task.id]){
     alert('正在处理中，请稍等…');
     return;
@@ -2156,15 +2160,14 @@ async function parentApprove(idx){
   const tipText = over ? "（超时减半）" : "";
   const hasImg = !!task.proof_image;
   const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
-
   const timeTip = task.start_at ? `用时${Math.round(diffMin)}分钟` : '（无计时记录）';
 
-  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
+  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐\n\n⚠️ 通过后任务将直接删除（跨天审核也适用）`)) return;
 
   approvingTasks[task.id] = true;
 
   try {
-    // 先删图片，再更新数据库
+    // 1. 删除图片
     if(task.proof_image){
       try{
         const urlParts = task.proof_image.split('/');
@@ -2175,29 +2178,32 @@ async function parentApprove(idx){
       }
     }
 
+    // 2. 加星星
     state.star += getStar;
     state.parent_star += getStar;
     await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
     await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
 
-    const { error } = await supabase.from('daily_tasks').update({
-      status: 'approved',
-      approved_date: new Date().toISOString()
-    }).eq('id', task.id);
-
+    // 3. 更新数据库并删除任务（保证不重复出现）
+    const { error } = await supabase.from('daily_tasks')
+      .update({ status: 'approved' })
+      .eq('id', task.id);
+      
     if(error){
       console.error('审核更新失败', error);
       alert('❌ 审核失败：' + error.message);
-      // 回滚星星
-      state.star -= getStar;
+      state.star -= getStar; // 回滚
       state.parent_star -= getStar;
       return;
     }
 
+    // 4. 审核完立刻删除，不留到第二天
+    await supabase.from('daily_tasks').delete().eq('id', task.id);
+
     await saveState();
     await loadAllData();
     renderAll();
-    alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐`);
+    alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐，任务已归档删除！`);
 
   } finally {
     delete approvingTasks[task.id];
@@ -2677,14 +2683,15 @@ async function approveLongTask(idx){
   if(!task) return;
   if(task.submit_status !== 'submitted') return;
 
-  // 防止重复点击：任务正在处理中，直接退出
   if(approvingTasks[task.id]) return;
   approvingTasks[task.id] = true;
 
   try {
+    // 使用提交那天的日期作为最后完成日期，而不是今天
+    // 这样即使第二天才审核，也算作昨天完成的，今天依然可以重新打卡
     const lastDate = task.submit_date || new Date().toDateString();
 
-    // 如果有录音，先删除
+    // 删除录音
     if(task.audio_url){
       try {
         const urlParts = task.audio_url.split('/');
@@ -2695,12 +2702,20 @@ async function approveLongTask(idx){
       }
     }
 
-    await supabase.from('long_tasks').update({
+    // 更新数据库状态
+    const { error } = await supabase.from('long_tasks').update({
       last_date: lastDate,
-      submit_status: 'normal',
+      submit_status: 'normal', // 状态重置，第二天自动回到“未完成”栏
       audio_url: null
     }).eq('id', task.id);
+    
+    if (error) {
+      console.error('审核更新失败', error);
+      alert('❌ 审核失败：' + error.message);
+      return;
+    }
 
+    // 加星星
     const roleType = task.owner_type;
     if(task.owner_type === 'child'){
       state.star += task.star;
@@ -2708,16 +2723,13 @@ async function approveLongTask(idx){
       state.parent_star += task.star;
     }
     await saveState();
-    try{
-      await addStarLogItem(roleType, task.star,`长期任务【${task.title}】打卡完成`);
-    }catch(e){
-      console.warn("长期任务，写入星星日志失败",e);
-    }
+    await addStarLogItem(roleType, task.star, `长期任务【${task.title}】打卡完成`);
+
     await loadAllData();
     renderAll();
     alert('✅ 确认完成，+'+task.star+'⭐');
+
   } finally {
-    // 无论成功失败，最后都释放锁
     delete approvingTasks[task.id];
   }
 }
@@ -2755,12 +2767,11 @@ async function handleDelete(type, idx) {
   renderAll();
 }
 
-// 夜间21:30自动扣星逻辑：未提交任务每条扣1星，仅每日执行一次
+// 夜间扣星逻辑：支持跨天补扣，区分日常和长期
+// 夜间扣星逻辑：支持跨天补扣，区分日常和长期
 async function autoDeductStarTask() {
   const now = new Date();
-  const todayStr = now.getFullYear() + '-' +
-                  String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                  String(now.getDate()).padStart(2, '0');
+  const todayStr = now.toDateString();
 
   // 如果今天已经扣过，直接退出
   if (state.lastAutoDeductDate === todayStr) {
@@ -2768,115 +2779,149 @@ async function autoDeductStarTask() {
     return;
   }
 
+  console.log('夜间扣星：开始执行检查');
+
   const hour = now.getHours();
   const minute = now.getMinutes();
   const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
-  if (!isAfter2130) return;
 
-  console.log('夜间扣星：开始执行，今天未扣过');
+  // 算出“昨天”的字符串，用于判断长期任务是否在昨天完成过
+  const yesterday = new Date(now.getTime() - 86400000);
+  const yesterdayStr = yesterday.toDateString();
 
-  // 先标记为已执行，避免中途失败后重复执行
-  state.lastAutoDeductDate = todayStr;
-  await saveState();
+  try {
+    // ===== 1. 日常任务扣星（只扣 active 状态，跨天补扣） =====
+    const unfinishDaily = state.daily.filter(t => {
+      if (t.status !== 'active') return false; // 只扣未完成的
+      const taskDate = new Date(t.create_at || Date.now()).toDateString();
+      // 如果是今天的任务，必须过了21:30才扣；如果是以前的任务，直接补扣
+      return (taskDate === todayStr && isAfter2130) || (taskDate !== todayStr);
+    });
 
-  // ===== 日常任务：扣孩子的星，写孩子的日志 =====
-  const unfinishDailyList = state.daily.filter(t => t.status === 'active');
-  for(const task of unfinishDailyList){
-    state.star -= 1;
-    await addStarLogItem("child", -1, `⏰夜间扣星：日常任务【${task.title}】未完成`);
-  }
-
-  // ===== 长期任务：按 owner_type 分角色扣 =====
-  const unfinishLongList = state.long.filter(t =>
-    t.submit_status !== "submitted"
-    && t.last_date !== now.toDateString()
-  );
-
-  for(const task of unfinishLongList){
-    if(task.owner_type === "child"){
+    for (const task of unfinishDaily) {
       state.star -= 1;
-      await addStarLogItem("child", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
-    }else{
-      state.parent_star -= 1;
-      await addStarLogItem("parent", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
+      await addStarLogItem("child", -1, `⏰夜间扣星：日常任务【${task.title}】未完成`);
     }
-  }
 
-  // 保存扣星后的最新状态
-  await saveState();
+    // ===== 2. 长期任务扣星（只扣未打卡且不是submitted的，跨天补扣） =====
+    const unfinishLong = state.long.filter(t => {
+      if (t.submit_status === 'submitted') return false; // 已提交待审核的不扣
+      if (t.last_date === todayStr) return false; // 今天已完成的
+      
+      // 【核心修复】：如果是昨天完成的，今天早上打开App时不应该扣星！
+      // 只有今天过了21:30，且今天还没完成，才扣星。
+      if (t.last_date === yesterdayStr) {
+        return isAfter2130; 
+      }
+      
+      // 前天或更早完成，或者从来没完成过，说明昨天就没打卡，直接补扣
+      return true;
+    });
+
+    for (const task of unfinishLong) {
+      if (task.owner_type === "child") {
+        state.star -= 1;
+        await addStarLogItem("child", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
+      } else {
+        state.parent_star -= 1;
+        await addStarLogItem("parent", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
+      }
+    }
+
+    // 【核心修复】：扣星全部成功之后，才记录“今天已扣过”，防止网络失败导致卡死
+    state.lastAutoDeductDate = todayStr;
+    await saveState();
+    console.log('夜间扣星：执行完毕');
+    
+  } catch(e) {
+    console.warn('夜间扣星发生网络异常，不标记今天已扣，稍后重试', e);
+    // 注意：这里故意不设置 state.lastAutoDeductDate，留到下一次重试
+  }
 }
 
+  await saveState();
+  console.log('夜间扣星：执行完毕');
+}
 
-
- // ========== 独立清理函数：21:30后删除「未提交」和「已审核通过」的日常任务 ==========
+// 清理日常任务：支持跨天补删，保留待审核任务
 async function cleanApprovedTasks(){
   const now = new Date();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
-  if(!isAfter2130) return;
+  const todayStr = now.toDateString();
 
-  const todayStr = now.getFullYear() + '-' +
-    String(now.getMonth() + 1).padStart(2, '0') + '-' +
-    String(now.getDate()).padStart(2, '0');
-
-  // 今天已经成功清理过，跳过
-  if(window.lastCleanDate === todayStr) return;
-
-  // 防止同时多次触发（focus 和 setInterval 可能同时跑到）
-  if(window.cleaningNow) return;
+  // 如果今天已经清理过，直接退出
+  if (window.lastCleanDate === todayStr) return;
+  if (window.cleaningNow) return;
   window.cleaningNow = true;
 
-  try{
-    // 1. 先查出所有要删的任务
-    const { data: toDeleteList, error: selectErr } = await supabase
+  try {
+    // 查出所有日常任务
+    const { data: allTasks, error: selectErr } = await supabase
       .from('daily_tasks')
-      .select('id,title,status')
-      .in('status', ['active', 'approved']);
+      .select('id,title,status,create_at');
 
     if(selectErr) throw selectErr;
-
-    console.log('夜间清理：查到要删的任务条数 =', toDeleteList ? toDeleteList.length : 0);
-
-    if(!toDeleteList || toDeleteList.length === 0){
-      // 没有任何要删的，也算今天清理成功
+    if(!allTasks || allTasks.length === 0){
       window.lastCleanDate = todayStr;
       return;
     }
 
-    // 2. 一条一条删，失败的记下来
-    const failedList = [];
-    for(const item of toDeleteList){
-      const { error: delErr } = await supabase
-        .from('daily_tasks')
-        .delete()
-        .eq('id', item.id);
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
 
+    const tasksToDelete = [];
+
+    for(const item of allTasks){
+      const taskDate = new Date(item.create_at || Date.now()).toDateString();
+      const isToday = (taskDate === todayStr);
+
+      // 逻辑A：待审核的任务，永远不删（保留给家长审核）
+      if(item.status === 'pending_review') continue;
+
+      // 逻辑B：如果是今天创建的任务，且还没到21:30，不删
+      if(isToday && !isAfter2130) continue;
+
+      // 逻辑C：如果是今天的任务，且已经过了21:30，状态是 active 或 approved，删
+      // 逻辑D：如果是昨天或更早的任务（不管是 active 还是 approved），跨天补删
+      if(isAfter2130 || !isToday){
+        tasksToDelete.push(item);
+      }
+    }
+
+    if(tasksToDelete.length === 0){
+      window.lastCleanDate = todayStr;
+      return;
+    }
+
+    console.log(`清理任务：准备删除 ${tasksToDelete.length} 条任务`);
+
+    const failedList = [];
+    for(const item of tasksToDelete){
+      const { error: delErr } = await supabase.from('daily_tasks').delete().eq('id', item.id);
       if(delErr){
-        console.error('夜间清理：删除失败', item, delErr);
+        console.error('删除失败：', item, delErr);
         failedList.push(item);
       }
     }
 
-    // 3. 重新加载数据 & 刷新页面
     await loadAllData();
     renderAll();
 
-    // 4. 只有全部删除成功才标记今天已清理
     if(failedList.length === 0){
       window.lastCleanDate = todayStr;
-      console.log('夜间清理：全部成功 ✅');
-    }else{
-      console.warn('夜间清理：有任务删除失败，今天稍后会再试', failedList);
-      // 注意：故意不设置 lastCleanDate，让下一次 setInterval / focus 再试一次
+      console.log('清理任务：全部成功 ✅');
+    } else {
+      console.warn('清理任务：有失败，稍后会重试', failedList);
     }
 
-  }catch(e){
-    console.warn("夜间清理日常任务失败", e);
-  }finally{
+  } catch(e){
+    console.warn("清理任务异常", e);
+  } finally {
     window.cleaningNow = false;
   }
 }
+
+
 
 
 
@@ -3124,69 +3169,98 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
   document.getElementById("dailyPendingList").innerHTML = dailyPendingHtml || `<p style="padding:10px;color:#888;">无待审核任务</p>`;
   document.getElementById("dailyApprovedList").innerHTML = dailyApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无审核通过的作业</p>`;
 
-  // 长期任务渲染【拆分：孩子任务 / 家长任务】
-  let longChildHtml = "";
-  let longParentHtml = "";
-  state.long.forEach((task,idx)=>{
+  // ================== 长期任务渲染（三栏分类版） ==================
+  let longUnfinishHtml = "";
+  let longPendingHtml = "";
+  let longApprovedHtml = "";
+  
+  const todayStr = new Date().toDateString();
+
+  state.long.forEach((task, idx) => {
+    // 1. 过滤类别
     if(currentLongTab !== 'all'){
       const cat = task.category || '成长';
       if(cat !== currentLongTab) return;
     }
+
     const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
+    
+    // 2. 判断任务当前状态
+    const isTodayDone = (task.last_date === todayStr);
+    let taskStatus = 'unfinished'; // 默认未完成
+    if (task.submit_status === 'submitted') {
+      taskStatus = 'pending'; // 待审核
+    } else if (isTodayDone) {
+      taskStatus = 'approved'; // 已审核/已完成
+    }
+
+    // 3. 构造按钮（根据不同状态灰置按钮）
+    let actionButtons = "";
+    
+    // 判断是否被禁用
+    // 规则：待审核或已完成时禁用。未完成时，如果到了21:30也禁用
+    const btnDisabled = (taskStatus === 'pending' || taskStatus === 'approved' || isAfter2130());
+    
+    // 提交打卡按钮
+    if (taskStatus === 'unfinished') {
+      actionButtons += `<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${btnDisabled ? 'disabled' : ''}>提交打卡</button>`;
+      // 录音打卡按钮（仅限孩子成长类）
+      if (task.owner_type === 'child' && (task.category || '成长') === '成长') {
+        actionButtons += `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${btnDisabled ? 'disabled' : ''}>🎤 录音打卡</button>`;
+      }
+    }
+
+    // 待审核状态：显示提示，如果是对方，显示确认按钮
+    if (taskStatus === 'pending') {
+      if ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child')) {
+        actionButtons += `<button class="task-btn task-btn-approve" onclick="this.disabled=true; approveLongTask(${idx})">确认完成</button>`;
+      } else {
+        actionButtons += `<span class="badge-pending" style="padding:8px 12px;font-size:14px;">等待对方确认</span>`;
+      }
+    }
+
+    // 已完成状态：显示提示
+    if (taskStatus === 'approved') {
+      actionButtons += `<span class="badge-submit" style="padding:8px 12px;font-size:14px;">今日已完成</span>`;
+    }
+
+    // 家长端删除按钮
+    if (currentRole === 'parent') {
+      actionButtons += `<button class="task-btn btn-del" onclick="deleteLongTask(${idx})">删除</button>`;
+    }
+
+    // 4. 生成完整的任务卡片 HTML
     const itemHtml = `
-
     <div class="task-row">
-
       <div class="task-info">
-
         <div class="task-icon">⏳</div>
-
         <div class="task-text">${task.title} ${ownerLabel}
           <div class="task-meta">奖励${task.star}⭐
-
-          ${task.submit_status === 'submitted' ? `<span class="badge-pending">已提交等待确认</span>` : ""}
-
+            ${task.audio_url ? `<span class="badge-timing" style="cursor:pointer;" onclick="playAudio('${task.audio_url}')">🔊 播放录音</span>` : ""}
           </div>
-
         </div>
-
       </div>
-
-      <!-- 按钮下方靠右 -->
-
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
-
-        ${ ((task.owner_type === 'child' && currentRole === 'child') || (task.owner_type === 'parent' && currentRole === 'parent'))
-?`<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>提交打卡</button>${(task.owner_type === 'child' && (task.category || '成长') === '成长') ? `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${task.submit_status === 'submitted' || task.last_date === new Date().toDateString() || isAfter2130() ? 'disabled' : ''}>🎤 录音打卡</button>` : ''}`:""}
-        ${task.audio_url ? `<button class="task-btn btn-blue" onclick="playAudio('${task.audio_url}')">🔊 播放录音</button>` : ''}
-        ${task.submit_status === 'submitted' && ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child'))
-
-        ?`<button class="task-btn task-btn-approve" onclick="this.disabled=true; approveLongTask(${idx})">确认完成</button>`:""}  
-
-        ${currentRole==='parent'?`<button class="task-btn btn-del"  onclick="deleteLongTask(${idx})">删除</button>`:""}
-
+        ${actionButtons}
       </div>
-
     </div>`;
-    if(task.owner_type === "child"){
-      longChildHtml += itemHtml;
-    }else{
-      longParentHtml += itemHtml;
+
+    // 5. 根据状态放入不同的 HTML 块
+    if (taskStatus === 'unfinished') {
+      longUnfinishHtml += itemHtml;
+    } else if (taskStatus === 'pending') {
+      longPendingHtml += itemHtml;
+    } else {
+      longApprovedHtml += itemHtml;
     }
   });
-  let longFinalHtml = "";
-  longFinalHtml += `<div style="margin:12px 0 4px;font-weight:bold;color:#1d4ed8;">👧 孩子长期任务</div>`;
-  if(longChildHtml){
-    longFinalHtml += longChildHtml;
-  }else{
-    longFinalHtml += `<p style="padding:10px;color:#888;">暂无孩子长期任务</p>`;
-  }
 
-  longFinalHtml += `<div style="margin:16px 0 4px;font-weight:bold;color:#be185d;">👨‍👩‍👧 家长长期任务</div>`;
-  if(longParentHtml){
-    longFinalHtml += longParentHtml;
-  }else{
-    longFinalHtml += `<p style="padding:10px;color:#888;">暂无家长长期任务</p>`;
+  // 6. 注入到对应的容器中
+  document.getElementById("longUnfinishedList").innerHTML = longUnfinishHtml || `<p style="padding:10px;color:#888;">暂无未完成长期任务</p>`;
+  document.getElementById("longPendingList").innerHTML = longPendingHtml || `<p style="padding:10px;color:#888;">暂无待审核长期任务</p>`;
+  document.getElementById("longApprovedList").innerHTML = longApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无已完成的长期任务</p>`;
+
+  // ================== 长期任务渲染结束 ==================
   }
   document.getElementById("longList").innerHTML = longFinalHtml;
   // 心愿渲染
@@ -3378,14 +3452,21 @@ function logout(){
   document.getElementById('childBtn').classList.remove('active');
 }
 
-// ========== 页面回到前台时，补一次夜间清理检查 ==========
-window.addEventListener('focus', function(){
-  try { cleanApprovedTasks(); } catch(e){ console.warn(e); }
-});
+
+// ========== 页面回到前台时，自动补做未完成的任务 ==========
+function runBackgroundCatchUp(){
+  try { 
+    // 只有家长端才能进行扣星和清理操作（防止数据冲突）
+    if(currentRole === 'parent') {
+      autoDeductStarTask(); 
+      cleanApprovedTasks(); 
+    }
+  } catch(e){ console.warn(e); }
+}
+
+window.addEventListener('focus', runBackgroundCatchUp);
 document.addEventListener('visibilitychange', function(){
-  if(!document.hidden){
-    try { cleanApprovedTasks(); } catch(e){ console.warn(e); }
-  }
+  if(!document.hidden) runBackgroundCatchUp();
 });
 
 </script>
