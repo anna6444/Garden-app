@@ -2926,103 +2926,92 @@ async function renderAll(){
 
   document.getElementById('starNum').innerText = currentRole === "parent" ? state.parent_star : state.star;
   document.getElementById('starRoleTip').innerText = currentRole === "parent" ? "家长星星" : "孩子星星";
-  // ==========【新版：区分家长/孩子两端独立统计，严格按需求】==========
-
-  let num1,num2,num3;
-
-  let text1,text2,text3;
 
 
-if(currentRole === "child"){
+  // ==========【新版：严格按“今天”统计，防止跨天任务污染数据】==========
+  let num1, num2, num3;
+  let text1, text2, text3;
+  const todayStr = new Date().toDateString();
 
+  if(currentRole === "child"){
     // 🧒 孩子端统计
 
-    // 1.未完成任务：日常active + 孩子长期：不是已提交 AND 没有last_date（没有完成记录）
-
-    const childDailyUnfinish = state.daily.filter(t => t.status === "active").length;
-
+    // 1. 今日未完成：今天创建的日常 active + 今天还没完成的长期任务
+    const childDailyUnfinish = state.daily.filter(t => {
+      if (t.status !== "active") return false;
+      const taskDate = new Date(t.create_at || Date.now()).toDateString();
+      return taskDate === todayStr;
+    }).length;
     const childLongUnfinish = state.long.filter(t =>
- 
-        t.owner_type==="child"
- 
-        && t.submit_status !== "submitted"
- 
-        && !t.last_date
+      t.owner_type === "child" &&
+      t.submit_status !== "submitted" &&
+      t.last_date !== todayStr  // ← 关键修复：必须“今天没完成”才算未完成
     ).length;
-
     num1 = childDailyUnfinish + childLongUnfinish;
+    text1 = "今日未完成";
 
-    text1 = "未完成任务";
-
-
-
-
-    //2.家长待确认：家长长期任务 submitted
- 
-   num2 = state.long.filter(t => t.owner_type==="parent" && t.submit_status === "submitted").length;
-
+    // 2. 家长待确认：家长已提交等待孩子确认的长期任务
+    num2 = state.long.filter(t => 
+      t.owner_type === "parent" && 
+      t.submit_status === "submitted"
+    ).length;
     text2 = "家长待确认";
 
-
-
-        //3.已完成任务：孩子待审核 + 已审核通过的日常任务 + 孩子长期有last_date（确认完成）
-    const childDailyDone = state.daily.filter(t => t.status === "pending_review" || t.status === "approved").length;
-    const childLongDone = state.long.filter(t => t.owner_type==="child" && !!t.last_date).length;
+    // 3. 今日已完成：今天审核通过的日常 + 今天已打卡的长期
+    const childDailyDone = state.daily.filter(t => {
+      if (t.status !== "approved") return false;
+      const approvedDate = t.approved_date ? new Date(t.approved_date).toDateString() : "";
+      return approvedDate === todayStr;
+    }).length;
+    const childLongDone = state.long.filter(t =>
+      t.owner_type === "child" &&
+      t.last_date === todayStr  // ← 关键修复：必须“今天完成”才算完成
+    ).length;
     num3 = childDailyDone + childLongDone;
-    text3 = "已提交/已完成"; // 改一下标签，更准确
+    text3 = "今日已完成";
 
-   }else{
-
+  }else{
     // 👨‍👩‍👧 家长端统计
 
-    //1.未完成任务：家长自己长期任务：不是submitted，并且没有last_date
-
+    // 1. 今日未完成：家长自己的长期任务（今天还没完成）
     num1 = state.long.filter(t =>
- 
-        t.owner_type==="parent"
- 
-        && t.submit_status !== "submitted"
- 
-        && !t.last_date
-
+      t.owner_type === "parent" &&
+      t.submit_status !== "submitted" &&
+      t.last_date !== todayStr  // ← 关键修复
     ).length;
+    text1 = "今日未完成";
 
-    text1 = "未完成任务";
-
-
-
-    //2.孩子待审核：孩子日常pending_review +孩子长期submitted
-
+    // 2. 孩子待审核：孩子日常待审核 + 孩子长期已提交
     const childDailyNeedReview = state.daily.filter(t => t.status === "pending_review").length;
-
-    const childLongNeedReview = state.long.filter(t => t.owner_type==="child" && t.submit_status === "submitted").length;
-
+    const childLongNeedReview = state.long.filter(t => 
+      t.owner_type === "child" && 
+      t.submit_status === "submitted"
+    ).length;
     num2 = childDailyNeedReview + childLongNeedReview;
-
     text2 = "孩子待审核";
 
-
-
-        //3.已完成任务：家长已审核通过的孩子日常任务 + 家长自己的长期任务
-    const parentApprovedDaily = state.daily.filter(t => t.status === "approved").length;
-    const parentDoneLong = state.long.filter(t => t.owner_type==="parent" && !!t.last_date).length;
+    // 3. 今日已完成：今天审核通过的日常 + 今天已完成的家长长期
+    const parentApprovedDaily = state.daily.filter(t => {
+      if (t.status !== "approved") return false;
+      const approvedDate = t.approved_date ? new Date(t.approved_date).toDateString() : "";
+      return approvedDate === todayStr;
+    }).length;
+    const parentDoneLong = state.long.filter(t =>
+      t.owner_type === "parent" &&
+      t.last_date === todayStr  // ← 关键修复
+    ).length;
     num3 = parentApprovedDaily + parentDoneLong;
-    text3 = "已处理/已完成"; // 改一下标签，更准确
-    }
+    text3 = "今日已完成";
+  }
 
   // 赋值渲染
-
   document.getElementById('countPendingDaily').innerText = num1;
-
   document.getElementById('countPendingLong').innerText = num2;
-
   document.getElementById('countTotal').innerText = num3;
-
   document.getElementById('label1').innerText = text1;
-
   document.getElementById('label2').innerText = text2;
-
   document.getElementById('label3').innerText = text3;
+  
 
 
   // 植物渲染
