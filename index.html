@@ -2768,7 +2768,6 @@ async function handleDelete(type, idx) {
 }
 
 // 夜间扣星逻辑：支持跨天补扣，区分日常和长期
-// 夜间扣星逻辑：支持跨天补扣，区分日常和长期
 async function autoDeductStarTask() {
   const now = new Date();
   const todayStr = now.toDateString();
@@ -3261,8 +3260,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
   document.getElementById("longApprovedList").innerHTML = longApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无已完成的长期任务</p>`;
 
   // ================== 长期任务渲染结束 ==================
-  }
-  document.getElementById("longList").innerHTML = longFinalHtml;
+  
   // 心愿渲染
   let wishHtml = "";
   state.wish.forEach((wish,idx)=>{
