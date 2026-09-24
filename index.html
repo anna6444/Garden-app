@@ -193,10 +193,9 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
     align-items: start;
   }
   
-  /* 强制在横屏下同时显示统计和任务列表，形成仪表盘效果 */
+    /* 移除强制显示，交给 JavaScript 控制显示/隐藏 */
   #dailyOverview, #longOverview,
   #dailyTaskListCard, #longTaskListCard {
-    display: block !important;
     margin: 0;
   }
   
@@ -321,14 +320,17 @@ if('serviceWorker' in navigator){
       </div>
     </div>
   </div>
-  <div id="tab-task" class="hidden">
-    <div class="category-layout">
+    <div id="tab-task" class="hidden">
+    <div class="category-layout"> <!-- 包裹层开始：包含左侧和右侧 -->
+      
+      <!-- 左侧分类栏 -->
       <div class="category-sidebar">
         <div class="category-item active" id="cat-all" onclick="selectSubjectTab('all')">
           <div class="cat-icon">📋</div>
           <div class="cat-name">全部</div>
           <div class="cat-dot hidden" id="dot-all"></div>
         </div>
+        <div style="font-size:14px;color:#3b82f6;font-weight:bold;text-align:center;margin-top:14px;margin-bottom:4px;letter-spacing:2px;">日常</div>
         <div class="category-item" id="cat-chinese" onclick="selectSubjectTab('chinese')">
           <div class="cat-icon">📖</div>
           <div class="cat-name">语文</div>
@@ -344,11 +346,29 @@ if('serviceWorker' in navigator){
           <div class="cat-name">英语</div>
           <div class="cat-dot hidden" id="dot-english"></div>
         </div>
+        <div style="font-size:14px;color:#3b82f6;font-weight:bold;text-align:center;margin-top:14px;margin-bottom:4px;letter-spacing:2px;">长期</div>
+        <div class="category-item" id="cat-grow" onclick="selectSubjectTab('成长')">
+          <div class="cat-icon">🌱</div>
+          <div class="cat-name">成长</div>
+          <div class="cat-dot hidden" id="dot-grow"></div>
+        </div>
+        <div class="category-item" id="cat-chore" onclick="selectSubjectTab('家务')">
+          <div class="cat-icon">🧹</div>
+          <div class="cat-name">家务</div>
+          <div class="cat-dot hidden" id="dot-chore"></div>
+        </div>
+        <div class="category-item" id="cat-sport" onclick="selectSubjectTab('运动')">
+          <div class="cat-icon">🏃</div>
+          <div class="cat-name">运动</div>
+          <div class="cat-dot hidden" id="dot-sport"></div>
+        </div>
       </div>
-            <div class="category-content">
+
+      <!-- 右侧内容区域 -->
+      <div class="category-content">
         <!-- 总览页：只在"全部"时显示 -->
         <div id="dailyOverview" class="card overview-card">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 class="task-card-title" style="text-align:left;margin:0;">📊 今日完成总览</h3>
             <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openBatchModal()">+ 批量新增</button>
           </div>
@@ -374,12 +394,11 @@ if('serviceWorker' in navigator){
           </div>
         </div>
 
-               <!-- 任务列表：只在具体科目时显示 -->
+        <!-- 任务列表：只在具体科目时显示 -->
         <div id="dailyTaskListCard" class="card" style="display:none;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <h3 class="task-card-title" id="taskPageTitle">📅 日常任务</h3>
-           <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openSingleTaskModal()">+ 新增</button>
-            
+            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openSingleTaskModal()">+ 新增</button>
           </div>
           <div><span class="group-title">待开始 / 进行中任务</span></div>
           <div id="dailyActiveList"></div>
@@ -388,9 +407,23 @@ if('serviceWorker' in navigator){
           <div><span class="group-title">✅ 今日已审核通过</span></div>
           <div id="dailyApprovedList"></div>
         </div>
+
+        <!-- 新增：任务页的长期任务列表（只展示孩子任务） -->
+        <div id="taskLongListCard" class="card" style="display:none;">
+          <div style="margin-bottom:12px;">
+            <h3 class="task-card-title" id="taskLongTitle">⏳ 长期任务</h3>
+          </div>
+          <div><span class="group-title">待开始 / 未完成</span></div>
+          <div id="taskLongUnfinishedList"></div>
+          <div><span class="group-title">⏳ 待审核</span></div>
+          <div id="taskLongPendingList"></div>
+          <div><span class="group-title">✅ 今日已完成</span></div>
+          <div id="taskLongApprovedList"></div>
+        </div>
       </div>
-    </div>
-  </div>
+
+    </div> <!-- 包裹层结束 -->
+ </div>
     <div id="tab-long" class="hidden">
     <div class="category-layout">
       <div class="category-sidebar">
@@ -1131,15 +1164,24 @@ function switchTab(name,btn){
 }
 
 // 切换日常任务的科目分类
+// 切换任务页的分类（日常 + 长期都支持）
 function selectSubjectTab(subj){
   currentSubjectTab = subj;
   document.querySelectorAll('#tab-task .category-item').forEach(el=>el.classList.remove('active'));
-  const map = {all:'cat-all',chinese:'cat-chinese',math:'cat-math',english:'cat-english'};
+  const map = {
+    all:'cat-all',
+    chinese:'cat-chinese', math:'cat-math', english:'cat-english',
+    '成长':'cat-grow', '家务':'cat-chore', '运动':'cat-sport'
+  };
   const el = document.getElementById(map[subj]);
   if(el) el.classList.add('active');
-  const titles = {all:'📅 日常任务',chinese:'📖 语文任务',math:'📐 数学任务',english:'🔤 英语任务'};
+  const titles = {
+    all:'📅 全部任务',
+    chinese:'📖 语文任务', math:'📐 数学任务', english:'🔤 英语任务',
+    '成长':'🌱 成长任务', '家务':'🧹 家务任务', '运动':'🏃 运动任务'
+  };
   const titleEl = document.getElementById('taskPageTitle');
-  if(titleEl) titleEl.innerText = titles[subj];
+  if(titleEl) titleEl.innerText = titles[subj] || '任务';
   renderAll();
 }
 
@@ -1163,17 +1205,36 @@ function calcPercent(done, total){
 function renderDailyOverview(){
   const dailyOverview = document.getElementById('dailyOverview');
   const taskListCard = document.getElementById('dailyTaskListCard');
+  const taskLongCard = document.getElementById('taskLongListCard');
   if(!dailyOverview || !taskListCard) return;
 
-  if(currentSubjectTab !== 'all'){
-    dailyOverview.style.display = 'none';
-    taskListCard.style.display = 'block';
+  // 判断当前是日常科目还是长期类别
+  const isDailySubject = (currentSubjectTab === 'all' || currentSubjectTab === 'chinese' || currentSubjectTab === 'math' || currentSubjectTab === 'english');
+  const isLongCategory = (currentSubjectTab === '成长' || currentSubjectTab === '家务' || currentSubjectTab === '运动');
+
+  if(currentSubjectTab === 'all'){
+    dailyOverview.style.display = 'block';
+    taskListCard.style.display = 'none';
+    if(taskLongCard) taskLongCard.style.display = 'none';
     return;
   }
-  dailyOverview.style.display = 'block';
-  taskListCard.style.display = 'none';
+  if(isDailySubject){
+    dailyOverview.style.display = 'none';
+    taskListCard.style.display = 'block';
+    if(taskLongCard) taskLongCard.style.display = 'none';
+    return;
+  }
+  if(isLongCategory){
+    dailyOverview.style.display = 'none';
+    taskListCard.style.display = 'none';
+    if(taskLongCard) taskLongCard.style.display = 'block';
+    // 顺便把任务页的长期列表标题改成当前类别
+    const titleEl = document.getElementById('taskLongTitle');
+    if(titleEl) titleEl.innerText = '⏳ ' + currentSubjectTab + '任务';
+    return;
+  }
 
-  // 统计各科目完成情况
+  // 统计各科目完成情况（保持原逻辑）
   const stats = {
     chinese:{done:0, total:0},
     math:{done:0, total:0},
@@ -1185,7 +1246,6 @@ function renderDailyOverview(){
     if(t.status === 'approved') stats[t.subject].done++;
   });
 
-  // 三条进度条
   ['chinese','math','english'].forEach(subj=>{
     const s = stats[subj];
     const pct = calcPercent(s.done, s.total);
@@ -1197,7 +1257,6 @@ function renderDailyOverview(){
     if(txt) txt.innerText = `${s.done}/${s.total}`;
   });
 
-  // 总进度饼图
   const totalAll = stats.chinese.total + stats.math.total + stats.english.total;
   const doneAll = stats.chinese.done + stats.math.done + stats.english.done;
   const totalPct = calcPercent(doneAll, totalAll);
@@ -3156,47 +3215,44 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
   document.getElementById("dailyPendingList").innerHTML = dailyPendingHtml || `<p style="padding:10px;color:#888;">无待审核任务</p>`;
   document.getElementById("dailyApprovedList").innerHTML = dailyApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无审核通过的作业</p>`;
 
-  // ================== 长期任务渲染（三栏分类版） ==================
-  let longUnfinishHtml = "";
-  let longPendingHtml = "";
-  let longApprovedHtml = "";
+  // ================== 长期任务渲染 ==================
+  // 任务页只渲染孩子的长期任务；家长页只渲染家长的长期任务
+  let taskLongUnfinishHtml = "";
+  let taskLongPendingHtml = "";
+  let taskLongApprovedHtml = "";
+  let parentLongUnfinishHtml = "";
+  let parentLongPendingHtml = "";
+  let parentLongApprovedHtml = "";
   
 
   state.long.forEach((task, idx) => {
-    // 1. 过滤类别
-    if(currentLongTab !== 'all'){
-      const cat = task.category || '成长';
-      if(cat !== currentLongTab) return;
-    }
 
-    const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
-    
-    // 2. 判断任务当前状态
+    // 1. 过滤类别：如果是任务页，用 currentSubjectTab；如果是家长页，用 currentLongTab
+    let cat = task.category || '成长';
+    if(currentSubjectTab !== 'all' && task.owner_type === 'child') {
+        if(cat !== currentSubjectTab) return;
+    }
+    if(currentLongTab !== 'all' && task.owner_type === 'parent') {
+        if(cat !== currentLongTab) return;
+    }
     const isTodayDone = (task.last_date === todayStr);
-    let taskStatus = 'unfinished'; // 默认未完成
+    let taskStatus = 'unfinished';
     if (task.submit_status === 'submitted') {
-      taskStatus = 'pending'; // 待审核
+      taskStatus = 'pending';
     } else if (isTodayDone) {
-      taskStatus = 'approved'; // 已审核/已完成
+      taskStatus = 'approved';
     }
 
-    // 3. 构造按钮（根据不同状态灰置按钮）
     let actionButtons = "";
-    
-    // 判断是否被禁用
-    // 规则：待审核或已完成时禁用。未完成时，如果到了21:30也禁用
     const btnDisabled = (taskStatus === 'pending' || taskStatus === 'approved' || isAfter2130());
-    
-    // 提交打卡按钮
+
     if (taskStatus === 'unfinished') {
       actionButtons += `<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${btnDisabled ? 'disabled' : ''}>提交打卡</button>`;
-      // 录音打卡按钮（仅限孩子成长类）
       if (task.owner_type === 'child' && (task.category || '成长') === '成长') {
         actionButtons += `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${btnDisabled ? 'disabled' : ''}>🎤 录音打卡</button>`;
       }
     }
 
-    // 待审核状态：显示提示，如果是对方，显示确认按钮
     if (taskStatus === 'pending') {
       if ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child')) {
         actionButtons += `<button class="task-btn task-btn-approve" onclick="this.disabled=true; approveLongTask(${idx})">确认完成</button>`;
@@ -3205,17 +3261,15 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
       }
     }
 
-    // 已完成状态：显示提示
     if (taskStatus === 'approved') {
       actionButtons += `<span class="badge-submit" style="padding:8px 12px;font-size:14px;">今日已完成</span>`;
     }
 
-    // 家长端删除按钮
     if (currentRole === 'parent') {
       actionButtons += `<button class="task-btn btn-del" onclick="deleteLongTask(${idx})">删除</button>`;
     }
 
-    // 4. 生成完整的任务卡片 HTML
+    const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
     const itemHtml = `
     <div class="task-row">
       <div class="task-info">
@@ -3231,22 +3285,31 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
       </div>
     </div>`;
 
-    // 5. 根据状态放入不同的 HTML 块
-    if (taskStatus === 'unfinished') {
-      longUnfinishHtml += itemHtml;
-    } else if (taskStatus === 'pending') {
-      longPendingHtml += itemHtml;
+    // 任务页：只放孩子的长期任务
+    if (task.owner_type === 'child') {
+      if (taskStatus === 'unfinished') taskLongUnfinishHtml += itemHtml;
+      else if (taskStatus === 'pending') taskLongPendingHtml += itemHtml;
+      else taskLongApprovedHtml += itemHtml;
     } else {
-      longApprovedHtml += itemHtml;
+      // 家长页：只放家长的长期任务
+      if (taskStatus === 'unfinished') parentLongUnfinishHtml += itemHtml;
+      else if (taskStatus === 'pending') parentLongPendingHtml += itemHtml;
+      else parentLongApprovedHtml += itemHtml;
     }
   });
 
-  // 6. 注入到对应的容器中
-  document.getElementById("longUnfinishedList").innerHTML = longUnfinishHtml || `<p style="padding:10px;color:#888;">暂无未完成长期任务</p>`;
-  document.getElementById("longPendingList").innerHTML = longPendingHtml || `<p style="padding:10px;color:#888;">暂无待审核长期任务</p>`;
-  document.getElementById("longApprovedList").innerHTML = longApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无已完成的长期任务</p>`;
+  // 注入到【任务页】的长期容器
+  const tu = document.getElementById("taskLongUnfinishedList");
+  const tp = document.getElementById("taskLongPendingList");
+  const ta = document.getElementById("taskLongApprovedList");
+  if(tu) tu.innerHTML = taskLongUnfinishHtml || `<p style="padding:10px;color:#888;">暂无未完成长期任务</p>`;
+  if(tp) tp.innerHTML = taskLongPendingHtml || `<p style="padding:10px;color:#888;">暂无待审核长期任务</p>`;
+  if(ta) ta.innerHTML = taskLongApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无已完成的长期任务</p>`;
 
-  // ================== 长期任务渲染结束 ==================
+  // 注入到【家长页】的长期容器
+  document.getElementById("longUnfinishedList").innerHTML = parentLongUnfinishHtml || `<p style="padding:10px;color:#888;">暂无未完成家长任务</p>`;
+  document.getElementById("longPendingList").innerHTML = parentLongPendingHtml || `<p style="padding:10px;color:#888;">暂无待审核家长任务</p>`;
+  document.getElementById("longApprovedList").innerHTML = parentLongApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无已完成的家长任务</p>`;
   
   // 心愿渲染
   let wishHtml = "";
