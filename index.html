@@ -334,6 +334,16 @@ if('serviceWorker' in navigator){
         </div>
         <button class="btn btn-red" id="feedBtn" onclick="feedPlant()">提交培育物资</button>
         <p id="doneTip" class="hidden" style="color:#22c55e;text-align:center;margin-top:8px;">✅ 本周植物培育完成！</p>
+
+        <!-- 对方植物对比卡片 -->
+                    <!-- 对方植物对比卡片（只显示进度） -->
+        <div id="plantOtherCard" class="hidden" style="margin-top:20px;padding-top:16px;border-top:1px dashed #eee;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <p style="font-size:14px;color:#999;margin:0;" id="otherPlantTitle">🌱 对方植物</p>
+            <p style="font-size:14px;color:#666;margin:0;">阶段 <b id="curStageOther" style="color:#34d399;">1</b>/7</p>
+          </div>
+          <div class="stage-dots" id="stageDotsOther" style="margin:10px 0 0 0;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -387,7 +397,10 @@ if('serviceWorker' in navigator){
         <div id="dailyOverview" class="card overview-card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 class="task-card-title" style="text-align:left;margin:0;">📊 今日完成总览</h3>
-            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openBatchModal()">+ 批量新增</button>
+                     <div style="display:flex;gap:8px;">
+              <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openBatchModal()">+ 批量新增</button>
+              <button class="btn btn-gray btn-sm add-daily-btn-only-parent" onclick="batchDeleteDailyTasks()">🗑 批量删除</button>
+            </div>
           </div>
           <div class="progress-ring-wrap">
             <svg class="progress-ring" width="140" height="140">
@@ -486,10 +499,13 @@ if('serviceWorker' in navigator){
       </div>
             <div class="category-content">
         <!-- 长期总览：只在"全部"时显示 -->
-                <div id="longOverview" class="card overview-card">
+                              <div id="longOverview" class="card overview-card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 class="task-card-title" style="text-align:left;margin:0;">📊 今日完成总览</h3>
-            <button id="addLongBtn" class="btn btn-red btn-sm" onclick="openModal('longModal')">+ 新增</button>
+                       <div style="display:flex;gap:8px;">
+              <button id="addLongBtn" class="btn btn-red btn-sm" onclick="openModal('longModal')">+ 新增</button>
+              <button id="batchDelLongBtn" class="btn btn-gray btn-sm" onclick="batchDeleteLongTasks()">🗑 批量删除</button>
+            </div>     
           </div>
           <div class="progress-ring-wrap">
             <svg class="progress-ring" width="140" height="140">
@@ -500,27 +516,18 @@ if('serviceWorker' in navigator){
             <div class="progress-ring-sub">总完成度</div>
           </div>
           <div class="bar-item">
-            <div class="bar-top"><span>📝 待审核孩子日常</span><span id="barTextChildDaily">0/0</span></div>
-            <div class="bar-track"><div class="bar-fill chinese" id="barChildDaily" style="width:0%"></div></div>
+            <div class="bar-top"><span id="barLabel1">📝 待审核孩子日常</span><span id="barTextA">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill chinese" id="barA" style="width:0%"></div></div>
           </div>
           <div class="bar-item">
-            <div class="bar-top"><span>⏳ 待审核孩子长期</span><span id="barTextChildLong">0/0</span></div>
-            <div class="bar-track"><div class="bar-fill child" id="barChildLong" style="width:0%"></div></div>
-          </div>
-                   <div style="margin-top:18px;padding-top:12px;border-top:1px dashed #eee;font-size:13px;color:#999;text-align:left;">👨‍👩‍👧 我的任务</div>
-          <div class="bar-item">
-            <div class="bar-top"><span>🌱 成长</span><span id="barTextMyGrow">0/0</span></div>
-            <div class="bar-track"><div class="bar-fill parent" id="barMyGrow" style="width:0%"></div></div>
+            <div class="bar-top"><span id="barLabel2">⏳ 待审核孩子长期</span><span id="barTextB">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill child" id="barB" style="width:0%"></div></div>
           </div>
           <div class="bar-item">
-            <div class="bar-top"><span>🧹 家务</span><span id="barTextMyChore">0/0</span></div>
-            <div class="bar-track"><div class="bar-fill parent" id="barMyChore" style="width:0%"></div></div>
+            <div class="bar-top"><span id="barLabel3">👨‍👩‍👧 我的未完成</span><span id="barTextC">0/0</span></div>
+            <div class="bar-track"><div class="bar-fill parent" id="barC" style="width:0%"></div></div>
           </div>
-          <div class="bar-item">
-            <div class="bar-top"><span>🏃 运动</span><span id="barTextMySport">0/0</span></div>
-            <div class="bar-track"><div class="bar-fill parent" id="barMySport" style="width:0%"></div></div>
-          </div> 
-        </div>                     
+        </div>                      
 
         <!-- 长期任务列表：只在具体分类时显示 -->
                 <!-- 家长页的长期任务列表（只展示家长任务） -->
@@ -985,7 +992,8 @@ let state = {
   daily: [], long: [], wish: [],
 
   lastAutoDeductDate: "" // 新增：记录上次执行夜间扣星的日期，防止同一天重复扣
-
+  ,
+  plantChild: null, stageChild: 1, waterChild: 0, sunChild: 0, fertChild: 0, plantDoneChild: false
 };
 const STAGE_NAMES = ["种子发芽","长出小苗","长叶片","抽枝长茎","含苞待放","开花啦","结果丰收"];
 const PLANT = {
@@ -1086,7 +1094,7 @@ async function doLogin(){
     //保存登录状态
     
 localStorage.setItem("garden_role", currentRole);
-    await loadStarLog();
+    
     renderAll();
   }else{
     alert('密码错误');
@@ -1096,20 +1104,34 @@ async function loadAllData(){
   if(!supabase) return;
   let stateLoadedOK = false;
   try{
-    const {data:stateData} = await supabase.from('app_state').select('*').eq('id',1).single();
+    // 4张表并行查，速度提升3-4倍
+    const [stateRes, dailyRes, longRes, wishRes] = await Promise.all([
+      supabase.from('app_state').select('*').eq('id',1).single(),
+      supabase.from('daily_tasks').select('*'),
+      supabase.from('long_tasks').select('*'),
+      supabase.from('wishes').select('*')
+    ]);
+
+    const stateData = stateRes.data;
     if(stateData){
       state = {...state, ...stateData};
       if(stateData.lastautodeductdate !== undefined){
         state.lastAutoDeductDate = stateData.lastautodeductdate || "";
       }
+      if(stateData.plant_child){
+        const pc = stateData.plant_child;
+        state.plantChild = pc.plant || null;
+        state.stageChild = pc.stage || 1;
+        state.waterChild = pc.water || 0;
+        state.sunChild = pc.sun || 0;
+        state.fertChild = pc.fert || 0;
+        state.plantDoneChild = pc.plantDone || false;
+      }
       stateLoadedOK = true;
     }
-    const {data:daily} = await supabase.from('daily_tasks').select('*');
-    state.daily = daily || [];
-    const {data:long} = await supabase.from('long_tasks').select('*');
-    state.long = long || [];
-    const {data:wishes} = await supabase.from('wishes').select('*');
-    state.wish = wishes || [];
+    state.daily = dailyRes.data || [];
+    state.long = longRes.data || [];
+    state.wish = wishRes.data || [];
   }catch(e){
     console.warn("加载基础数据异常",e);
   }
@@ -1117,11 +1139,24 @@ async function loadAllData(){
     console.warn('app_state 读取失败，跳过扣星和清理');
     return;
   }
-  // 只有家长端执行夜间扣星，避免并发
+
+  // 关键优化：扣星和清理放后台执行，不阻塞页面渲染
   if(currentRole === 'parent'){
-    await autoDeductStarTask();
+    (async () => {
+      try {
+        await autoDeductStarTask();
+        await cleanApprovedTasks();
+        renderAll();
+      } catch(e) { console.warn(e); }
+    })();
+  } else {
+    (async () => {
+      try {
+        await cleanApprovedTasks();
+        renderAll();
+      } catch(e) { console.warn(e); }
+    })();
   }
-  await cleanApprovedTasks();
 }
 
 
@@ -1133,6 +1168,16 @@ async function saveState(){
       id:1, star:state.star, parent_star:state.parent_star,
       water:state.water, sun:state.sun, fert:state.fert,
       plant:state.plant, stage:state.stage, plant_done:state.plantDone,
+            plant_child: {
+        plant: state.plantChild,
+        stage: state.stageChild,
+        water: state.waterChild,
+        sun: state.sunChild,
+        fert: state.fertChild,
+        plantDone: state.plantDoneChild
+      },
+
+
       lastautodeductdate: state.lastAutoDeductDate || ""
     });
   }catch(e){
@@ -1150,7 +1195,7 @@ async function addStarLogItem(roleType, changeNum, reason){
       reason:reason,
       current_star:curStar
     }]);
-    await loadStarLog();
+    window.starLogDirty = true;
   }catch(e){
     console.warn("写入星星日志失败，可能表未创建",e);
   }
@@ -1233,7 +1278,10 @@ function switchTab(name,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
   ['garden','task','long','shop','mine'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden', t!==name));
-  if(name==="mine") loadStarLog();
+  if(name==="mine"){
+    // 只在切到"我的"页面时才加载星星日志
+    loadStarLog();
+  }
 }
 
 // 切换日常任务的科目分类
@@ -1350,63 +1398,59 @@ function renderDailyOverview(){
   }
   if(ringText) ringText.innerText = totalPct + '%';
 
-  // ========== 家长页总览（三类） ==========
-    // 孩子日常：已提交的（待审+已审核）里，已审核的比例
-  const childDailySubmitted = state.daily.filter(t =>
-    t.status === 'approved' || t.status === 'pending_review'
-  );
-  const childDailyTotal = childDailySubmitted.length;
-  const childDailyDone = state.daily.filter(t => t.status === 'approved').length;
-
-  // 孩子长期：已提交的（待确认+已完成）里，今天已完成的比例
-  const childLongSubmitted = state.long.filter(t =>
-    t.owner_type === 'child' &&
-    (t.submit_status === 'submitted' || t.last_date === today)
-  );
-  const childLongTotal = childLongSubmitted.length;
-  const childLongDone = state.long.filter(t =>
-    t.owner_type === 'child' && t.last_date === today
+    // ========== 家长页总览（根据当前角色动态渲染） ==========
+  const parentLongList = state.long.filter(t => t.owner_type === 'parent');
+  const parentSubmittedCount = parentLongList.filter(t => t.submit_status === 'submitted').length;
+  const parentDoneCount = parentLongList.filter(t => t.last_date === today).length;
+  const parentUnfinishCount = parentLongList.filter(t =>
+    t.submit_status !== 'submitted' && t.last_date !== today
+  ).length;
+  const childDailyPending = state.daily.filter(t => t.status === 'pending_review').length;
+  const childLongPending = state.long.filter(t =>
+    t.owner_type === 'child' && t.submit_status === 'submitted'
   ).length;
 
-  // 家长任务：按分类拆分
-  const parentLongList = state.long.filter(t => t.owner_type === 'parent');
-  const myStats = { '成长':{done:0,total:0}, '家务':{done:0,total:0}, '运动':{done:0,total:0} };
-  parentLongList.forEach(t => {
-    const cat = t.category || '成长';
-    if(!myStats[cat]) return;
-    myStats[cat].total++;
-    if(t.last_date === today) myStats[cat].done++;
-  });
+  let bars = [];  // { label, done, total, fillCls }
 
-  const pairs = [
-    {key:'ChildDaily', done: childDailyDone, total: childDailyTotal},
-    {key:'ChildLong', done: childLongDone, total: childLongTotal}
-  ];
-  pairs.forEach(({key, done, total}) => {
-    const pct = calcPercent(done, total);
+  if(currentRole === 'parent'){
+    // 家长端视角：孩子日常待审 / 孩子长期待审 / 家长自己未完成
+    bars = [
+      { label: '📝 待审核孩子日常', done: childDailyPending, total: state.daily.length, fillCls: 'chinese' },
+      { label: '⏳ 待审核孩子长期', done: childLongPending, total: state.long.filter(t => t.owner_type === 'child').length, fillCls: 'child' },
+      { label: '👨‍👩‍👧 我的未完成', done: parentUnfinishCount, total: parentLongList.length, fillCls: 'parent' }
+    ];
+   } else {
+    // 孩子端视角：家长已审核 / 家长已完成 / 家长已提交待审核
+    const childLongList = state.long.filter(t => t.owner_type === 'child');
+    // 1. 家长已审核 = 今天家长已确认的孩子长期任务数
+    const parentApprovedToday = childLongList.filter(t => t.last_date === today).length;
+    // 2. 家长已完成 = 家长自己今天已完成的长期任务数
+    const parentSelfDoneToday = parentLongList.filter(t => t.last_date === today).length;
+    // 3. 家长已提交待审核 = parentSubmittedCount（前面已算过）
+
+    bars = [
+      { label: '✅ 家长已审核', done: parentApprovedToday, total: childLongList.length, fillCls: 'chinese' },
+      { label: '👨‍👩‍👧 家长已完成', done: parentSelfDoneToday, total: parentLongList.length, fillCls: 'parent' },
+      { label: '⏳ 家长已提交待审核', done: parentSubmittedCount, total: parentLongList.length, fillCls: 'child' }
+    ];
+  }
+
+  // 动态更新标签和进度条
+  ['A','B','C'].forEach((key, i) => {
+    const b = bars[i];
+    const pct = calcPercent(b.done, b.total);
+    const label = document.getElementById('barLabel' + (i + 1));
+    const text = document.getElementById('barText' + key);
     const bar = document.getElementById('bar' + key);
-    const txt = document.getElementById('barText' + key);
-    if(bar) bar.style.width = pct + '%';
-    if(txt) txt.innerText = `${done}/${total}`;
+    if(label) label.innerText = b.label;
+    if(text) text.innerText = `${b.done}/${b.total}`;
+    if(bar){ bar.style.width = pct + '%'; }
   });
 
-  const myCatMap = {'成长':'MyGrow', '家务':'MyChore', '运动':'MySport'};
-  Object.keys(myCatMap).forEach(cat => {
-    const s = myStats[cat];
-    const pct = calcPercent(s.done, s.total);
-    const bar = document.getElementById('bar' + myCatMap[cat]);
-    const txt = document.getElementById('barText' + myCatMap[cat]);
-    if(bar) bar.style.width = pct + '%';
-    if(txt) txt.innerText = `${s.done}/${s.total}`;
-  });
-
-  const parentLongTotal = parentLongList.length;
-  const parentLongDone = parentLongList.filter(t => t.last_date === today).length;
-
-  const pTotal = childDailyTotal + childLongTotal + parentLongTotal;
-  const pDone = childDailyDone + childLongDone + parentLongDone;
-
-  const pPct = calcPercent(pDone, pTotal);
+  
+  const totalForRing = bars[0].total + bars[1].total + bars[2].total;
+  const doneForRing = bars[0].done + bars[1].done + bars[2].done;
+  const pPct = calcPercent(doneForRing, totalForRing);
   const circleParent = document.getElementById('ringCircleParent');
   const ringTextParent = document.getElementById('ringTextParent');
   if(circleParent){
@@ -1417,6 +1461,7 @@ function renderDailyOverview(){
   }
   if(ringTextParent) ringTextParent.innerText = pPct + '%';
 }
+  
 
 // 渲染长期任务总览
 function renderLongOverview(){
@@ -1462,7 +1507,9 @@ function renderLongOverview(){
 
 // 刷新左侧分类的红点提示
 function updateCategoryDots(){
-  // 日常任务：每个科目是否有未完成或待审核的任务
+  const today = new Date().toDateString();
+
+  // ===== 日常任务：每个科目是否有未完成或待审核的任务 =====
   const dailyBySubj = {chinese:false, math:false, english:false};
   state.daily.forEach(t=>{
     if(!t.subject) return;
@@ -1475,21 +1522,37 @@ function updateCategoryDots(){
     if(dot) dot.classList.toggle('hidden', !dailyBySubj[subj]);
   });
 
-  // 长期任务：每个类别是否有未完成的任务（今天未完成）
-  const today = new Date().toDateString();
-  const longByCat = {'成长':false, '家务':false, '运动':false};
+  // ===== 任务页（孩子端）长期任务：按类别显示红点 =====
+  const childLongByCat = {'成长':false, '家务':false, '运动':false};
   state.long.forEach(t=>{
+    if(t.owner_type !== 'child') return;
     const cat = t.category || '成长';
     if(t.submit_status !== 'submitted' && t.last_date !== today){
-      if(longByCat[cat] !== undefined) longByCat[cat] = true;
+      if(childLongByCat[cat] !== undefined) childLongByCat[cat] = true;
     }
   });
-  const map = {'成长':'dot-long-grow','家务':'dot-long-chore','运动':'dot-long-sport'};
-  Object.keys(map).forEach(cat=>{
-    const dot = document.getElementById(map[cat]);
-    if(dot) dot.classList.toggle('hidden', !longByCat[cat]);
+  const childMap = {'成长':'dot-grow', '家务':'dot-chore', '运动':'dot-sport'};
+  Object.keys(childMap).forEach(cat=>{
+    const dot = document.getElementById(childMap[cat]);
+    if(dot) dot.classList.toggle('hidden', !childLongByCat[cat]);
+  });
+
+  // ===== 家长页（家长端）长期任务：按类别显示红点 =====
+  const parentLongByCat = {'成长':false, '家务':false, '运动':false};
+  state.long.forEach(t=>{
+    if(t.owner_type !== 'parent') return;
+    const cat = t.category || '成长';
+    if(t.submit_status !== 'submitted' && t.last_date !== today){
+      if(parentLongByCat[cat] !== undefined) parentLongByCat[cat] = true;
+    }
+  });
+  const parentMap = {'成长':'dot-long-grow', '家务':'dot-long-chore', '运动':'dot-long-sport'};
+  Object.keys(parentMap).forEach(cat=>{
+    const dot = document.getElementById(parentMap[cat]);
+    if(dot) dot.classList.toggle('hidden', !parentLongByCat[cat]);
   });
 }
+
 
 // 手机端：点击任务打开详情弹窗
 function openTaskDetail(type, idx){
@@ -1642,94 +1705,200 @@ function openPlantPreview(plantId){
     card.innerHTML = `<div class="stage-preview-img">${emoji}</div><div class="stage-preview-text">第${i+1}阶段<br>${STAGE_NAMES[i]}</div>`;
     grid.appendChild(card);
   });
-  document.getElementById('confirmPlantBtn').onclick = function(){
+  
+    document.getElementById('confirmPlantBtn').onclick = function(){
     closeModal('plantPreviewModal');
-    state.plant = plantId; state.stage=1; state.water=0; state.sun=0; state.fert=0; state.plantDone=false;
+    if(currentRole === 'parent'){
+      state.plant = plantId; state.stage=1; state.water=0; state.sun=0; state.fert=0; state.plantDone=false;
+    } else {
+      state.plantChild = plantId; state.stageChild=1; state.waterChild=0; state.sunChild=0; state.fertChild=0; state.plantDoneChild=false;
+    }
     saveState(); renderAll();
   };
+  
   openModal('plantPreviewModal');
 }
+
+// 种植：提交培育物资
 function feedPlant(){
-  if(state.water<1||state.sun<1||state.fert<1){alert('物资不足！需要水、阳光、肥料各1份');return;}
-  if(state.plantDone){alert('本周植物已经培育完成');return;}
-  state.water--;state.sun--;state.fert--;state.stage++;
-  if(state.stage>=7){state.stage=7;state.plantDone=true;alert('🎉恭喜！植物培育完成');}
+  if(currentRole === 'parent'){
+    if(state.water<1||state.sun<1||state.fert<1){alert('物资不足！需要水、阳光、肥料各1份');return;}
+    if(state.plantDone){alert('本周植物已经培育完成');return;}
+    state.water--;state.sun--;state.fert--;state.stage++;
+    if(state.stage>=7){state.stage=7;state.plantDone=true;alert('🎉恭喜！植物培育完成');}
+  } else {
+    if(state.waterChild<1||state.sunChild<1||state.fertChild<1){alert('物资不足！需要水、阳光、肥料各1份');return;}
+    if(state.plantDoneChild){alert('本周植物已经培育完成');return;}
+    state.waterChild--;state.sunChild--;state.fertChild--;state.stageChild++;
+    if(state.stageChild>=7){state.stageChild=7;state.plantDoneChild=true;alert('🎉恭喜！植物培育完成');}
+  }
   saveState();renderAll();
 }
-async function resetWeek(){
 
+// 家长端：批量删除所有日常任务（需要输入"删除"二次确认）
+async function batchDeleteDailyTasks(){
+  if(currentRole !== 'parent'){ alert('只有家长能批量删除'); return; }
+  
+  const input = prompt(
+    '⚠️ 确认批量删除所有日常任务？\n\n' +
+    '执行后将清空全部日常任务（进行中、待审核、已审核的都会被删除）。\n\n' +
+    '此操作不可撤销！\n\n' +
+    '👉 请输入"删除"两个字确认：'
+  );
+  if(input !== '删除'){ 
+    if(input !== null) alert('取消删除（输入不匹配）');
+    return; 
+  }
+  
+  try{
+    const { data: allTasks, error: selectErr } = await supabase.from('daily_tasks').select('id');
+    if(selectErr) throw selectErr;
+    
+    if(!allTasks || allTasks.length === 0){
+      alert('没有日常任务需要删除');
+      return;
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    for(let i = 0; i < allTasks.length; i += 50){
+      const batch = allTasks.slice(i, i + 50).map(t => t.id);
+      const { error: delErr } = await supabase.from('daily_tasks').delete().in('id', batch);
+      if(delErr){
+        console.error('删除失败：', delErr);
+        failCount += batch.length;
+      } else {
+        successCount += batch.length;
+      }
+    }
+    
+    if(failCount === 0){
+      alert(`✅ 成功删除 ${successCount} 条日常任务`);
+    } else {
+      alert(`⚠️ 删除完成，成功 ${successCount} 条，失败 ${failCount} 条。\n\n请检查 Supabase 权限：daily_tasks 表是否允许 DELETE。`);
+    }
+    
+    await loadAllData();
+    renderAll();
+  }catch(e){
+    alert('❌ 批量删除失败：' + e.message);
+  }
+}
+
+// 家长端：批量删除所有长期任务（需要输入"删除"二次确认）
+async function batchDeleteLongTasks(){
+  if(currentRole !== 'parent'){ alert('只有家长能批量删除'); return; }
+  
+  const input = prompt(
+    '⚠️ 确认批量删除所有长期任务？\n\n' +
+    '执行后将清空全部长期任务（孩子任务 + 家长任务）。\n\n' +
+    '此操作不可撤销！\n\n' +
+    '👉 请输入"删除"两个字确认：'
+  );
+  if(input !== '删除'){ 
+    if(input !== null) alert('取消删除（输入不匹配）');
+    return; 
+  }
+  
+  try{
+    // 1. 先查出所有长期任务的 id
+    const { data: allTasks, error: selectErr } = await supabase.from('long_tasks').select('id');
+    if(selectErr) throw selectErr;
+    
+    if(!allTasks || allTasks.length === 0){
+      alert('没有长期任务需要删除');
+      return;
+    }
+    
+    // 2. 一批一批删（每批 50 条，避开 RLS 单次限制）
+    let successCount = 0;
+    let failCount = 0;
+    for(let i = 0; i < allTasks.length; i += 50){
+      const batch = allTasks.slice(i, i + 50).map(t => t.id);
+      const { error: delErr } = await supabase.from('long_tasks').delete().in('id', batch);
+      if(delErr){
+        console.error('删除失败：', delErr);
+        failCount += batch.length;
+      } else {
+        successCount += batch.length;
+      }
+    }
+    
+    if(failCount === 0){
+      alert(`✅ 成功删除 ${successCount} 条长期任务`);
+    } else {
+      alert(`⚠️ 删除完成，成功 ${successCount} 条，失败 ${failCount} 条。\n\n请检查 Supabase 权限：long_tasks 表是否允许 DELETE。`);
+    }
+    
+    await loadAllData();
+    renderAll();
+  }catch(e){
+    alert('❌ 批量删除失败：' + e.message);
+  }
+}
+
+async function resetWeek(){
   if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n4. 删除云端所有星星日志记录\n\n此操作不可撤销！'))return;
 
+  // 1. 先重置本地数据（瞬时完成，用户感知不到）
   state.plant = null;
-
   state.stage = 1;
-
   state.water = 0;
-
   state.sun = 0;
-
   state.fert = 0;
-
   state.plantDone = false;
-
+  state.plantChild = null;
+  state.stageChild = 1;
+  state.waterChild = 0;
+  state.sunChild = 0;
+  state.fertChild = 0;
+  state.plantDoneChild = false;
   state.star = 0;
-
   state.parent_star = 0;
 
-  // 清理存储桶全部作业图片
-
-  try{
-
-    const {data:fileList, error:listErr} = await supabase.storage.from('task-proof').list();
-
-    if(!listErr && fileList && fileList.length > 0){
-
-      const filePaths = fileList.map(item => item.name);
-
-      await supabase.storage.from('task-proof').remove(filePaths);
-
-    }
-
-  }catch(err){
-
-    console.warn('清理图片出错', err);
-
-  }
-
-  // =========修复：先读取所有日志ID，循环逐条删除（绕过RLS批量删除限制）==========
-
-  try{
-
-    // 先查出全部星星日志
-
-    const {data:allLogs} = await supabase.from('star_logs').select('id');
-
-    if(allLogs && allLogs.length>0){
-
-      for(let logItem of allLogs){
-
-        await supabase.from('star_logs').delete().eq('id', logItem.id);
-
+  // 2. 三件事并行执行（关键优化，速度提升3倍）
+  await Promise.all([
+    // 清空存储桶图片
+    (async () => {
+      try{
+        const {data:fileList} = await supabase.storage.from('task-proof').list();
+        if(fileList && fileList.length > 0){
+          const filePaths = fileList.map(item => item.name);
+          await supabase.storage.from('task-proof').remove(filePaths);
+        }
+      }catch(err){
+        console.warn('清理图片出错', err);
       }
+    })(),
 
-    }
+        // 清空星星日志（先查 id，再一次性 in 删除，避开 RLS 全删限制）
+    (async () => {
+      try{
+        const {data:allLogs} = await supabase.from('star_logs').select('id');
+        if(allLogs && allLogs.length > 0){
+          const ids = allLogs.map(l => l.id);
+          // 分批删除，每批 100 条
+          for(let i = 0; i < ids.length; i += 100){
+            const batch = ids.slice(i, i + 100);
+            await supabase.from('star_logs').delete().in('id', batch);
+          }
+        }
+      }catch(e){
+        console.warn("清空星星日志异常",e);
+      }
+    })(),
 
-  }catch(e){
+    // 保存状态（清空植物、星星）
+    saveState()
+  ]);
 
-    console.warn("清空星星日志异常",e);
-
-  }
-
-  await saveState();
-
-  await loadAllData();
-
-  await loadStarLog();
-
-  renderAll();
-
+  // 3. 立刻提示用户
   alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片、全部星星日志已删除。\n可以重新选择植物。');
 
+  // 4. 后台刷新数据
+  await loadAllData();
+ 
+  renderAll();
 }
 
 
@@ -1740,12 +1909,22 @@ async function buyRes(type){
   if(type==='water') resName="水";
   if(type==='sun') resName="阳光";
   if(type==='fert') resName="肥料";
-  if(currentRole === 'parent') state.parent_star -=6;
-  else state.star -=6;
-  if(type==='water')state.water++;
-  if(type==='sun')state.sun++;
-  if(type==='fert')state.fert++;
-  await addStarLogItem(currentRole,-6,`商城兑换${resName}`);
+  
+  if(currentRole === 'parent'){
+    // 家长用自己的星星，买自己的物资
+    state.parent_star -= 6;
+    if(type==='water') state.water++;
+    if(type==='sun') state.sun++;
+    if(type==='fert') state.fert++;
+  } else {
+    // 孩子用自己的星星，买自己的物资
+    state.star -= 6;
+    if(type==='water') state.waterChild++;
+    if(type==='sun') state.sunChild++;
+    if(type==='fert') state.fertChild++;
+  }
+  
+  await addStarLogItem(currentRole, -6, `商城兑换${resName}`);
   await saveState();
   renderAll();
   alert('兑换成功！');
@@ -3049,16 +3228,6 @@ async function handleDelete(type, idx) {
 }
 
 
-async function saveWish(){
-  const content = document.getElementById('wishContent').value.trim();
-  if(!content) return alert('请输入心愿内容');
-  await supabase.from('wishes').insert([{content}]);
-  closeModal('wishModal');
-  document.getElementById('wishContent').value = '';
-  await loadAllData();
-  renderAll();
-}
-
 
 
 // 夜间扣星逻辑：支持跨天补扣，区分日常和长期
@@ -3296,33 +3465,68 @@ async function renderAll(){
   document.getElementById('label3').innerText = text3;
   
 
-
-  // 植物渲染
+  // ========== 植物渲染（各自独立：我的 + 对方的） ==========
   const plantSel = document.getElementById("plantSelect");
   const plantGrow = document.getElementById("plantGrow");
-  if(!state.plant){
+  const plantOtherCard = document.getElementById("plantOtherCard");
+
+  // 自己的植物数据（物资独立）
+  const myPlant   = currentRole === 'parent' ? state.plant       : state.plantChild;
+  const myStage   = currentRole === 'parent' ? state.stage       : state.stageChild;
+  const myDone    = currentRole === 'parent' ? state.plantDone   : state.plantDoneChild;
+  const myWater   = currentRole === 'parent' ? state.water       : state.waterChild;
+  const mySun     = currentRole === 'parent' ? state.sun         : state.sunChild;
+  const myFert    = currentRole === 'parent' ? state.fert        : state.fertChild;
+
+  // 对方的植物数据
+  const otherPlant = currentRole === 'parent' ? state.plantChild : state.plant;
+  const otherStage = currentRole === 'parent' ? state.stageChild : state.stage;
+  const otherDone  = currentRole === 'parent' ? state.plantDoneChild : state.plantDone;
+
+  if(!myPlant){
     plantSel.classList.remove("hidden");
     plantGrow.classList.add("hidden");
   }else{
     plantSel.classList.add("hidden");
     plantGrow.classList.remove("hidden");
-    const p = PLANT[state.plant];
-    document.getElementById("plantIcon").innerText = p.stages[state.stage-1];
+    const p = PLANT[myPlant];
+    document.getElementById("plantIcon").innerText = p.stages[myStage-1];
     document.getElementById("plantNameText").innerText = p.name;
-    document.getElementById("curStage").innerText = state.stage;
-    document.getElementById("stageName").innerText = STAGE_NAMES[state.stage-1];
-    // 阶段圆点
+    document.getElementById("curStage").innerText = myStage;
+    document.getElementById("stageName").innerText = STAGE_NAMES[myStage-1];
     let dotHtml = "";
     for(let i=1;i<=7;i++){
-      dotHtml += `<div class="stage-dot ${i <= state.stage ? 'done' : ''}"></div>`;
+      dotHtml += `<div class="stage-dot ${i <= myStage ? 'done' : ''}"></div>`;
     }
     document.getElementById("stageDots").innerHTML = dotHtml;
-    document.getElementById("resWater").innerText = state.water;
-    document.getElementById("resSun").innerText = state.sun;
-    document.getElementById("resFert").innerText = state.fert;
-    document.getElementById("doneTip").classList.toggle("hidden", !state.plantDone);
+    document.getElementById("resWater").innerText = myWater;
+    document.getElementById("resSun").innerText = mySun;
+    document.getElementById("resFert").innerText = myFert;
+    document.getElementById("doneTip").classList.toggle("hidden", !myDone);
+
+    // 渲染对方植物卡片
+        if(plantOtherCard){
+      if(otherPlant){
+        plantOtherCard.classList.remove("hidden");
+        const titleEl = document.getElementById("otherPlantTitle");
+        if(titleEl){
+          const otherName = PLANT[otherPlant].name;
+          titleEl.innerText = (currentRole === 'parent' ? '🧒 孩子：' : '👨‍👩‍👧 家长：') + otherName;
+        }
+        const stageEl = document.getElementById("curStageOther");
+        if(stageEl) stageEl.innerText = otherStage;
+        let dotHtmlOther = "";
+        for(let i=1;i<=7;i++){
+          dotHtmlOther += `<div class="stage-dot ${i <= otherStage ? 'done' : ''}"></div>`;
+        }
+        document.getElementById("stageDotsOther").innerHTML = dotHtmlOther;
+      }else{
+        plantOtherCard.classList.add("hidden");
+    
+      }
+    }
   }
-  
+ 
  // 日常任务渲染
     // ====== 计算当前任务进度条 ======
   const targetTasks = state.daily.filter(t => currentSubjectTab === 'all' || t.subject === currentSubjectTab);
