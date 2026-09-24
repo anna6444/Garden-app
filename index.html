@@ -67,9 +67,10 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
 .stage-dot.done{background:#34d399;}
 .res-row{display:flex;justify-content:space-around;margin:12px 0;font-size:16px;}
 .res-item{text-align:center;}
-.modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:none;align-items:flex-end;justify-content:center;}
+.modal-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:none;align-items:center;justify-content:center;padding:20px;padding-top:80px;
+padding-bottom:20px;}
 .modal-mask.show{display:flex;}
-.modal-box{background:#fff;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;}
+.modal-box{background:#fff;border-radius:24px;padding:20px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;}
 .preview-title{font-size:22px;font-weight:bold;text-align:center;margin-bottom:8px;color:#333;}
 .preview-subtitle{font-size:14px;color:#999;text-align:center;margin-bottom:20px;}
 .stage-preview-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:20px;}
@@ -194,11 +195,14 @@ input,select,textarea{width:100%;padding:14px;border:1px solid #ddd;border-radiu
   }
   
     /* 移除强制显示，交给 JavaScript 控制显示/隐藏 */
-  #dailyOverview, #longOverview,
-  #dailyTaskListCard, #longTaskListCard {
+   #dailyOverview, #longOverview,
+  #dailyTaskListCard, #longTaskListCard,
+  #taskLongListCard {
     margin: 0;
+    grid-column: 1 / -1;
   }
-  
+
+
   /* 4. 任务行在宽屏下改为【左右排列】，文字在左，按钮在右 */
   .task-row {
     flex-direction: row !important;
@@ -400,6 +404,8 @@ if('serviceWorker' in navigator){
             <h3 class="task-card-title" id="taskPageTitle">📅 日常任务</h3>
             <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openSingleTaskModal()">+ 新增</button>
           </div>
+                    <!-- 任务进度条容器 -->
+          <div id="dailyProgressBar" style="margin-bottom:16px;"></div>
           <div><span class="group-title">待开始 / 进行中任务</span></div>
           <div id="dailyActiveList"></div>
           <div><span class="group-title">待家长审核</span></div>
@@ -407,14 +413,16 @@ if('serviceWorker' in navigator){
           <div><span class="group-title">✅ 今日已审核通过</span></div>
           <div id="dailyApprovedList"></div>
         </div>
-
         <!-- 新增：任务页的长期任务列表（只展示孩子任务） -->
         <div id="taskLongListCard" class="card" style="display:none;">
-          <div style="margin-bottom:12px;">
-            <h3 class="task-card-title" id="taskLongTitle">⏳ 长期任务</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 class="task-card-title" id="taskLongTitle" style="margin:0;">⏳ 长期任务</h3>
+            <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openLongTaskModalFor('child', (currentSubjectTab === '成长' || currentSubjectTab === '家务' || currentSubjectTab === '运动') ? currentSubjectTab : null)">+ 新增</button>
           </div>
+          <div id="longProgressBar" style="margin-bottom:16px;"></div>
           <div><span class="group-title">待开始 / 未完成</span></div>
           <div id="taskLongUnfinishedList"></div>
+        
           <div><span class="group-title">⏳ 待审核</span></div>
           <div id="taskLongPendingList"></div>
           <div><span class="group-title">✅ 今日已完成</span></div>
@@ -466,17 +474,19 @@ if('serviceWorker' in navigator){
         </div>
 
         <!-- 长期任务列表：只在具体分类时显示 -->
+                <!-- 家长页的长期任务列表（只展示家长任务） -->
         <div id="longTaskListCard" class="card" style="display:none;">
-                    <div style="margin-bottom:12px;">
-            <h3 class="task-card-title">⏳ 长期任务</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 class="task-card-title" style="margin:0;">⏳ 家长任务</h3>
+             <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openLongTaskModalFor('parent', currentLongTab === 'all' ? null : currentLongTab)">+ 新增</button>
           </div>
-          <div><span class="group-title">待开始 / 未完成长期任务</span></div>
-<div id="longUnfinishedList"></div>
-<div><span class="group-title">⏳ 待审核长期任务</span></div>
-<div id="longPendingList"></div>
-<div><span class="group-title">✅ 今日已完成 / 已审核</span></div>
-<div id="longApprovedList"></div>
-        </div>
+          <div><span class="group-title">待开始 / 未完成</span></div>
+          <div id="longUnfinishedList"></div>
+          <div><span class="group-title">⏳ 待审核</span></div>
+          <div id="longPendingList"></div>
+          <div><span class="group-title">✅ 今日已完成</span></div>
+          <div id="longApprovedList"></div>
+        </div>        
       </div>
     </div>
   </div>
@@ -897,6 +907,8 @@ let pendingProofImgUrl = ""; //缓存本次选中图片地址
 let currentSubjectTab = "all";   // 日常任务当前选中的科目
 let currentLongTab = "all";      // 长期任务当前选中的类别
 let approvingTasks = {};   // 防止确认按钮重复点击
+let pendingLongOwnerType = null; // 记录即将创建的任务归属
+let pendingLongCategory = null;
 
 
 let state = {
@@ -1367,6 +1379,25 @@ function openModal(id){
     const hint = document.getElementById('dictationHint');
     if(hint) hint.style.display = 'none';
   }
+      
+      if(id === 'longModal'){
+    // 从"总览"打开时（没有锁定的归属/类别），恢复所有下拉框
+    if(pendingLongOwnerType === null){
+      const ownerSel = document.getElementById('longOwnerType');
+      const ownerLabel = ownerSel.previousElementSibling;
+      if(ownerLabel && ownerLabel.classList.contains('label-text')) ownerLabel.style.display = 'block';
+      ownerSel.style.display = 'block';
+    }
+    if(pendingLongCategory === null){
+      const catSel = document.getElementById('longCategory');
+      const catLabel = catSel.previousElementSibling;
+      if(catLabel && catLabel.classList.contains('label-text')) catLabel.style.display = 'block';
+      catSel.style.display = 'block';
+    }
+  }
+    
+  
+
   if(id === 'batchModal'){
     selectedSubject = null;
     document.getElementById('batchTaskText').value = '';
@@ -2334,19 +2365,67 @@ async function deleteDailyTask(idx){
 
 
 async function saveLongTask(){
-  const title=document.getElementById('longTitle').value.trim();
-  const star=parseInt(document.getElementById('longStar').value)||1;
-  const ownerType = document.getElementById('longOwnerType').value;
-  const category = document.getElementById('longCategory').value;
-  if(!title)return alert('请输入任务名称');
+  const title = document.getElementById('longTitle').value.trim();
+  const star = parseInt(document.getElementById('longStar').value) || 1;
+  const ownerType = pendingLongOwnerType || document.getElementById('longOwnerType').value;
+  const category = pendingLongCategory || document.getElementById('longCategory').value;
+  if(!title) return alert('请输入任务名称');
   await supabase.from('long_tasks').insert([{
-    title, star, owner_type:ownerType, category:category,
+    title, star, owner_type: ownerType, category: category,
     last_date:'', submit_status:'normal'
   }]);
+  
+  // 恢复所有下拉框（下次从"总览"打开时能正常显示）
+  const ownerSel = document.getElementById('longOwnerType');
+  ownerSel.style.display = 'block';
+  const ownerLabel = ownerSel.previousElementSibling;
+  if(ownerLabel && ownerLabel.classList.contains('label-text')) ownerLabel.style.display = 'block';
+  
+  const catSel = document.getElementById('longCategory');
+  catSel.style.display = 'block';
+  const catLabel = catSel.previousElementSibling;
+  if(catLabel && catLabel.classList.contains('label-text')) catLabel.style.display = 'block';
+  
+  pendingLongOwnerType = null;
+  pendingLongCategory = null;
+  
   closeModal('longModal');
-  document.getElementById('longTitle').value='';
-  await loadAllData();renderAll();
+  document.getElementById('longTitle').value = '';
+  await loadAllData();
+  renderAll();
 }
+
+
+
+// 从具体分类入口打开新增长期任务弹窗
+function openLongTaskModalFor(ownerType, category){
+  pendingLongOwnerType = ownerType;
+  pendingLongCategory = category;
+  document.getElementById('longTitle').value = '';
+  document.getElementById('longStar').value = '1';
+  
+  // 归属下拉框：总是隐藏（因为入口已经锁定归属）
+  const ownerSel = document.getElementById('longOwnerType');
+  ownerSel.value = ownerType;
+  const ownerLabel = ownerSel.previousElementSibling;
+  if(ownerLabel && ownerLabel.classList.contains('label-text')) ownerLabel.style.display = 'none';
+  ownerSel.style.display = 'none';
+  
+  // 类别下拉框：如果入口锁定了类别就隐藏，否则显示让用户选
+  const catSel = document.getElementById('longCategory');
+  const catLabel = catSel.previousElementSibling;
+  if(category){
+    catSel.value = category;
+    if(catLabel && catLabel.classList.contains('label-text')) catLabel.style.display = 'none';
+    catSel.style.display = 'none';
+  } else {
+    if(catLabel && catLabel.classList.contains('label-text')) catLabel.style.display = 'block';
+    catSel.style.display = 'block';
+  }
+  
+  document.getElementById('longModal').classList.add('show');
+}
+
 
 // ================== 录音打卡功能 ==================
 let mediaRecorder = null;
@@ -2828,6 +2907,19 @@ async function handleDelete(type, idx) {
   renderAll();
 }
 
+
+async function saveWish(){
+  const content = document.getElementById('wishContent').value.trim();
+  if(!content) return alert('请输入心愿内容');
+  await supabase.from('wishes').insert([{content}]);
+  closeModal('wishModal');
+  document.getElementById('wishContent').value = '';
+  await loadAllData();
+  renderAll();
+}
+
+
+
 // 夜间扣星逻辑：支持跨天补扣，区分日常和长期
 async function autoDeductStarTask() {
   const now = new Date();
@@ -3102,6 +3194,59 @@ async function renderAll(){
   }
   
  // 日常任务渲染
+    // ====== 计算当前任务进度条 ======
+  const targetTasks = state.daily.filter(t => currentSubjectTab === 'all' || t.subject === currentSubjectTab);
+  const doneCount = targetTasks.filter(t => t.status === 'approved').length;
+  const totalCount = targetTasks.length;
+  const percent = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+  
+  const progressBarHtml = `
+    <div style="padding:14px;background:#f8f9fa;border-radius:12px;border:1px solid #e5e7eb;">
+      <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;">
+        <span style="font-weight:bold;color:#333;">📊 当前任务进度</span>
+        <span style="color:#34d399;font-weight:bold;">${percent}%</span>
+      </div>
+      <div style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;margin-bottom:6px;">
+        <div style="width:${percent}%;height:100%;background:#34d399;transition:width 0.4s;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:#888;">
+        <span>✅ 已完成：${doneCount}</span>
+        <span>⏳ 未完成：${totalCount - doneCount}</span>
+        <span>📋 总计：${totalCount}</span>
+      </div>
+    </div>
+  `;
+  document.getElementById("dailyProgressBar").innerHTML = progressBarHtml;
+  // ====== 计算长期任务进度条 ======
+  const targetLongTasks = state.long.filter(t => 
+    t.owner_type === 'child' && 
+    (currentSubjectTab === 'all' || t.category === currentSubjectTab)
+  );
+  const longDoneCount = targetLongTasks.filter(t => t.last_date === todayStr).length;
+  const longTotalCount = targetLongTasks.length;
+  const longPercent = longTotalCount === 0 ? 0 : Math.round((longDoneCount / longTotalCount) * 100);
+  
+  const longProgressBarEl = document.getElementById("longProgressBar");
+  if(longProgressBarEl) {
+    longProgressBarEl.innerHTML = `
+      <div style="padding:14px;background:#f8f9fa;border-radius:12px;border:1px solid #e5e7eb;">
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;">
+          <span style="font-weight:bold;color:#333;">📊 长期任务进度</span>
+          <span style="color:#34d399;font-weight:bold;">${longPercent}%</span>
+        </div>
+        <div style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;margin-bottom:6px;">
+          <div style="width:${longPercent}%;height:100%;background:#34d399;transition:width 0.4s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:#888;">
+          <span>✅ 已完成：${longDoneCount}</span>
+          <span>⏳ 未完成：${longTotalCount - longDoneCount}</span>
+          <span>📋 总计：${longTotalCount}</span>
+        </div>
+      </div>
+    `;
+  }
+
+
   let dailyActiveHtml = "";
   let dailyPendingHtml = "";
   let dailyApprovedHtml = "";
@@ -3243,28 +3388,48 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
       taskStatus = 'approved';
     }
 
-    let actionButtons = "";
+        // ====== 判断“这是不是我自己的任务” ======
+    // 孩子的任务 → 孩子端自己的；家长的任务 → 家长端自己的
+    const isMyTask = (
+      (task.owner_type === 'child' && currentRole === 'child') ||
+      (task.owner_type === 'parent' && currentRole === 'parent')
+    );
+    // 这是不是“对方的任务”
+    const isOpponentTask = !isMyTask;
+
     const btnDisabled = (taskStatus === 'pending' || taskStatus === 'approved' || isAfter2130());
 
-    if (taskStatus === 'unfinished') {
+    let actionButtons = "";
+
+    // ====== 1. 未完成状态：只有自己的任务才能提交打卡 ======
+    if (taskStatus === 'unfinished' && isMyTask) {
       actionButtons += `<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${btnDisabled ? 'disabled' : ''}>提交打卡</button>`;
+      // 录音打卡：仅限“孩子 + 成长”类任务
       if (task.owner_type === 'child' && (task.category || '成长') === '成长') {
         actionButtons += `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${btnDisabled ? 'disabled' : ''}>🎤 录音打卡</button>`;
       }
     }
 
+    // ====== 2. 未完成 + 对方的任务：什么都不显示 ======
+    // （家长不需要替孩子打卡，孩子也不需要替家长打卡）
+
+    // ====== 3. 待审核状态 ======
     if (taskStatus === 'pending') {
-      if ((task.owner_type === 'child' && currentRole === 'parent') || (task.owner_type === 'parent' && currentRole === 'child')) {
+      if (isOpponentTask) {
+        // 对方的任务已提交 → 显示“确认完成”
         actionButtons += `<button class="task-btn task-btn-approve" onclick="this.disabled=true; approveLongTask(${idx})">确认完成</button>`;
       } else {
+        // 自己提交的任务 → 显示“等待对方确认”
         actionButtons += `<span class="badge-pending" style="padding:8px 12px;font-size:14px;">等待对方确认</span>`;
       }
     }
 
+    // ====== 4. 已完成状态 ======
     if (taskStatus === 'approved') {
       actionButtons += `<span class="badge-submit" style="padding:8px 12px;font-size:14px;">今日已完成</span>`;
     }
 
+    // ====== 5. 删除按钮：只有家长能删 ======
     if (currentRole === 'parent') {
       actionButtons += `<button class="task-btn btn-del" onclick="deleteLongTask(${idx})">删除</button>`;
     }
@@ -3274,7 +3439,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
     <div class="task-row">
       <div class="task-info">
         <div class="task-icon">⏳</div>
-        <div class="task-text">${task.title} ${ownerLabel}
+        <div class="task-text">${task.title}
           <div class="task-meta">奖励${task.star}⭐
             ${task.audio_url ? `<span class="badge-timing" style="cursor:pointer;" onclick="playAudio('${task.audio_url}')">🔊 播放录音</span>` : ""}
           </div>
