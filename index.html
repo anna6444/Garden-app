@@ -1792,7 +1792,14 @@ function openTaskDetail(type, idx){
     if(!task) return;
     title = '⏳ ' + task.title;
     info = `奖励 ${task.star}⭐`;
-  } else return;
+   } else if(type === 'wish'){                              // ★ 新增
+    const wish = state.wish[idx];
+    if(!wish) return;
+    title = '💖 ' + wish.content;
+    info = '';
+
+
+} else return;
   
   document.getElementById('taskDetailTitle').innerText = title;
   document.getElementById('taskDetailInfo').innerText = info;
@@ -4858,7 +4865,7 @@ ${viewBtnHtml2}
           </div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+      <div class="task-actions" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
         ${actionButtons}
       </div>
     </div>`;
@@ -4923,28 +4930,25 @@ ${viewBtnHtml2}
   
 
 
-  // 心愿渲染
-  let wishHtml = "";
-  state.wish.forEach((wish,idx)=>{
-    wishHtml += `
+// 心愿渲染
+let wishHtml = "";
+state.wish.forEach((wish,idx)=>{
+  const wishActions = currentRole==='parent'
+    ? `<button class="task-btn btn-del" onclick="handleDelete('wish',${idx})">删除</button>`
+    : '';
+  window.taskActionMap['wish-' + idx] = wishActions || '<p style="color:#aaa;">无可操作项</p>';
 
-    <div class="task-row">
-
-      <div class="task-info">
-
-        <div class="task-icon">💖</div>
-
-        <div class="task-text">${wish.content}</div>
-      </div>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
-
-        ${currentRole==='parent'?`<button class="task-btn btn-del" onclick="handleDelete('wish',${idx})">删除</button>`:""}
-
-      </div>
-
-    </div>`;
-  });
+  wishHtml += `
+  <div class="task-row" data-task-type="wish" data-task-idx="${idx}">
+    <div class="task-info">
+      <div class="task-icon">💖</div>
+      <div class="task-text">${wish.content}</div>
+    </div>
+    <div class="task-actions" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;width:100%;">
+      ${wishActions}
+    </div>
+  </div>`;
+});
   document.getElementById("wishList").innerHTML = wishHtml || `<p style="padding:10px;color:#888;">暂无心愿</p>`;
   updateCategoryDots();
   renderDailyOverview();
