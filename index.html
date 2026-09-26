@@ -245,6 +245,115 @@ padding-bottom:20px;}
   .countdown-time { font-size: 46px; }
 }
 
+
+/* ========== 大图预览：放大、拖动、缩放 ========== */
+.img-preview-wrap{
+  position:relative;
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  padding:20px;
+  box-sizing:border-box;
+}
+#bigProofImg{
+  max-width:100%;
+  max-height:calc(100vh - 160px);
+  object-fit:contain;
+  border-radius:12px;
+  transition:transform 0.15s ease-out;
+  cursor:zoom-in;
+  user-select:none;
+  -webkit-user-drag:none;
+  touch-action:none;
+  will-change:transform;
+}
+#bigProofImg.zoomed{
+  cursor:grab;
+}
+#bigProofImg.dragging{
+  cursor:grabbing;
+  transition:none;
+}
+.img-preview-tools{
+  position:fixed;
+  bottom:30px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:8px;
+  background:rgba(0,0,0,0.7);
+  padding:10px 14px;
+  border-radius:30px;
+  z-index:10000;
+  box-shadow:0 4px 16px rgba(0,0,0,0.3);
+}
+.img-preview-tools button{
+  background:#fff;
+  border:none;
+  padding:8px 14px;
+  border-radius:20px;
+  font-size:14px;
+  font-weight:bold;
+  color:#333;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.img-preview-tools button.close-btn{
+  background:#ef4444;
+  color:#fff;
+}
+.img-preview-tip{
+  position:fixed;
+  bottom:90px;
+  left:50%;
+  transform:translateX(-50%);
+  color:#fff;
+  background:rgba(0,0,0,0.5);
+  padding:6px 12px;
+  border-radius:14px;
+  font-size:12px;
+  margin:0;
+  z-index:10000;
+  white-space:nowrap;
+}
+
+/* ========== 子任务分类切换标签 ========== */
+.sub-tabs{
+  display:flex;
+  gap:8px;
+  margin:12px 0;
+  padding:4px;
+  background:#f3f4f6;
+  border-radius:14px;
+}
+.sub-tab{
+  flex:1;
+  padding:10px 8px;
+  border:none;
+  border-radius:10px;
+  font-size:14px;
+  font-weight:bold;
+  color:#666;
+  background:transparent;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.sub-tab.active{
+  background:#fff;
+  color:#ef4444;
+  box-shadow:0 2px 6px rgba(0,0,0,0.08);
+}
+.sub-content{
+  margin-top:8px;
+}
+.sub-content.hidden{
+  display:none!important;
+}
+
+
 </style>
 
 <link rel="manifest" href="./manifest.json">
@@ -280,9 +389,12 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 <div id="mainPage" class="hidden main-content">
-  <div class="top-star-card">
+    <div class="top-star-card">
     <div class="top-star-title">🌱 种植小花园</div>
-    <div class="star-badge">⭐ <span id="starNum">0</span> <span id="starRoleTip"></span></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="star-badge">⭐ <span id="starNum">0</span> <span id="starRoleTip"></span></div>
+      <button onclick="refreshPage()" style="background:#fff;border:1px solid #fde68a;border-radius:20px;padding:8px 12px;font-size:16px;cursor:pointer;" title="刷新">🔄</button>
+    </div>
   </div>
   <!-- =========新增待处理任务统计卡片========= -->
   <div class="task-count-card">
@@ -445,14 +557,25 @@ if('serviceWorker' in navigator){
             <h3 class="task-card-title" id="taskPageTitle">📅 日常任务</h3>
             <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openSingleTaskModal()">+ 新增</button>
           </div>
-                    <!-- 任务进度条容器 -->
+                              <!-- 任务进度条容器 -->
           <div id="dailyProgressBar" style="margin-bottom:16px;"></div>
-          <div><span class="group-title">待开始 / 进行中任务</span></div>
-          <div id="dailyActiveList"></div>
-          <div><span class="group-title">待家长审核</span></div>
-          <div id="dailyPendingList"></div>
-          <div><span class="group-title">✅ 今日已审核通过</span></div>
-          <div id="dailyApprovedList"></div>
+
+          <!-- 子标签切换 -->
+          <div class="sub-tabs" id="dailySubTabs">
+            <button type="button" class="sub-tab" id="dailyTabActive" onclick="switchDailySubTab('active')">进行中 (<span id="dailyCountActive">0</span>)</button>
+            <button type="button" class="sub-tab" id="dailyTabPending" onclick="switchDailySubTab('pending')">待审核 (<span id="dailyCountPending">0</span>)</button>
+            <button type="button" class="sub-tab" id="dailyTabApproved" onclick="switchDailySubTab('approved')">已通过 (<span id="dailyCountApproved">0</span>)</button>
+          </div>
+
+          <div id="dailyActiveWrap" class="sub-content hidden">
+            <div id="dailyActiveList"></div>
+          </div>
+          <div id="dailyPendingWrap" class="sub-content hidden">
+            <div id="dailyPendingList"></div>
+          </div>
+          <div id="dailyApprovedWrap" class="sub-content hidden">
+            <div id="dailyApprovedList"></div>
+          </div>
         </div>
         <!-- 新增：任务页的长期任务列表（只展示孩子任务） -->
         <div id="taskLongListCard" class="card" style="display:none;">
@@ -460,14 +583,24 @@ if('serviceWorker' in navigator){
             <h3 class="task-card-title" id="taskLongTitle" style="margin:0;">⏳ 长期任务</h3>
             <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openLongTaskModalFor('child', (currentSubjectTab === '成长' || currentSubjectTab === '家务' || currentSubjectTab === '运动') ? currentSubjectTab : null)">+ 新增</button>
           </div>
-          <div id="longProgressBar" style="margin-bottom:16px;"></div>
-          <div><span class="group-title">待开始 / 未完成</span></div>
-          <div id="taskLongUnfinishedList"></div>
-        
-          <div><span class="group-title">⏳ 待审核</span></div>
-          <div id="taskLongPendingList"></div>
-          <div><span class="group-title">✅ 今日已完成</span></div>
-          <div id="taskLongApprovedList"></div>
+                    <div id="longProgressBar" style="margin-bottom:16px;"></div>
+
+          <!-- 子标签切换 -->
+          <div class="sub-tabs" id="taskLongSubTabs">
+            <button type="button" class="sub-tab" id="taskLongTabUnfinished" onclick="switchTaskLongSubTab('unfinished')">未完成 (<span id="taskLongCountUnfinished">0</span>)</button>
+            <button type="button" class="sub-tab" id="taskLongTabPending" onclick="switchTaskLongSubTab('pending')">待审核 (<span id="taskLongCountPending">0</span>)</button>
+            <button type="button" class="sub-tab" id="taskLongTabApproved" onclick="switchTaskLongSubTab('approved')">已完成 (<span id="taskLongCountApproved">0</span>)</button>
+          </div>
+
+          <div id="taskLongUnfinishedWrap" class="sub-content hidden">
+            <div id="taskLongUnfinishedList"></div>
+          </div>
+          <div id="taskLongPendingWrap" class="sub-content hidden">
+            <div id="taskLongPendingList"></div>
+          </div>
+          <div id="taskLongApprovedWrap" class="sub-content hidden">
+            <div id="taskLongApprovedList"></div>
+          </div>
         </div>
       </div>
 
@@ -536,12 +669,22 @@ if('serviceWorker' in navigator){
             <h3 class="task-card-title" style="margin:0;">⏳ 家长任务</h3>
              <button class="btn btn-red btn-sm add-daily-btn-only-parent" onclick="openLongTaskModalFor('parent', currentLongTab === 'all' ? null : currentLongTab)">+ 新增</button>
           </div>
-          <div><span class="group-title">待开始 / 未完成</span></div>
-          <div id="longUnfinishedList"></div>
-          <div><span class="group-title">⏳ 待审核</span></div>
-          <div id="longPendingList"></div>
-          <div><span class="group-title">✅ 今日已完成</span></div>
-          <div id="longApprovedList"></div>
+                    <!-- 子标签切换 -->
+          <div class="sub-tabs" id="parentLongSubTabs">
+            <button type="button" class="sub-tab" id="parentLongTabUnfinished" onclick="switchParentLongSubTab('unfinished')">未完成 (<span id="parentLongCountUnfinished">0</span>)</button>
+            <button type="button" class="sub-tab" id="parentLongTabPending" onclick="switchParentLongSubTab('pending')">待审核 (<span id="parentLongCountPending">0</span>)</button>
+            <button type="button" class="sub-tab" id="parentLongTabApproved" onclick="switchParentLongSubTab('approved')">已完成 (<span id="parentLongCountApproved">0</span>)</button>
+          </div>
+
+          <div id="parentLongUnfinishedWrap" class="sub-content hidden">
+            <div id="longUnfinishedList"></div>
+          </div>
+          <div id="parentLongPendingWrap" class="sub-content hidden">
+            <div id="longPendingList"></div>
+          </div>
+          <div id="parentLongApprovedWrap" class="sub-content hidden">
+            <div id="longApprovedList"></div>
+          </div>
         </div>        
       </div>
     </div>
@@ -687,6 +830,7 @@ if('serviceWorker' in navigator){
         <h3 style="margin-bottom:12px;">新增单条任务</h3>
     <p id="singleTaskSubjectTip" style="color:#3b82f6;font-size:14px;margin-bottom:12px;font-weight:bold;"></p>
 
+   
     <label class="label-text">任务类型</label>
 
     <div class="subject-buttons" style="margin-bottom:12px;">
@@ -694,8 +838,14 @@ if('serviceWorker' in navigator){
       <button type="button" class="subject-btn" id="typeDictationBtn" onclick="selectTaskType('dictation')" style="flex:1;border-color:#bfdbfe;color:#1d4ed8;">🔊 听写任务</button>
     </div>
 
-    <!-- ==========原有单条任务表单，保留不变========== -->
+    <label class="label-text">提交方式（决定孩子端显示什么按钮）</label>
+    <div class="subject-buttons" style="margin-bottom:12px;">
+      <button type="button" class="subject-btn" id="submitTypeNormalBtn" onclick="selectSubmitType('normal')" style="flex:1;border-color:#bbf7d0;color:#15803d;">✅ 普通</button>
+      <button type="button" class="subject-btn" id="submitTypePhotoBtn" onclick="selectSubmitType('photo')" style="flex:1;border-color:#bfdbfe;color:#1d4ed8;">📷 图片</button>
+      <button type="button" class="subject-btn" id="submitTypeAudioBtn" onclick="selectSubmitType('audio')" style="flex:1;border-color:#fecdd3;color:#b91c1c;">🎤 录音</button>
+    </div>
 
+    <!-- ==========原有单条任务表单，保留不变========== -->
 
 
     
@@ -707,9 +857,15 @@ if('serviceWorker' in navigator){
 
     <label class="label-text" id="dailyDescLabel">任务说明（可选）</label>
     <textarea id="dailyDesc" placeholder="可选，简要说明任务"></textarea>
-    <p id="dictationHint" style="display:none;color:#3b82f6;font-size:13px;margin:4px 0;">
-      💡 听写任务：把单词写在上面这个"任务说明"里，用英文句号 . 分隔。例如：apple.banana.cat.dog
+        <p id="dictationHint" style="display:none;color:#3b82f6;font-size:13px;margin:4px 0;">
+      💡 听写任务：把词语写在上面这个"任务说明"里。中文用中文逗号 ， 分隔（如 苹果，香蕉），英文用英文句号 . 或逗号分隔。也可以直接上传照片自动识别。
     </p>
+    <!-- 听写拍照识别 -->
+    <div id="dictationOcrBox" style="display:none;margin:8px 0;">
+      <button type="button" class="btn btn-blue" id="ocrBtn" onclick="triggerOcrImageSelect()">📷 上传照片自动识别词语</button>
+      <input type="file" id="ocrImageFile" accept="image/*" style="display:none;" onchange="handleOcrImage(event)">
+      <div id="ocrStatus" style="font-size:13px;color:#888;margin-top:6px;line-height:1.5;"></div>
+    </div>
     <label class="label-text">奖励星星数</label>
 
     <input id="dailyStar" type="number" value="2" placeholder="完成任务获得几颗星星"/>
@@ -772,11 +928,19 @@ if('serviceWorker' in navigator){
       <option value="家务">🧹 家务（洗碗、扫地）</option>
       <option value="运动">🏃 运动（跳绳、跑步）</option>
     </select>
-    <label class="label-text">任务归属</label>
+        <label class="label-text">任务归属</label>
     <select id="longOwnerType">
       <option value="child">👧 孩子任务</option>
       <option value="parent">👨‍👩‍👧 家长任务</option>
     </select>
+
+    <label class="label-text">提交方式</label>
+    <div class="subject-buttons" style="margin-bottom:12px;">
+      <button type="button" class="subject-btn" id="longSubmitTypeNormalBtn" onclick="selectLongSubmitType('normal')" style="flex:1;border-color:#bbf7d0;color:#15803d;">✅ 普通</button>
+      <button type="button" class="subject-btn" id="longSubmitTypePhotoBtn" onclick="selectLongSubmitType('photo')" style="flex:1;border-color:#bfdbfe;color:#1d4ed8;">📷 图片</button>
+      <button type="button" class="subject-btn" id="longSubmitTypeAudioBtn" onclick="selectLongSubmitType('audio')" style="flex:1;border-color:#fecdd3;color:#b91c1c;">🎤 录音</button>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button class="btn btn-gray" style="flex:1;" onclick="closeModal('longModal')">取消</button>
       <button class="btn btn-red" style="flex:1;" onclick="saveLongTask()">保存</button>
@@ -843,9 +1007,28 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<!-- 修改提交方式弹窗 -->
+<div class="modal-mask" id="setSubmitTypeModal">
+  <div class="modal-box">
+    <h3>📤 修改提交方式</h3>
+    <p style="color:#888;font-size:13px;margin:8px 0;">孩子端将显示对应的提交按钮</p>
+    <div class="subject-buttons" style="margin-bottom:12px;">
+      <button type="button" class="subject-btn" id="editSubmitTypeNormalBtn" onclick="selectEditSubmitType('normal')" style="flex:1;border-color:#bbf7d0;color:#15803d;">✅ 普通</button>
+      <button type="button" class="subject-btn" id="editSubmitTypePhotoBtn" onclick="selectEditSubmitType('photo')" style="flex:1;border-color:#bfdbfe;color:#1d4ed8;">📷 图片</button>
+      <button type="button" class="subject-btn" id="editSubmitTypeAudioBtn" onclick="selectEditSubmitType('audio')" style="flex:1;border-color:#fecdd3;color:#b91c1c;">🎤 录音</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('setSubmitTypeModal')">取消</button>
+      <button class="btn btn-red" style="flex:1;" onclick="saveTaskSubmitType()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 任务时限设置弹窗 -->
 
 <div class="modal-mask" id="setTimeModal">
+
+
 
   <div class="modal-box">
 
@@ -917,17 +1100,18 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
-<!-- 大图预览弹窗 -->
+<!-- 大图预览弹窗（支持放大、拖动、双指缩放） -->
 <div class="modal-mask" id="imgPreviewModal">
-
-  <div class="modal-box">
-
-    <img id="bigProofImg" style="width:100%;border-radius:16px;">
-
-    <button class="btn" onclick="closeImgPreviewModal()" style="margin-top:12px">关闭</button>
-
+  <div class="img-preview-wrap" id="imgPreviewWrap">
+    <img id="bigProofImg" onclick="toggleImgZoom(event)">
+    <div class="img-preview-tools">
+      <button type="button" onclick="zoomInImg()">➕ 放大</button>
+      <button type="button" onclick="zoomOutImg()">➖ 缩小</button>
+      <button type="button" onclick="resetImgZoom()">↺ 重置</button>
+      <button type="button" class="close-btn" onclick="closeImgPreviewModal()">✕ 关闭</button>
+    </div>
+    <p class="img-preview-tip">💡 点击图片可放大/缩小，放大后可拖动查看</p>
   </div>
-
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.7/dist/umd/supabase.min.js"></script>
 
@@ -977,8 +1161,22 @@ let approvingTasks = {};   // 防止确认按钮重复点击
 let pendingLongOwnerType = null; // 记录即将创建的任务归属
 let pendingLongCategory = null;
 window.taskActionMap = {}; // 手机端：存每个任务的按钮 HTML
+// ===== 听写 OCR 相关全局变量 =====
+let ocrWorker = null;          // Tesseract worker 复用，避免重复下载语言包
 
-
+// ===== 子标签切换状态 =====
+let dailySubTab = null;       // 任务页-日常任务当前选中的子标签
+let taskLongSubTab = null;    // 任务页-长期任务当前选中的子标签
+let parentLongSubTab = null;  // 家长页-长期任务当前选中的子标签
+// ===== 提交方式相关 =====
+let selectedSubmitType = 'normal';       // 新建日常任务时选中的提交方式
+let selectedLongSubmitType = 'normal';   // 新建长期任务时选中的提交方式
+let editSubmitTypeIdx = null;            // 正在修改提交方式的任务索引
+let editSubmitTypeContext = 'daily';     // 'daily' 或 'long'
+let editSelectedSubmitType = 'normal';   // 修改弹窗里当前选中的提交方式
+let pendingDailyAudioIdx = null;         // 日常任务录音的索引
+let pendingLongImgIdx = null;            // 长期任务图片提交的索引
+let recordContext = 'long';              // 录音上下文：'long' 长期任务，'daily' 日常任务
 let state = {
 
   star: 0,
@@ -1047,6 +1245,12 @@ window.addEventListener('load', function(){
       document.getElementById('addLongBtn').classList.add('hidden');
       document.getElementById('addWishBtn').classList.add('hidden');
     }
+    
+    // 重置子标签状态（自动登录时显示默认视图）
+    dailySubTab = null;
+    taskLongSubTab = null;
+    parentLongSubTab = null;
+
     await loadAllData();
 
     await loadStarLog();
@@ -1093,6 +1297,10 @@ async function doLogin(){
     await loadAllData();
     //保存登录状态
     
+    // 重置子标签状态（下次登录时显示默认视图）
+    dailySubTab = null;
+    taskLongSubTab = null;
+    parentLongSubTab = null;
 localStorage.setItem("garden_role", currentRole);
     
     renderAll();
@@ -1141,23 +1349,15 @@ async function loadAllData(){
   }
 
   // 关键优化：扣星和清理放后台执行，不阻塞页面渲染
-  if(currentRole === 'parent'){
-    (async () => {
-      try {
-        await autoDeductStarTask();
-        await cleanApprovedTasks();
-        renderAll();
-      } catch(e) { console.warn(e); }
-    })();
-  } else {
-    (async () => {
-      try {
-        await cleanApprovedTasks();
-        renderAll();
-      } catch(e) { console.warn(e); }
-    })();
+(async () => {
+  try {
+    await autoDeductStarTask();     // 两端都跑
+    await cleanApprovedTasks();
+    renderAll();
+  } catch(e) { console.warn(e); }
+})();
   }
-}
+
 
 
 
@@ -1274,6 +1474,28 @@ async function quickReward(targetRole, delta, reason){
   renderAll();
   alert(`✅已记录：${reason}，${delta>0?"+":""}${delta}⭐`);
 }
+
+// 手动刷新按钮：重新拉取数据
+async function refreshPage(){
+  try{
+    // 显示刷新中
+    const btns = document.querySelectorAll('.top-star-card button');
+    btns.forEach(b => { b.style.opacity = '0.5'; b.disabled = true; });
+    
+    await loadAllData();
+    await loadStarLog();
+    renderAll();
+    alert('✅ 已刷新');
+  }catch(e){
+    alert('❌ 刷新失败：' + e.message);
+  }finally{
+    const btns = document.querySelectorAll('.top-star-card button');
+    btns.forEach(b => { b.style.opacity = '1'; b.disabled = false; });
+  }
+}
+
+
+
 function switchTab(name,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
@@ -1591,8 +1813,9 @@ function openTaskDetail(type, idx){
 
 function openModal(id){
   document.getElementById(id).classList.add('show');
-  if(id === 'dailyModal'){
+     if(id === 'dailyModal'){
     selectedTaskType = 'normal';
+    selectedSubmitType = 'normal';
     // 清空上次输入
     document.getElementById('dailyTitle').value = '';
     document.getElementById('dailyDesc').value = '';
@@ -1609,11 +1832,21 @@ function openModal(id){
       dictationBtn.style.borderWidth = '1px';
       dictationBtn.style.fontWeight = 'normal';
     }
+    // 重置提交方式按钮
+    selectSubmitType('normal');
     const hint = document.getElementById('dictationHint');
     if(hint) hint.style.display = 'none';
-  }
-      
-      if(id === 'longModal'){
+    // 新增：重置 OCR 区域
+    const ocrBox = document.getElementById('dictationOcrBox');
+    if(ocrBox) ocrBox.style.display = 'none';
+    const ocrStatus = document.getElementById('ocrStatus');
+    if(ocrStatus) ocrStatus.innerText = '';
+    const ocrBtn = document.getElementById('ocrBtn');
+    if(ocrBtn) ocrBtn.disabled = false;
+  }  
+            if(id === 'longModal'){
+    selectedLongSubmitType = 'normal';
+    selectLongSubmitType('normal');
     // 从"总览"打开时（没有锁定的归属/类别），恢复所有下拉框
     if(pendingLongOwnerType === null){
       const ownerSel = document.getElementById('longOwnerType');
@@ -1650,20 +1883,204 @@ function selectTaskType(type){
   const normalBtn = document.getElementById('typeNormalBtn');
   const dictationBtn = document.getElementById('typeDictationBtn');
   const hint = document.getElementById('dictationHint');
+  const ocrBox = document.getElementById('dictationOcrBox');
   if(type === 'normal'){
     normalBtn.style.borderWidth = '2px';
     normalBtn.style.fontWeight = 'bold';
     dictationBtn.style.borderWidth = '1px';
     dictationBtn.style.fontWeight = 'normal';
     if(hint) hint.style.display = 'none';
+    if(ocrBox) ocrBox.style.display = 'none';
   }else{
     dictationBtn.style.borderWidth = '2px';
     dictationBtn.style.fontWeight = 'bold';
     normalBtn.style.borderWidth = '1px';
     normalBtn.style.fontWeight = 'normal';
-    if(hint) hint.style.display = 'block';
+        if(hint) hint.style.display = 'block';
+    if(ocrBox) ocrBox.style.display = 'block';
   }
 }
+
+// 切换提交方式（新建任务弹窗里用）
+function selectSubmitType(type){
+  selectedSubmitType = type;
+  ['normal','photo','audio'].forEach(t => {
+    const btn = document.getElementById('submitType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
+    if(!btn) return;
+    const isActive = (t === type);
+    btn.style.borderWidth = isActive ? '2px' : '1px';
+    btn.style.fontWeight = isActive ? 'bold' : 'normal';
+  });
+}
+
+// 切换提交方式（新建长期任务弹窗里用）
+function selectLongSubmitType(type){
+  selectedLongSubmitType = type;
+  ['normal','photo','audio'].forEach(t => {
+    const btn = document.getElementById('longSubmitType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
+    if(!btn) return;
+    const isActive = (t === type);
+    btn.style.borderWidth = isActive ? '2px' : '1px';
+    btn.style.fontWeight = isActive ? 'bold' : 'normal';
+  });
+}
+
+// ================== 听写 OCR 功能开始 ==================
+
+// 懒加载 Tesseract.js（只在第一次使用时下载，不拖慢首页）
+function loadTesseractOnce(){
+  if(window.__tesseractLoading) return window.__tesseractLoading;
+  window.__tesseractLoading = new Promise((resolve, reject) => {
+    if(window.Tesseract) return resolve(window.Tesseract);
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => {
+      if(window.Tesseract) resolve(window.Tesseract);
+      else reject(new Error('识别引擎加载异常'));
+    };
+    s.onerror = () => reject(new Error('识别引擎加载失败，请检查网络后重试'));
+    document.head.appendChild(s);
+  });
+  return window.__tesseractLoading;
+}
+
+// 点击按钮，唤起相册/拍照
+function triggerOcrImageSelect(){
+  document.getElementById('ocrImageFile').click();
+}
+
+// 把大图缩小，加快 OCR 速度（手机原图 4000px 识别会非常慢）
+function prepareImageForOcr(file, maxWidth = 1600){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try{
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if(!w || !h) throw new Error('图片尺寸异常');
+        if(w > maxWidth){
+          h = Math.round(h * maxWidth / w);
+          w = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(blob => {
+          URL.revokeObjectURL(url);
+          blob ? resolve(blob) : reject(new Error('图片处理失败'));
+        }, 'image/jpeg', 0.92);
+      }catch(err){
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+    img.src = url;
+  });
+}
+
+// 把 OCR 原始文本拆成一个个词语
+function parseOcrText(raw){
+  if(!raw) return [];
+  let t = String(raw);
+  // 全角/半角空格统一
+  t = t.replace(/[ \t\u3000]+/g, ' ');
+  // 各种标点统一当分隔符
+  t = t.replace(/[.。，,、;；:：!！?？"'“”‘’()（）\[\]【】<>《》\-—_/\\|]+/g, '\n');
+
+  const out = [];
+  t.split('\n').forEach(line => {
+    let s = line.trim();
+    if(!s) return;
+    s = s.replace(/^\d+[.、)）]\s*/, '').trim();   // 去掉 "1." "2、" 这类序号
+    s = s.replace(/^[•·※*☆★]+\s*/, '').trim();     // 去掉项目符号
+    if(!s) return;
+    if(/^[\d\s]+$/.test(s)) return;                 // 纯数字行跳过
+
+    // 含英文字母：按空格拆（英文单词之间就是空格）
+    // 纯中文：不按空格拆，避免把"苹 果"拆成两个字
+    const hasLatin = /[A-Za-z]/.test(s);
+    const parts = hasLatin ? s.split(' ') : [s.replace(/\s+/g, '')];
+    parts.forEach(w => {
+      w = w.trim();
+      if(w) out.push(w);
+    });
+  });
+  return out;
+}
+
+// 统一的听写分词函数（英文句号 / 中文逗号 都支持）
+function splitDictationWords(desc){
+  if(!desc) return [];
+  return String(desc)
+    .split(/[.。,，、;；\n\r\t]+/)
+    .map(w => w.trim())
+    .filter(w => w.length > 0);
+}
+
+// 选择照片后：识别文字 → 填入"任务说明"
+async function handleOcrImage(e){
+  const input = e.target;
+  const file = input.files && input.files[0];
+  input.value = ''; // 允许重复选择同一张图
+  if(!file) return;
+
+  const statusEl = document.getElementById('ocrStatus');
+  const btn = document.getElementById('ocrBtn');
+
+  try{
+    statusEl.style.color = '#3b82f6';
+    statusEl.innerText = '⏳ 正在加载识别引擎…';
+    if(btn) btn.disabled = true;
+
+    const Tesseract = await loadTesseractOnce();
+    const prepared = await prepareImageForOcr(file);
+
+    if(!ocrWorker){
+      statusEl.innerText = '⏳ 首次使用，正在下载中文识别语言包（约 10-20MB），请耐心等待…';
+      ocrWorker = await Tesseract.createWorker(['chi_sim','eng'], 1, {
+        logger: m => {
+          if(!m || !m.status) return;
+          const p = m.progress ? Math.round(m.progress * 100) : 0;
+          const el = document.getElementById('ocrStatus');
+          if(!el) return;
+          if(m.status === 'recognizing text'){
+            el.innerText = `🔍 正在识别文字… ${p}%`;
+          }else if(m.status.indexOf('loading') === 0 || m.status.indexOf('initializing') === 0){
+            el.innerText = `⏳ 正在准备识别引擎… ${p}%`;
+          }
+        }
+      });
+    }
+
+    statusEl.innerText = '🔍 正在识别文字…';
+    const result = await ocrWorker.recognize(prepared);
+    const rawText = (result && result.data && result.data.text) ? result.data.text : '';
+    const words = parseOcrText(rawText);
+
+    if(words.length === 0){
+      statusEl.style.color = '#ef4444';
+      statusEl.innerText = '⚠️ 没有识别到文字，请换一张更清晰、光线更好的照片，或手动输入。';
+      return;
+    }
+
+    document.getElementById('dailyDesc').value = words.join('，');
+    statusEl.style.color = '#16a34a';
+    statusEl.innerText = `✅ 已识别 ${words.length} 个词语，已填入上方"任务说明"，请家长核对修改后再保存。`;
+
+  }catch(err){
+    console.error('OCR失败', err);
+    statusEl.style.color = '#ef4444';
+    statusEl.innerText = '❌ 识别失败：' + (err && err.message ? err.message : err);
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+// ================== 听写 OCR 功能结束 ==================
 
 // 从分类页打开单条任务弹窗（科目已由分类决定）
 function openSingleTaskModal(){
@@ -1840,7 +2257,7 @@ async function batchDeleteLongTasks(){
 async function resetWeek(){
   if(!confirm('⚠️ 确认重置本周？\n\n执行后将：\n1. 清空植物生长进度、水/阳光/肥料\n2. 孩子星星清零、家长星星清零\n3. 删除系统内全部作业照片\n4. 删除云端所有星星日志记录\n\n此操作不可撤销！'))return;
 
-  // 1. 先重置本地数据（瞬时完成，用户感知不到）
+  // ===== 1. 本地状态立刻清零 =====
   state.plant = null;
   state.stage = 1;
   state.water = 0;
@@ -1855,52 +2272,76 @@ async function resetWeek(){
   state.plantDoneChild = false;
   state.star = 0;
   state.parent_star = 0;
+  // 关键：标记今天已扣星，防止重置后立刻被 autoDeductStarTask 再扣一次
+  state.lastAutoDeductDate = new Date().toDateString();
 
-  // 2. 三件事并行执行（关键优化，速度提升3倍）
-  await Promise.all([
-    // 清空存储桶图片
-    (async () => {
-      try{
-        const {data:fileList} = await supabase.storage.from('task-proof').list();
-        if(fileList && fileList.length > 0){
-          const filePaths = fileList.map(item => item.name);
-          await supabase.storage.from('task-proof').remove(filePaths);
-        }
-      }catch(err){
-        console.warn('清理图片出错', err);
-      }
-    })(),
-
-        // 清空星星日志（先查 id，再一次性 in 删除，避开 RLS 全删限制）
-    (async () => {
-      try{
-        const {data:allLogs} = await supabase.from('star_logs').select('id');
-        if(allLogs && allLogs.length > 0){
-          const ids = allLogs.map(l => l.id);
-          // 分批删除，每批 100 条
-          for(let i = 0; i < ids.length; i += 100){
-            const batch = ids.slice(i, i + 100);
-            await supabase.from('star_logs').delete().in('id', batch);
-          }
-        }
-      }catch(e){
-        console.warn("清空星星日志异常",e);
-      }
-    })(),
-
-    // 保存状态（清空植物、星星）
-    saveState()
-  ]);
-
-  // 3. 立刻提示用户
-  alert('✅ 本周已重置！\n植物进度、物资、星星已清空，作业图片、全部星星日志已删除。\n可以重新选择植物。');
-
-  // 4. 后台刷新数据
-  await loadAllData();
- 
+  // ===== 2. 立刻刷新界面（用户秒看到星星归零） =====
   renderAll();
+
+  // ===== 3. 同步星星到服务器（这一步很快，等它完成再提示） =====
+  await saveState();
+
+  // ===== 4. 立刻提示用户，不等清理 =====
+  alert('✅ 本周已重置！\n星星、植物、物资已清零，云端图片和日志正在后台清理…');
+
+  // ===== 5. 后台异步清理（不阻塞界面） =====
+  (async () => {
+    try {
+      await Promise.all([
+        clearAllStorageFiles(),
+        clearAllStarLogs()
+      ]);
+      console.log('✅ 后台清理完成');
+    } catch(e){
+      console.warn('后台清理出错', e);
+    }
+  })();
+}
+// ===== 清空 storage 所有文件（支持分页，不怕超过1000个） =====
+async function clearAllStorageFiles(){
+  const BUCKET = 'task-proof';
+  const PAGE_SIZE = 1000;
+  let totalDeleted = 0;
+  let offset = 0;
+
+  while(true){
+    const { data: files, error } = await supabase.storage
+      .from(BUCKET)
+      .list('', { limit: PAGE_SIZE, offset });
+
+    if(error){ console.warn('list 失败', error); break; }
+    if(!files || files.length === 0) break;
+
+    const paths = files.map(f => f.name);
+    const { error: delErr } = await supabase.storage.from(BUCKET).remove(paths);
+    if(delErr) console.warn('删除文件失败', delErr);
+
+    totalDeleted += paths.length;
+    if(files.length < PAGE_SIZE) break;   // 最后一页
+    offset += PAGE_SIZE;
+  }
+  console.log(`清空 storage：共删除 ${totalDeleted} 个文件`);
 }
 
+// ===== 清空 star_logs（分批并行删除，速度更快） =====
+async function clearAllStarLogs(){
+  const { data: allLogs, error } = await supabase.from('star_logs').select('id');
+  if(error){ console.warn('查询 star_logs 失败', error); return; }
+  if(!allLogs || allLogs.length === 0) return;
+
+  const ids = allLogs.map(l => l.id);
+  const BATCH = 100;
+  const batches = [];
+  for(let i = 0; i < ids.length; i += BATCH){
+    batches.push(ids.slice(i, i + BATCH));
+  }
+
+  // 并行删所有批次
+  await Promise.all(batches.map(batch =>
+    supabase.from('star_logs').delete().in('id', batch)
+  ));
+  console.log(`清空 star_logs：共删除 ${ids.length} 条`);
+}
 
 async function buyRes(type){
   const myStar = currentRole === 'parent' ? state.parent_star : state.star;
@@ -1940,19 +2381,22 @@ async function saveDailyTask(){
 
   const isDictation = (selectedTaskType === 'dictation');
 
-  if(isDictation){
-    if(!desc) return alert('听写任务请在"任务说明"里填写单词，用英文句号分隔');
+    if(isDictation){
+    if(!desc) return alert('听写任务请在"任务说明"里填写词语，用中文逗号或英文句号分隔');
     // 简单校验一下格式，至少有一个词
-    const words = desc.split('.').map(w => w.trim()).filter(w => w);
+    const words = splitDictationWords(desc);
     if(words.length === 0){
-      return alert('请至少输入一个单词，用英文句号分隔');
+      return alert('请至少输入一个词语，用中文逗号或英文句号分隔');
     }
   }
+  
+
   const { error: insertErr } = await supabase.from('daily_tasks').insert([{
     title, star, minute_limit: minuteLimit,
     subject: selectedSubject,
     description: desc,
     is_dictation: isDictation,
+    submit_type: selectedSubmitType,
     create_at: new Date().toISOString(),
     start_at: null, proof_image: null, status: 'active'
   }]);
@@ -1963,17 +2407,19 @@ async function saveDailyTask(){
   }
   closeModal('dailyModal');
       
-  document.getElementById('dailyTitle').value='';
+    document.getElementById('dailyTitle').value='';
   document.getElementById('dailyDesc').value='';
   document.getElementById('dailyStar').value='2';
   document.getElementById('dailyMinuteLimit').value='0';
   selectedTaskType = 'normal';
+  selectedSubmitType = 'normal';
   await loadAllData();renderAll();
 }
 
 function closeSubmitModal(){
   closeModal('taskSubmitModal');
   pendingTaskIdx = null;
+  pendingLongImgIdx = null;
   pendingProofImgUrl = "";
   window.pendingCompressedFile = null;
   window.pendingSelectingImage = false;
@@ -2011,6 +2457,29 @@ async function doSubmitTask(){
     return;
   }
   
+  // ========== 长期任务图片打卡 ==========
+  if(pendingLongImgIdx !== null){
+    if(!window.pendingCompressedFile){
+      alert('📷 请先上传作业图片，再点确认提交');
+      return;
+    }
+    if(btn){ btn.disabled = true; btn.innerText = '提交中...'; }
+    try {
+      await submitLongTaskWithImg();
+    } catch(e){
+      console.error('提交异常',e);
+      if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
+    }
+    return;
+  }
+  
+  // ========== 日常任务提交 ==========
+  const task = state.daily[pendingTaskIdx];
+  if(task && task.submit_type === 'photo' && !window.pendingCompressedFile){
+    alert('📷 这是一个图片提交任务，请先上传作业图片，再点确认提交');
+    return;
+  }
+  
   if(btn){ btn.disabled = true; btn.innerText = '提交中...'; }
   
   try {
@@ -2025,10 +2494,113 @@ async function doSubmitTask(){
   }
 }
 
+// 长期任务带图片提交
+async function submitLongTaskWithImg(){
+  if(pendingLongImgIdx === null){
+    alert('任务信息丢失，请重新打开');
+    return;
+  }
+  const task = state.long[pendingLongImgIdx];
+  const file = window.pendingCompressedFile;
+  const btn = document.getElementById('taskSubmitConfirmBtn');
+  
+  if(!file){
+    alert("没有选中图片，请重新选择图片！");
+    if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
+    return;
+  }
+  
+  if(btn){ btn.disabled = true; btn.innerText = '图片上传中...'; }
+  
+  try{
+    const fileName = `long_img_${task.id}_${Date.now()}.jpg`;
+    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
+    if(upErr) throw upErr;
+    
+    const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
+    const imgUrl = urlData.publicUrl;
+    
+    const today = new Date().toDateString();
+    const { error } = await supabase.from('long_tasks')
+      .update({
+        submit_status: 'submitted',
+        submit_date: today,
+        audio_url: imgUrl
+      })
+      .eq('id', task.id);
+    
+    if(error){
+      alert('❌ 提交失败：' + error.message);
+      if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
+      return;
+    }
+    
+    if(currentRole === "child"){
+      state.child_today_done += 1;
+      await saveState();
+    }
+    
+    window.pendingCompressedFile = null;
+    window.pendingSelectingImage = false;
+    pendingLongImgIdx = null;
+    closeSubmitModal();
+    alert("✅ 图片打卡已提交，等待对方确认！");
+    await loadAllData();
+    renderAll();
+  }catch(e){
+    console.error('异常',e);
+    alert('❌ 图片上传失败：' + e.message + '\n\n请检查网络后重试。');
+    if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
+  }
+}
+
 
 let editTaskIdx = null;
  
-// 打开设置时限弹窗
+
+
+function openSetSubmitTypeModal(idx, context){
+  editSubmitTypeContext = context || 'daily';
+  editSubmitTypeIdx = idx;
+  const task = (editSubmitTypeContext === 'long') ? state.long[idx] : state.daily[idx];
+  if(!task) return;
+  editSelectedSubmitType = task.submit_type || 'normal';
+  selectEditSubmitType(editSelectedSubmitType);
+  openModal('setSubmitTypeModal');
+}
+
+function selectEditSubmitType(type){
+  editSelectedSubmitType = type;
+  ['normal','photo','audio'].forEach(t => {
+    const btn = document.getElementById('editSubmitType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
+    if(!btn) return;
+    const isActive = (t === type);
+    btn.style.borderWidth = isActive ? '2px' : '1px';
+    btn.style.fontWeight = isActive ? 'bold' : 'normal';
+  });
+}
+
+async function saveTaskSubmitType(){
+  if(editSubmitTypeIdx === null) return;
+  const table = (editSubmitTypeContext === 'long') ? 'long_tasks' : 'daily_tasks';
+  const task = (editSubmitTypeContext === 'long') ? state.long[editSubmitTypeIdx] : state.daily[editSubmitTypeIdx];
+  if(!task) return;
+  
+  const { error } = await supabase.from(table)
+    .update({ submit_type: editSelectedSubmitType })
+    .eq('id', task.id);
+  
+  if(error){
+    alert('❌ 保存失败：' + error.message);
+    return;
+  }
+  
+  closeModal('setSubmitTypeModal');
+  await loadAllData();
+  renderAll();
+  alert('✅ 提交方式已更新');
+}
+
 
 function openSetTimeModal(idx){
 
@@ -2165,13 +2737,14 @@ for(let taskName of taskList){
 
   try{
 
-     await supabase.from('daily_tasks').insert([{
+          await supabase.from('daily_tasks').insert([{
       title: taskName,
       star: 2,
       minute_limit: 0,
       subject: selectedSubject,
       description: '',
       is_dictation: false,
+      submit_type: 'normal',
       create_at: new Date().toISOString(),
       start_at: null,
       proof_image: null,
@@ -2212,6 +2785,76 @@ async function startTask(idx){
     openFullscreenCountdown({ ...task, start_at: startIso });
   }
 }
+
+
+// ============ 普通提交（无图无录音，直接确认） ============
+async function doSubmitNormal(idx){
+  const task = state.daily[idx];
+  if(!task) return;
+  if(!task.start_at){
+    alert('请先点击【开始任务】，再提交完成！');
+    return;
+  }
+  if(!confirm(`确认完成任务【${task.title}】？`)) return;
+  
+  const today = new Date().toISOString();
+  try{
+    const { error } = await supabase.from('daily_tasks').update({
+      submit_status: 'submitted',
+      submit_date: today,
+      proof_image: null,
+      status: 'pending_review'
+    }).eq('id', task.id);
+    
+    if(error){
+      alert('提交失败：' + error.message);
+      return;
+    }
+    if(currentRole === "child"){
+      state.child_today_done += 1;
+      await saveState();
+    }
+    closeFullscreenCountdown();
+    alert('✅ 提交成功，等待家长审核！');
+    await loadAllData();
+    renderAll();
+  }catch(e){
+    alert('提交异常：' + e.message);
+  }
+}
+
+
+
+
+
+
+// 长期任务图片打卡：打开图片提交弹窗
+function handleLongTaskPhotoUpload(idx){
+  const task = state.long[idx];
+  if(!task) return;
+  pendingTaskIdx = null;
+  pendingLongImgIdx = idx;
+  
+  document.getElementById('submitTaskTitle').innerText = `任务：${task.title}`;
+  document.getElementById('submitImgPreviewBox').classList.add('hidden');
+  document.getElementById('submitPreviewImg').src = "";
+  pendingProofImgUrl = "";
+  
+  // 清掉可能残留的图片
+  window.pendingCompressedFile = null;
+  window.pendingSelectingImage = false;
+  window.isCompressing = false;
+  if(window.pendingPreviewUrl){
+    URL.revokeObjectURL(window.pendingPreviewUrl);
+    window.pendingPreviewUrl = null;
+  }
+  
+  const btn = document.getElementById('taskSubmitConfirmBtn');
+  if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
+  
+  openModal('taskSubmitModal');
+}
+
 async function handleTaskComplete(idx){
 
   const task = state.daily[idx];
@@ -2527,27 +3170,231 @@ async function handleProofUpload(e){
   await loadAllData();
   renderAll();
 }
+ 
+// ========== 大图预览：放大 / 缩小 / 拖动 / 双指缩放 ==========
+let imgZoomState = { scale: 1, x: 0, y: 0 };
+let imgDragInfo = { dragging: false, startX: 0, startY: 0, baseX: 0, baseY: 0, moved: false };
+let imgPinchInfo = { active: false, startDist: 0, startScale: 1 };
+
 function viewProofImage(url){
-
-  document.getElementById('bigProofImg').src = url;
-
+  const img = document.getElementById('bigProofImg');
+  imgZoomState = { scale: 1, x: 0, y: 0 };
+  img.classList.remove('zoomed', 'dragging');
+  img.style.transform = '';
   document.getElementById('imgPreviewModal').classList.add('show');
 
+  // 等图片加载完成 + 弹窗渲染完成，才能拿到正确的容器尺寸
+  img.onload = function(){
+    requestAnimationFrame(function(){
+      applyImgTransform();
+    });
+  };
+  img.src = url;
 }
-
-//关闭大图弹窗
-
 
 function closeImgPreviewModal(){
-
+  const img = document.getElementById('bigProofImg');
   document.getElementById('imgPreviewModal').classList.remove('show');
-
-  const imgDom = document.getElementById('bigProofImg');
-
-  imgDom.src = "";
-
+  img.src = "";
+  img.classList.remove('zoomed', 'dragging');
+  imgZoomState = { scale: 1, x: 0, y: 0 };
+  applyImgTransform();
 }
 
+// 计算图片在当前缩放下的最大可偏移范围
+function getImgMaxOffset(){
+  const img = document.getElementById('bigProofImg');
+  const wrap = document.getElementById('imgPreviewWrap');
+  if(!img || !wrap) return { maxX: 0, maxY: 0 };
+
+  const naturalW = img.naturalWidth || img.width || 0;
+  const naturalH = img.naturalHeight || img.height || 0;
+  if(naturalW === 0 || naturalH === 0) return { maxX: 0, maxY: 0 };
+
+  // 容器内容区域（扣除 padding）
+  const wrapStyle = window.getComputedStyle(wrap);
+  const padL = parseFloat(wrapStyle.paddingLeft) || 0;
+  const padR = parseFloat(wrapStyle.paddingRight) || 0;
+  const padT = parseFloat(wrapStyle.paddingTop) || 0;
+  const padB = parseFloat(wrapStyle.paddingBottom) || 0;
+  const containerW = Math.max(0, wrap.clientWidth - padL - padR);
+  const containerH = Math.max(0, wrap.clientHeight - padT - padB);
+  if(containerW === 0 || containerH === 0) return { maxX: 0, maxY: 0 };
+
+  // object-fit: contain 后的基础尺寸
+  const fitScale = Math.min(containerW / naturalW, containerH / naturalH);
+  const baseW = naturalW * fitScale;
+  const baseH = naturalH * fitScale;
+
+  // 当前缩放后的实际显示尺寸
+  const displayW = baseW * imgZoomState.scale;
+  const displayH = baseH * imgZoomState.scale;
+
+  // 允许的最大偏移（超出部分才允许拖动）
+  const maxX = Math.max(0, (displayW - containerW) / 2);
+  const maxY = Math.max(0, (displayH - containerH) / 2);
+  return { maxX, maxY };
+}
+
+function applyImgTransform(){
+  const img = document.getElementById('bigProofImg');
+  if(!img) return;
+
+  // 边界限制：拖动到边缘就停住，不会跑出屏幕
+  const { maxX, maxY } = getImgMaxOffset();
+  if(imgZoomState.x >  maxX) imgZoomState.x =  maxX;
+  if(imgZoomState.x < -maxX) imgZoomState.x = -maxX;
+  if(imgZoomState.y >  maxY) imgZoomState.y =  maxY;
+  if(imgZoomState.y < -maxY) imgZoomState.y = -maxY;
+
+  img.style.transform = `translate(${imgZoomState.x}px, ${imgZoomState.y}px) scale(${imgZoomState.scale})`;
+}
+
+// 点击图片：放大 / 缩小切换
+function toggleImgZoom(e){
+  if(e) e.stopPropagation();
+  // 拖动结束时触发 click 不切换
+  if(imgDragInfo.moved){ imgDragInfo.moved = false; return; }
+  const img = document.getElementById('bigProofImg');
+  if(imgZoomState.scale <= 1){
+    imgZoomState.scale = 2.5;
+    img.classList.add('zoomed');
+  }else{
+    imgZoomState.scale = 1;
+    imgZoomState.x = 0;
+    imgZoomState.y = 0;
+    img.classList.remove('zoomed');
+  }
+  applyImgTransform();
+}
+
+function zoomInImg(){
+  const img = document.getElementById('bigProofImg');
+  imgZoomState.scale = Math.min(imgZoomState.scale + 0.5, 5);
+  if(imgZoomState.scale > 1) img.classList.add('zoomed');
+  applyImgTransform();
+}
+
+function zoomOutImg(){
+  const img = document.getElementById('bigProofImg');
+  imgZoomState.scale = Math.max(imgZoomState.scale - 0.5, 0.5);
+  if(imgZoomState.scale <= 1){
+    imgZoomState.scale = 1;
+    imgZoomState.x = 0;
+    imgZoomState.y = 0;
+    img.classList.remove('zoomed');
+  }
+  applyImgTransform();
+}
+
+function resetImgZoom(){
+  const img = document.getElementById('bigProofImg');
+  imgZoomState = { scale: 1, x: 0, y: 0 };
+  img.classList.remove('zoomed');
+  applyImgTransform();
+}
+
+// ========== 绑定拖动和双指缩放事件（页面加载后绑定一次） ==========
+window.addEventListener('load', function(){
+  const img = document.getElementById('bigProofImg');
+  if(!img) return;
+
+  // 鼠标拖动（桌面/平板）
+  img.addEventListener('mousedown', function(e){
+    if(imgZoomState.scale <= 1) return;
+    e.preventDefault();
+    imgDragInfo.dragging = true;
+    imgDragInfo.moved = false;
+    imgDragInfo.startX = e.clientX;
+    imgDragInfo.startY = e.clientY;
+    imgDragInfo.baseX = imgZoomState.x;
+    imgDragInfo.baseY = imgZoomState.y;
+    img.classList.add('dragging');
+  });
+
+  document.addEventListener('mousemove', function(e){
+    if(!imgDragInfo.dragging) return;
+    const dx = e.clientX - imgDragInfo.startX;
+    const dy = e.clientY - imgDragInfo.startY;
+    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) imgDragInfo.moved = true;
+    imgZoomState.x = imgDragInfo.baseX + dx;
+    imgZoomState.y = imgDragInfo.baseY + dy;
+    applyImgTransform();
+  });
+
+  document.addEventListener('mouseup', function(){
+    if(!imgDragInfo.dragging) return;
+    imgDragInfo.dragging = false;
+    img.classList.remove('dragging');
+    // 松手后延迟复位 moved，让 click 能正确判断
+    setTimeout(()=>{ imgDragInfo.moved = false; }, 50);
+  });
+
+  // 触摸拖动 + 双指缩放（手机）
+  img.addEventListener('touchstart', function(e){
+    if(e.touches.length === 1){
+      if(imgZoomState.scale <= 1) return;
+      imgDragInfo.dragging = true;
+      imgDragInfo.moved = false;
+      imgDragInfo.startX = e.touches[0].clientX;
+      imgDragInfo.startY = e.touches[0].clientY;
+      imgDragInfo.baseX = imgZoomState.x;
+      imgDragInfo.baseY = imgZoomState.y;
+      img.classList.add('dragging');
+    }else if(e.touches.length === 2){
+      // 双指开始
+      imgPinchInfo.active = true;
+      imgPinchInfo.startDist = getTouchDistance(e.touches);
+      imgPinchInfo.startScale = imgZoomState.scale;
+      imgDragInfo.dragging = false;
+    }
+  }, { passive: true });
+
+  img.addEventListener('touchmove', function(e){
+    if(e.touches.length === 1 && imgDragInfo.dragging){
+      e.preventDefault();
+      const dx = e.touches[0].clientX - imgDragInfo.startX;
+      const dy = e.touches[0].clientY - imgDragInfo.startY;
+      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) imgDragInfo.moved = true;
+      imgZoomState.x = imgDragInfo.baseX + dx;
+      imgZoomState.y = imgDragInfo.baseY + dy;
+      applyImgTransform();
+    }else if(e.touches.length === 2 && imgPinchInfo.active){
+      e.preventDefault();
+      const dist = getTouchDistance(e.touches);
+      const ratio = dist / imgPinchInfo.startDist;
+      let newScale = imgPinchInfo.startScale * ratio;
+      newScale = Math.max(0.5, Math.min(newScale, 5));
+      imgZoomState.scale = newScale;
+      if(newScale > 1) img.classList.add('zoomed');
+      else img.classList.remove('zoomed');
+      applyImgTransform();
+    }
+  }, { passive: false });
+
+  img.addEventListener('touchend', function(e){
+    if(e.touches.length === 0){
+      imgPinchInfo.active = false;
+      imgDragInfo.dragging = false;
+      img.classList.remove('dragging');
+      setTimeout(()=>{ imgDragInfo.moved = false; }, 50);
+    }
+  });
+
+    function getTouchDistance(touches){
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+});
+
+// 窗口大小变化时（比如手机旋转、浏览器缩放），重新应用边界限制
+window.addEventListener('resize', function(){
+  const modal = document.getElementById('imgPreviewModal');
+  if(modal && modal.classList.contains('show')){
+    applyImgTransform();
+  }
+});
 
 async function parentApprove(idx){
   const task = state.daily[idx];
@@ -2574,7 +3421,16 @@ async function parentApprove(idx){
   const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
   const timeTip = task.start_at ? `用时${Math.round(diffMin)}分钟` : '（无计时记录）';
 
-  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐\n\n⚠️ 通过后任务将直接删除（跨天审核也适用）`)) return;
+  // 判断是否是今天创建的任务
+  const taskDate = new Date(task.create_at || Date.now()).toDateString();
+  const todayStr = new Date().toDateString();
+  const isTodayTask = (taskDate === todayStr);
+
+  const archiveTip = isTodayTask
+    ? '✅ 通过后会归档到"已通过"列表，今晚21:30统一清理'
+    : '⚠️ 这是跨天任务，通过后会立刻删除';
+
+  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐\n\n${archiveTip}`)) return;
 
   approvingTasks[task.id] = true;
 
@@ -2596,7 +3452,7 @@ async function parentApprove(idx){
     await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
     await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
 
-    // 3. 更新数据库并删除任务（保证不重复出现）
+    // 3. 更新数据库状态为 approved
     const { error } = await supabase.from('daily_tasks')
       .update({ status: 'approved' })
       .eq('id', task.id);
@@ -2609,18 +3465,28 @@ async function parentApprove(idx){
       return;
     }
 
-    // 4. 审核完立刻删除，不留到第二天
-    await supabase.from('daily_tasks').delete().eq('id', task.id);
+    // 4. 根据是否是今天任务决定是否立刻删除
+    //    - 今天创建：保留在"已通过"列表，等今晚21:30的 cleanApprovedTasks 统一删除
+    //    - 跨天任务：立刻删除，不污染今天的"已通过"列表
+    if(!isTodayTask){
+      await supabase.from('daily_tasks').delete().eq('id', task.id);
+    }
 
     await saveState();
     await loadAllData();
     renderAll();
-    alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐，任务已归档删除！`);
+    
+    if(isTodayTask){
+      alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐，任务已归档到"已通过"，今晚21:30清理。`);
+    }else{
+      alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐，跨天任务已删除。`);
+    }
 
   } finally {
     delete approvingTasks[task.id];
   }
 }
+
 
 async function parentReject(idx){
 
@@ -2692,7 +3558,8 @@ async function saveLongTask(){
   if(!title) return alert('请输入任务名称');
   await supabase.from('long_tasks').insert([{
     title, star, owner_type: ownerType, category: category,
-    last_date:'', submit_status:'normal'
+    last_date:'', submit_status:'normal',
+    submit_type: selectedLongSubmitType
   }]);
   
   // 恢复所有下拉框（下次从"总览"打开时能正常显示）
@@ -2755,9 +3622,11 @@ let recordTimerInterval = null;
 let recordStartTime = 0;
 let pendingLongTaskIdx = null;
 
-// 打开录音弹窗
+// 打开录音弹窗（长期任务用）
 function openRecordModal(idx){
   pendingLongTaskIdx = idx;
+  pendingDailyAudioIdx = null;
+  recordContext = 'long';
   const task = state.long[idx];
   document.getElementById('recordTaskTitle').innerText = `任务：${task.title}`;
   recordedBlob = null;
@@ -2774,6 +3643,31 @@ function openRecordModal(idx){
   document.getElementById('recordSubmitBtn').innerText = '提交录音';
   openModal('audioRecordModal');
 }
+
+// 打开录音弹窗（日常任务用）
+function openDailyRecordModal(idx){
+  const task = state.daily[idx];
+  if(!task) return;
+  pendingLongTaskIdx = null;
+  pendingDailyAudioIdx = idx;
+  recordContext = 'daily';
+  
+  document.getElementById('recordTaskTitle').innerText = `任务：${task.title}`;
+  recordedBlob = null;
+  audioChunks = [];
+  document.getElementById('recordTimer').innerText = "00:00";
+  document.getElementById('recordStatus').innerText = "点击下方按钮开始录音";
+  const btn = document.getElementById('recordBtn');
+  btn.innerText = "🎤 开始录音";
+  btn.classList.remove('hidden');
+  btn.classList.add('btn-red');
+  btn.classList.remove('btn-gray');
+  document.getElementById('recordPreviewBox').classList.add('hidden');
+  document.getElementById('recordSubmitBtn').disabled = true;
+  document.getElementById('recordSubmitBtn').innerText = '提交录音';
+  openModal('audioRecordModal');
+}
+
 
 // 开始/停止录音（用 WAV 格式，跨平台通用）
 async function toggleRecording(){
@@ -2950,20 +3844,35 @@ function cancelRecording(){
     URL.revokeObjectURL(audio.src);
     audio.src = "";
   }
-  recordedBlob = null;
+    recordedBlob = null;
   audioChunks = [];
   pendingLongTaskIdx = null;
+  pendingDailyAudioIdx = null;
+  recordContext = 'long';
   closeModal('audioRecordModal');
 }
 
-// 上传录音并提交
+
+// 上传录音并提交（根据 recordContext 分流）
 async function uploadRecordingAndSubmit(){
-  if(!recordedBlob || pendingLongTaskIdx === null){
+  if(!recordedBlob){
     alert('请先录制一段录音');
     return;
   }
+  if(recordContext === 'daily'){
+    await uploadDailyRecording();
+  } else {
+    await uploadLongRecording();
+  }
+}
+
+// 长期任务录音提交
+async function uploadLongRecording(){
+  if(pendingLongTaskIdx === null){
+    alert('任务信息丢失，请重新打开');
+    return;
+  }
   const task = state.long[pendingLongTaskIdx];
- 
   const fileName = `long_audio_${task.id}_${Date.now()}.wav`;
   try {
     const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
@@ -2983,6 +3892,44 @@ async function uploadRecordingAndSubmit(){
     await loadAllData();
     renderAll();
     alert('✅ 录音打卡已提交，等待家长确认！');
+  } catch(err){
+    console.error(err);
+    alert('❌ 提交失败：' + err.message);
+  }
+}
+
+// 日常任务录音提交
+async function uploadDailyRecording(){
+  if(pendingDailyAudioIdx === null){
+    alert('任务信息丢失，请重新打开');
+    return;
+  }
+  const task = state.daily[pendingDailyAudioIdx];
+  const fileName = `daily_audio_${task.id}_${Date.now()}.wav`;
+  try {
+    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
+    if(upErr) throw upErr;
+    const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
+    const audioUrl = urlData.publicUrl;
+
+    const today = new Date().toISOString();
+    const { error } = await supabase.from('daily_tasks').update({
+      submit_status: 'submitted',
+      submit_date: today,
+      proof_image: audioUrl,   // 复用 proof_image 字段存录音 URL
+      status: 'pending_review'
+    }).eq('id', task.id);
+    if(error) throw error;
+
+    if(currentRole === "child"){
+      state.child_today_done += 1;
+      await saveState();
+    }
+
+    cancelRecording();
+    await loadAllData();
+    renderAll();
+    alert('✅ 录音已提交，等待家长审核！');
   } catch(err){
     console.error(err);
     alert('❌ 提交失败：' + err.message);
@@ -3011,7 +3958,7 @@ let dictationTaskRef = null;  // 当前听写对应的任务
 function openDictationModal(idx){
   const task = state.daily[idx];
   if(!task) return;
-  const words = (task.description || '').split('.').map(w => w.trim()).filter(w => w);
+    const words = splitDictationWords(task.description || '');
   if(words.length === 0){
     alert('这个任务没有可听写的单词');
     return;
@@ -3031,21 +3978,50 @@ function openDictationModal(idx){
 function speakCurrentWord(){
   if(!dictationWords.length) return;
   const word = dictationWords[dictationIndex];
-  // 如果浏览器不支持语音合成，就用界面显示
   if(!('speechSynthesis' in window)){
     alert('你的浏览器不支持语音播报，请换用 Chrome 或 Safari');
     return;
   }
   window.speechSynthesis.cancel(); // 先取消之前可能还在播的
   const utter = new SpeechSynthesisUtterance(word);
-  // 默认使用英语发音，如果是语文听写，可以改成中文
   const subject = dictationTaskRef ? dictationTaskRef.subject : 'english';
+  
+  // 获取系统语音列表
+  let voices = window.speechSynthesis.getVoices();
+  
   if(subject === 'chinese'){
+    // 中文听写：优先选普通话标准语音
     utter.lang = 'zh-CN';
+    let bestVoice = null;
+    for(let v of voices){
+      if(v.lang === 'zh-CN' || v.lang === 'zh_CN'){
+        // 优先选名字里带“普通话”或“Chinese”的，或者常见中文语音
+        if(v.name.includes('普通话') || v.name.includes('Chinese') || v.name.includes('Yaoyao') || v.name.includes('Huihui') || v.name.includes('Xiaoxiao')){
+          bestVoice = v;
+          break;
+        }
+        if(!bestVoice) bestVoice = v; // 没找到特定的就先用第一个 zh-CN
+      }
+    }
+    if(bestVoice) utter.voice = bestVoice;
   }else{
+    // 英文听写
     utter.lang = 'en-US';
+    let bestVoice = null;
+    for(let v of voices){
+      if(v.lang === 'en-US' || v.lang === 'en_US'){
+        bestVoice = v;
+        break;
+      }
+    }
+    if(bestVoice) utter.voice = bestVoice;
   }
-  utter.rate = 0.9;
+  
+  // 给二年级小朋友听，速度放慢，发音清晰
+  utter.rate = 0.5;   // 原来 0.9，现在 0.5 更慢
+  utter.pitch = 1.0;  // 正常音调
+  utter.volume = 1.0;
+  
   window.speechSynthesis.speak(utter);
 }
 
@@ -3230,74 +4206,119 @@ async function handleDelete(type, idx) {
 
 
 
-// 夜间扣星逻辑：支持跨天补扣，区分日常和长期
-async function autoDeductStarTask() {
-  const now = new Date();
-  const todayStr = now.toDateString();
+// ==================== 夜间扣星（重构版） ====================
+const DEDUCT_STAR_PER_TASK = 1;   // 每个未完成任务扣几星
 
-  // 如果今天已经扣过，直接退出
-  if (state.lastAutoDeductDate === todayStr) {
-    console.log('夜间扣星：今天已执行过，跳过');
-    return;
-  }
+function isPastDeductTime(now = new Date()){
+  const h = now.getHours(), m = now.getMinutes();
+  return h > 21 || (h === 21 && m >= 30);
+}
 
-  console.log('夜间扣星：开始执行检查');
+// 扣一条任务；返回 true 表示这次真的扣了，false 表示之前已扣过/写日志失败
+async function deductOneTaskStar({ ownerType, taskType, taskId, taskTitle, dateStr }){
+  const deductKey = `deduct_${taskType}_${taskId}_${dateStr}`;
+  const reason = `⏰夜间扣星：${taskType === 'daily' ? '日常' : '长期'}任务【${taskTitle}】未完成`;
 
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
+  const { error } = await supabase.from('star_logs').insert([{
+    role_type: ownerType,
+    change_num: -DEDUCT_STAR_PER_TASK,
+    reason: reason,
+    deduct_key: deductKey,
+    current_star: 0   // 后面统一刷新，这里不纠结
+  }]);
 
-  // 算出“昨天”的字符串，用于判断长期任务是否在昨天完成过
-  const yesterday = new Date(now.getTime() - 86400000);
-  const yesterdayStr = yesterday.toDateString();
-
-  try {
-    // ===== 1. 日常任务扣星（只扣 active 状态，跨天补扣） =====
-    const unfinishDaily = state.daily.filter(t => {
-      if (t.status !== 'active') return false; // 只扣未完成的
-      const taskDate = new Date(t.create_at || Date.now()).toDateString();
-      // 如果是今天的任务，必须过了21:30才扣；如果是以前的任务，直接补扣
-      return (taskDate === todayStr && isAfter2130) || (taskDate !== todayStr);
-    });
-
-    for (const task of unfinishDaily) {
-      state.star -= 1;
-      await addStarLogItem("child", -1, `⏰夜间扣星：日常任务【${task.title}】未完成`);
+  if(error){
+    // 23505 = 唯一键冲突，说明今天这条已经扣过
+    if(error.code === '23505' || /duplicate|unique/i.test(error.message || '')){
+      return false;
     }
+    console.warn('扣星日志写入失败', error);
+    return false;   // 写不进去就不扣，宁可漏扣不可错扣
+  }
+  return true;
+}
 
-    // ===== 2. 长期任务扣星（只扣未打卡且不是submitted的，跨天补扣） =====
-    const unfinishLong = state.long.filter(t => {
-      if (t.submit_status === 'submitted') return false; // 已提交待审核的不扣
-      if (t.last_date === todayStr) return false; // 今天已完成的
-      
-      // 【核心修复】：如果是昨天完成的，今天早上打开App时不应该扣星！
-      // 只有今天过了21:30，且今天还没完成，才扣星。
-      if (t.last_date === yesterdayStr) {
-        return isAfter2130; 
-      }
-      
-      // 前天或更早完成，或者从来没完成过，说明昨天就没打卡，直接补扣
+async function autoDeductStarTask(){
+  if(window.autoDeductRunning) return;
+  window.autoDeductRunning = true;
+
+  try{
+    const now = new Date();
+    const todayStr = now.toDateString();
+    const afterTime = isPastDeductTime(now);
+// ★ 新增：过了21:30且今天已执行过，直接跳过
+    if(afterTime && state.lastAutoDeductDate === todayStr){
+      console.log('夜间扣星：今天已执行过，跳过');
+      return;
+    }
+    let changed = false;
+
+    // ============ 1. 日常任务 ============
+    const unfinishDaily = state.daily.filter(t => {
+      if(t.status !== 'active') return false;
+      const taskDate = new Date(t.create_at || Date.now()).toDateString();
+      // 今天创建的任务，只有过了21:30才扣；更早的任务随时补扣
+      if(taskDate === todayStr) return afterTime;
       return true;
     });
 
-    for (const task of unfinishLong) {
-      if (task.owner_type === "child") {
-        state.star -= 1;
-        await addStarLogItem("child", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
-      } else {
-        state.parent_star -= 1;
-        await addStarLogItem("parent", -1, `⏰夜间扣星：长期任务【${task.title}】未完成`);
+    for(const task of unfinishDaily){
+      const taskDate = new Date(task.create_at || Date.now()).toDateString();
+      const ok = await deductOneTaskStar({
+        ownerType: 'child',
+        taskType: 'daily',
+        taskId: task.id,
+        taskTitle: task.title,
+        dateStr: taskDate
+      });
+      if(ok){
+        state.star -= DEDUCT_STAR_PER_TASK;
+        await saveState(); 
+        changed = true;
       }
     }
 
-    // 【核心修复】：扣星全部成功之后，才记录“今天已扣过”，防止网络失败导致卡死
-    state.lastAutoDeductDate = todayStr;
-    await saveState();
-    console.log('夜间扣星：执行完毕');
-    
-  } catch(e) {
-    console.warn('夜间扣星发生网络异常，不标记今天已扣，稍后重试', e);
-    // 注意：这里故意不设置 state.lastAutoDeductDate，留到下一次重试
+    // ============ 2. 长期任务 ============
+    const unfinishLong = state.long.filter(t => {
+      if(t.submit_status === 'submitted') return false;   // 待审核不扣
+      if(t.last_date === todayStr) return false;          // 今天完成了不扣
+      return true;   // 昨天/更早/从未完成，都扣（用今天日期做去重键）
+    });
+
+    for(const task of unfinishLong){
+      const ok = await deductOneTaskStar({
+        ownerType: task.owner_type,
+        taskType: 'long',
+        taskId: task.id,
+        taskTitle: task.title,
+        dateStr: todayStr
+      });
+      if(ok){
+        if(task.owner_type === 'child') state.star -= DEDUCT_STAR_PER_TASK;
+        else state.parent_star -= DEDUCT_STAR_PER_TASK;
+        
+        await saveState();
+
+       changed = true;
+      }
+    }
+
+    // ============ 3. 有任何变动立刻落库 ============
+    if(changed){
+      await saveState();
+      console.log('夜间扣星：星星已保存');
+    }
+
+    // ============ 4. 标记“今天已跑过夜间扣星” ============
+    // 注意：这个只用于提前退出，真正的去重靠 deduct_key
+    if(afterTime && state.lastAutoDeductDate !== todayStr){
+      state.lastAutoDeductDate = todayStr;
+      await saveState();
+    }
+  } catch(e){
+    console.warn('夜间扣星异常', e);
+  } finally {
+    window.autoDeductRunning = false;
   }
 }
 
@@ -3381,7 +4402,39 @@ async function cleanApprovedTasks(){
 }
 
 
+// ================== 子标签切换函数 ==================
+function switchDailySubTab(mode){
+  dailySubTab = mode;
+  const modes = ['active', 'pending', 'approved'];
+  modes.forEach(m => {
+    const tab = document.getElementById('dailyTab' + m.charAt(0).toUpperCase() + m.slice(1));
+    const wrap = document.getElementById('daily' + m.charAt(0).toUpperCase() + m.slice(1) + 'Wrap');
+    if(tab) tab.classList.toggle('active', m === mode);
+    if(wrap) wrap.classList.toggle('hidden', m !== mode);
+  });
+}
 
+function switchTaskLongSubTab(mode){
+  taskLongSubTab = mode;
+  const modes = ['unfinished', 'pending', 'approved'];
+  modes.forEach(m => {
+    const tab = document.getElementById('taskLongTab' + m.charAt(0).toUpperCase() + m.slice(1));
+    const wrap = document.getElementById('taskLong' + m.charAt(0).toUpperCase() + m.slice(1) + 'Wrap');
+    if(tab) tab.classList.toggle('active', m === mode);
+    if(wrap) wrap.classList.toggle('hidden', m !== mode);
+  });
+}
+
+function switchParentLongSubTab(mode){
+  parentLongSubTab = mode;
+  const modes = ['unfinished', 'pending', 'approved'];
+  modes.forEach(m => {
+    const tab = document.getElementById('parentLongTab' + m.charAt(0).toUpperCase() + m.slice(1));
+    const wrap = document.getElementById('parentLong' + m.charAt(0).toUpperCase() + m.slice(1) + 'Wrap');
+    if(tab) tab.classList.toggle('active', m === mode);
+    if(wrap) wrap.classList.toggle('hidden', m !== mode);
+  });
+}
 
 
 async function renderAll(){
@@ -3420,15 +4473,12 @@ async function renderAll(){
     ).length;
     text2 = "家长待确认";
 
-    // 3. 今日已完成：今天审核通过的日常 + 今天已打卡的长期
-    const childDailyDone = state.daily.filter(t => {
-      if (t.status !== "approved") return false;
-      const approvedDate = t.approved_date ? new Date(t.approved_date).toDateString() : "";
-      return approvedDate === todayStr;
-    }).length;
+            // 3. 今日已完成：今天审核通过的日常 + 今天已打卡的长期
+    //    （daily 里 approved 状态的，就是今天审核通过还没清理的，因为跨天的已经删了）
+    const childDailyDone = state.daily.filter(t => t.status === "approved").length;
     const childLongDone = state.long.filter(t =>
       t.owner_type === "child" &&
-      t.last_date === todayStr  // ← 关键修复：必须“今天完成”才算完成
+      t.last_date === todayStr
     ).length;
     num3 = childDailyDone + childLongDone;
     text3 = "今日已完成";
@@ -3588,11 +4638,17 @@ async function renderAll(){
     if(currentSubjectTab !== 'all' && task.subject !== currentSubjectTab) return;
     const subjInfo = SUBJECT_MAP[task.subject] || {name:"",cls:""};
 
-       if(task.status === 'approved'){
+           if(task.status === 'approved'){
+     const isAudio1 = task.proof_image && task.proof_image.endsWith('.wav');
      const acts1 = `
-         ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>` : '<span style="color:#888;font-size:13px;">无作业照片</span>'}
+         ${task.proof_image ? (
+           isAudio1
+             ? `<button class="task-btn btn-blue" onclick="playAudio('${task.proof_image.replaceAll("'","\\'")}')">🔊 播放录音</button>`
+             : `<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>`
+         ) : '<span style="color:#888;font-size:13px;">无提交内容</span>'}
          ${currentRole==='parent'?`<button class="task-btn btn-del" onclick="deleteDailyTask(${idx})">删除</button>`:""}
-     `;
+     `;  
+     
      window.taskActionMap['daily-' + idx] = acts1;
      dailyApprovedHtml += `
      <div class="task-row" data-task-type="daily" data-task-idx="${idx}">
@@ -3609,13 +4665,19 @@ async function renderAll(){
 
  } else   if(task.status === 'pending_review'){
 
+        const isAudio2 = task.proof_image && task.proof_image.endsWith('.wav');
+    const viewBtnHtml2 = task.proof_image
+      ? (isAudio2
+          ? `<button class="task-btn btn-blue" onclick="playAudio('${task.proof_image.replaceAll("'","\\'")}')">🔊 播放录音</button>`
+          : `<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>`)
+      : '<span style="color:#888;font-size:13px;">无提交内容</span>';
     const acts2 = `
       ${currentRole==='parent'?`
-${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>` : '<span style="color:#888;font-size:13px;">无作业照片</span>'}
+${viewBtnHtml2}
 <button class="task-btn task-btn-approve" onclick="this.disabled=true; parentApprove(${idx})">✅通过</button>
 <button class="task-btn task-btn-reject" onclick="this.disabled=true; parentReject(${idx})">↩退回</button>
 <button class="task-btn btn-del" onclick="deleteDailyTask(${idx})">删除</button>
-`:`${task.proof_image?`<button class="task-btn" onclick="viewProofImage('${task.proof_image.replaceAll("'","\\'")}')">查看图片</button>`:`<span style="color:#888;font-size:13px;">无作业照片</span>`}`}
+`:`${viewBtnHtml2}`}
   `;
   window.taskActionMap['daily-' + idx] = acts2;
   dailyPendingHtml += `
@@ -3631,12 +4693,35 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
     </div>
   </div>`;
     }else{
+
+ // 根据 submit_type 生成孩子端提交按钮
+    const submitType = task.submit_type || 'normal';
+    let childSubmitBtn = '';
+    if (task.start_at && currentRole === 'child') {
+      if (submitType === 'photo') {
+        childSubmitBtn = `<button class="task-btn btn-blue" onclick="handleTaskComplete(${idx})">📷 提交图片</button>`;
+      } else if (submitType === 'audio') {
+        childSubmitBtn = `<button class="task-btn btn-red" onclick="openDailyRecordModal(${idx})">🎤 录音提交</button>`;
+      } else {
+        childSubmitBtn = `<button class="task-btn btn-green" onclick="doSubmitNormal(${idx})">✅ 提交完成</button>`;
+      }
+    }
+    // 提交方式标签
+    const submitLabelMap = {
+      'normal': '<span style="background:#dcfce7;color:#15803d;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">普通</span>',
+      'photo':  '<span style="background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">📷图片</span>',
+      'audio':  '<span style="background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">🎤录音</span>'
+    };
+    const submitLabel = submitLabelMap[submitType] || '';
+
+
  const acts3 = `
         ${task.is_dictation && currentRole === 'child' ? `<button class="task-btn btn-blue" onclick="openDictationModal(${idx})">🔊 听写练习</button>` : ''}
         ${!task.start_at && currentRole==="child"?`<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; startTask(${idx})">开始任务</button>`:""}
-        ${task.start_at && currentRole==="child"?`<button class="task-btn" onclick="handleTaskComplete(${idx})">提交完成</button>`:""}
+        ${childSubmitBtn}
         ${currentRole==='parent'?`
           <button class="task-btn btn-gray" onclick="openSetTimeModal(${idx})">设置时限</button>
+          <button class="task-btn btn-blue" onclick="openSetSubmitTypeModal(${idx})">📤 提交方式</button>
           <button class="task-btn btn-del"  onclick="deleteDailyTask(${idx})">删除</button>
         `:""}
  `;
@@ -3645,7 +4730,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
   <div class="task-row" data-task-type="daily" data-task-idx="${idx}">
     <div class="task-info">
       <div class="task-icon">📌</div>
-      <div class="task-text">${task.title}${task.is_dictation ? ' <span style="background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">听写</span>' : ''}<span class="${subjInfo.cls}">${subjInfo.name}</span>
+      <div class="task-text">${task.title}${task.is_dictation ? ' <span style="background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">听写</span>' : ''}${submitLabel}<span class="${subjInfo.cls}">${subjInfo.name}</span>
         <div class="task-meta">奖励${task.star}⭐ ${task.minute_limit>0?`限时${task.minute_limit}分钟`:"不限时"}
         ${task.start_at?`<span class="badge-timing">已开始</span>`:""}
         </div>
@@ -3707,12 +4792,15 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
 
     let actionButtons = "";
 
-    // ====== 1. 未完成状态：只有自己的任务才能提交打卡 ======
+       // ====== 1. 未完成状态：只有自己的任务才能提交打卡 ======
     if (taskStatus === 'unfinished' && isMyTask) {
-      actionButtons += `<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${btnDisabled ? 'disabled' : ''}>提交打卡</button>`;
-      // 录音打卡：仅限“孩子 + 成长”类任务
-      if (task.owner_type === 'child' && (task.category || '成长') === '成长') {
-        actionButtons += `<button class="task-btn btn-blue" onclick="this.disabled=true; openRecordModal(${idx})" ${btnDisabled ? 'disabled' : ''}>🎤 录音打卡</button>`;
+      const longSubmitType = task.submit_type || 'normal';
+      if (longSubmitType === 'photo') {
+        actionButtons += `<button class="task-btn btn-blue" onclick="this.disabled=true; handleLongTaskPhotoUpload(${idx})" ${btnDisabled ? 'disabled' : ''}>📷 图片打卡</button>`;
+      } else if (longSubmitType === 'audio') {
+        actionButtons += `<button class="task-btn btn-red" onclick="this.disabled=true; openRecordModal(${idx})" ${btnDisabled ? 'disabled' : ''}>🎤 录音打卡</button>`;
+      } else {
+        actionButtons += `<button class="task-btn task-btn-start" onclick="this.disabled=true; this.innerText='处理中...'; submitLongTask(${idx})" ${btnDisabled ? 'disabled' : ''}>✅ 提交打卡</button>`;
       }
     }
 
@@ -3735,21 +4823,38 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
       actionButtons += `<span class="badge-submit" style="padding:8px 12px;font-size:14px;">今日已完成</span>`;
     }
 
-    // ====== 5. 删除按钮：只有家长能删 ======
+        // ====== 5. 家长操作：修改提交方式 / 删除 ======
     if (currentRole === 'parent') {
+      actionButtons += `<button class="task-btn btn-blue" onclick="openSetSubmitTypeModal(${idx}, 'long')">📤 提交方式</button>`;
       actionButtons += `<button class="task-btn btn-del" onclick="deleteLongTask(${idx})">删除</button>`;
     }
 
     const ownerLabel = task.owner_type === 'child' ? `<span class="badge-child">孩子任务</span>` : `<span class="badge-parent">家长任务</span>`;
          window.taskActionMap['long-' + idx] = actionButtons;
+    // 提交方式标签
+    const longSubmitLabelMap = {
+      'normal': '<span style="background:#dcfce7;color:#15803d;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">普通</span>',
+      'photo':  '<span style="background:#dbeafe;color:#1d4ed8;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">📷图片</span>',
+      'audio':  '<span style="background:#fee2e2;color:#b91c1c;font-size:12px;padding:2px 6px;border-radius:6px;margin-left:4px;">🎤录音</span>'
+    };
+    const longSubmitLabel = longSubmitLabelMap[task.submit_type || 'normal'] || '';
+    // 附件预览按钮（图片 or 录音）
+    let mediaBtn = '';
+    if(task.audio_url){
+      if(task.audio_url.endsWith('.wav')){
+        mediaBtn = `<span class="badge-timing" style="cursor:pointer;" onclick="playAudio('${task.audio_url}')">🔊 播放录音</span>`;
+      } else {
+        mediaBtn = `<span class="badge-timing" style="cursor:pointer;" onclick="viewProofImage('${task.audio_url}')">🖼 查看图片</span>`;
+      }
+    }
     const itemHtml = `
     <div class="task-row" data-task-type="long" data-task-idx="${idx}">
       <div class="task-info">
         <div class="task-icon">⏳</div>
 
-        <div class="task-text">${task.title}
+        <div class="task-text">${task.title}${longSubmitLabel}
           <div class="task-meta">奖励${task.star}⭐
-            ${task.audio_url ? `<span class="badge-timing" style="cursor:pointer;" onclick="playAudio('${task.audio_url}')">🔊 播放录音</span>` : ""}
+            ${mediaBtn}
           </div>
         </div>
       </div>
@@ -3771,7 +4876,7 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
     }
   });
 
-  // 注入到【任务页】的长期容器
+    // 注入到【任务页】的长期容器
   const tu = document.getElementById("taskLongUnfinishedList");
   const tp = document.getElementById("taskLongPendingList");
   const ta = document.getElementById("taskLongApprovedList");
@@ -3783,7 +4888,41 @@ ${task.proof_image ? `<button class="task-btn" onclick="viewProofImage('${task.p
   document.getElementById("longUnfinishedList").innerHTML = parentLongUnfinishHtml || `<p style="padding:10px;color:#888;">暂无未完成家长任务</p>`;
   document.getElementById("longPendingList").innerHTML = parentLongPendingHtml || `<p style="padding:10px;color:#888;">暂无待审核家长任务</p>`;
   document.getElementById("longApprovedList").innerHTML = parentLongApprovedHtml || `<p style="padding:10px;color:#888;">今日暂无已完成的家长任务</p>`;
+
+  // ================== 更新子标签的数字 ==================
+  document.getElementById("dailyCountActive").innerText = (dailyActiveHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("dailyCountPending").innerText = (dailyPendingHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("dailyCountApproved").innerText = (dailyApprovedHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("taskLongCountUnfinished").innerText = (taskLongUnfinishHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("taskLongCountPending").innerText = (taskLongPendingHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("taskLongCountApproved").innerText = (taskLongApprovedHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("parentLongCountUnfinished").innerText = (parentLongUnfinishHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("parentLongCountPending").innerText = (parentLongPendingHtml.match(/class="task-row"/g) || []).length;
+  document.getElementById("parentLongCountApproved").innerText = (parentLongApprovedHtml.match(/class="task-row"/g) || []).length;
+  // ================== 根据角色设置默认显示的子标签 ==================
+  // 1. 任务页-日常任务（都是孩子的任务）
+  //    家长默认看"待审核"，孩子默认看"进行中"
+  if(dailySubTab === null){
+    dailySubTab = (currentRole === 'parent') ? 'pending' : 'active';
+  }
+  switchDailySubTab(dailySubTab);
+
+  // 2. 任务页-长期任务（都是孩子的任务）
+  //    家长默认看"待审核"，孩子默认看"未完成"
+  if(taskLongSubTab === null){
+    taskLongSubTab = (currentRole === 'parent') ? 'pending' : 'unfinished';
+  }
+  switchTaskLongSubTab(taskLongSubTab);
+
+  // 3. 家长页-长期任务（都是家长的任务）
+  //    家长默认看"未完成"，孩子默认看"待审核"  ← 这里和上面反过来
+  if(parentLongSubTab === null){
+    parentLongSubTab = (currentRole === 'parent') ? 'unfinished' : 'pending';
+  }
+  switchParentLongSubTab(parentLongSubTab);
   
+
+
   // 心愿渲染
   let wishHtml = "";
   state.wish.forEach((wish,idx)=>{
@@ -3973,16 +5112,16 @@ function logout(){
   document.getElementById('childBtn').classList.remove('active');
 }
 
-
-// ========== 页面回到前台时，自动补做未完成的任务 ==========
-function runBackgroundCatchUp(){
+// ========== 页面回到前台时，自动补做未完成的任务 + 刷新数据 ==========
+async function runBackgroundCatchUp(){
   try { 
-    // 只有家长端才能进行扣星和清理操作（防止数据冲突）
-    if(currentRole === 'parent') {
-      autoDeductStarTask(); 
-      cleanApprovedTasks(); 
-    }
-  } catch(e){ console.warn(e); }
+    if(!supabase) return;
+    await autoDeductStarTask();
+    await cleanApprovedTasks();
+    await loadAllData();
+    renderAll();
+    console.log('✅ 从后台切回，已自动刷新数据');
+  } catch(e){ console.warn('后台刷新失败', e); }
 }
 
 // 手机端：点击任务行打开详情弹窗（事件委托）
