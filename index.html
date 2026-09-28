@@ -1571,7 +1571,7 @@ function renderDailyOverview(){
     if(titleEl) titleEl.innerText = '⏳ ' + currentSubjectTab + '任务';
   }
 
-  const today = new Date().toDateString();
+  const today = getTodayStr();
 
   // ========== 任务页总览（语数英 + 长期分类） ==========
   const stats = { chinese:{done:0,total:0}, math:{done:0,total:0}, english:{done:0,total:0} };
@@ -1639,7 +1639,7 @@ function renderDailyOverview(){
     bars = [
       { label: '📝 待审核孩子日常', done: childDailyPending, total: state.daily.length, fillCls: 'chinese' },
       { label: '⏳ 待审核孩子长期', done: childLongPending, total: state.long.filter(t => t.owner_type === 'child').length, fillCls: 'child' },
-      { label: '👨‍👩‍👧 我的未完成', done: parentUnfinishCount, total: parentLongList.length, fillCls: 'parent' }
+      { label: '👨‍👩‍👧 我的未完成', done: parentDoneCount, total: parentLongList.length, fillCls: 'parent' }
     ];
    } else {
     // 孩子端视角：家长已审核 / 家长已完成 / 家长已提交待审核
@@ -1699,7 +1699,7 @@ function renderLongOverview(){
   longOverview.style.display = 'block';
   longListCard.style.display = 'none';
 
-  const today = new Date().toDateString();
+  const today = getTodayStr();
   let childTotal = 0, childDone = 0;
   let parentTotal = 0, parentDone = 0;
   state.long.forEach(t=>{
@@ -1729,7 +1729,7 @@ function renderLongOverview(){
 
 // 刷新左侧分类的红点提示
 function updateCategoryDots(){
-  const today = new Date().toDateString();
+  const today = getTodayStr();
 
   // ===== 日常任务：每个科目是否有未完成或待审核的任务 =====
   const dailyBySubj = {chinese:false, math:false, english:false};
@@ -2280,7 +2280,7 @@ async function resetWeek(){
   state.star = 0;
   state.parent_star = 0;
   // 关键：标记今天已扣星，防止重置后立刻被 autoDeductStarTask 再扣一次
-  state.lastAutoDeductDate = new Date().toDateString();
+  state.lastAutoDeductDate = getTodayStr();
 
   // ===== 2. 立刻刷新界面（用户秒看到星星归零） =====
   renderAll();
@@ -2527,7 +2527,7 @@ async function submitLongTaskWithImg(){
     const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
     const imgUrl = urlData.publicUrl;
     
-    const today = new Date().toDateString();
+    const today = getTodayStr();
     const { error } = await supabase.from('long_tasks')
       .update({
         submit_status: 'submitted',
@@ -3429,8 +3429,8 @@ async function parentApprove(idx){
   const timeTip = task.start_at ? `用时${Math.round(diffMin)}分钟` : '（无计时记录）';
 
   // 判断是否是今天创建的任务
-  const taskDate = new Date(task.create_at || Date.now()).toDateString();
-  const todayStr = new Date().toDateString();
+  const taskDate = getTodayStr(new Date(task.create_at || Date.now()));
+  const todayStr = getTodayStr();
   const isTodayTask = (taskDate === todayStr);
 
   const archiveTip = isTodayTask
@@ -3887,7 +3887,7 @@ async function uploadLongRecording(){
     const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
     const audioUrl = urlData.publicUrl;
 
-    const today = new Date().toDateString();
+    const today = getTodayStr();
     const { error } = await supabase.from('long_tasks').update({
       submit_status: 'submitted',
       submit_date: today,
@@ -4072,7 +4072,7 @@ async function submitLongTask(idx) {
 
   const task = state.long[idx];
 
-  const today = new Date().toDateString();
+  const today = getTodayStr();
 
   if(task.last_date===today)return alert('今日已经完成');
 
@@ -4132,7 +4132,7 @@ async function approveLongTask(idx){
   try {
     // 使用提交那天的日期作为最后完成日期，而不是今天
     // 这样即使第二天才审核，也算作昨天完成的，今天依然可以重新打卡
-    const lastDate = task.submit_date || new Date().toDateString();
+    const lastDate = task.submit_date || getTodayStr();
 
     // 删除录音
     if(task.audio_url){
@@ -4211,6 +4211,12 @@ async function handleDelete(type, idx) {
 }
 
 
+// ===== 统一日期格式：YYYY-MM-DD =====
+function getTodayStr(d = new Date()){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+
 
 
 // ==================== 夜间扣星（重构版） ====================
@@ -4251,8 +4257,10 @@ async function autoDeductStarTask(){
 
   try{
     const now = new Date();
-    const todayStr = now.toDateString();
+    const todayStr = getTodayStr(now);
     const afterTime = isPastDeductTime(now);
+
+
 // ★ 新增：过了21:30且今天已执行过，直接跳过
     if(afterTime && state.lastAutoDeductDate === todayStr){
       console.log('夜间扣星：今天已执行过，跳过');
@@ -4262,15 +4270,13 @@ async function autoDeductStarTask(){
 
     // ============ 1. 日常任务 ============
     const unfinishDaily = state.daily.filter(t => {
-      if(t.status !== 'active') return false;
-      const taskDate = new Date(t.create_at || Date.now()).toDateString();
-      // 今天创建的任务，只有过了21:30才扣；更早的任务随时补扣
-      if(taskDate === todayStr) return afterTime;
-      return true;
-    });
+  if(t.status !== 'active') return false;
+  if(!afterTime) return false;
+  return true;
+});
 
     for(const task of unfinishDaily){
-      const taskDate = new Date(task.create_at || Date.now()).toDateString();
+      const taskDate = getTodayStr(new Date(task.create_at || Date.now()));
       const ok = await deductOneTaskStar({
         ownerType: 'child',
         taskType: 'daily',
@@ -4289,6 +4295,7 @@ async function autoDeductStarTask(){
     const unfinishLong = state.long.filter(t => {
       if(t.submit_status === 'submitted') return false;   // 待审核不扣
       if(t.last_date === todayStr) return false;          // 今天完成了不扣
+      if(!afterTime) return false;
       return true;   // 昨天/更早/从未完成，都扣（用今天日期做去重键）
     });
 
@@ -4333,7 +4340,7 @@ async function autoDeductStarTask(){
 // 清理日常任务：支持跨天补删，保留待审核任务
 async function cleanApprovedTasks(){
   const now = new Date();
-  const todayStr = now.toDateString();
+  const todayStr = getTodayStr(now);
 
   // 如果今天已经清理过，直接退出
   if (window.lastCleanDate === todayStr) return;
@@ -4359,7 +4366,7 @@ async function cleanApprovedTasks(){
     const tasksToDelete = [];
 
     for(const item of allTasks){
-      const taskDate = new Date(item.create_at || Date.now()).toDateString();
+      const taskDate = getTodayStr(new Date(item.create_at || Date.now()));
       const isToday = (taskDate === todayStr);
 
       // 逻辑A：待审核的任务，永远不删（保留给家长审核）
@@ -4454,7 +4461,7 @@ async function renderAll(){
   // ==========【新版：严格按“今天”统计，防止跨天任务污染数据】==========
   let num1, num2, num3;
   let text1, text2, text3;
-  const todayStr = new Date().toDateString();
+  const todayStr = getTodayStr();
 
   if(currentRole === "child"){
     // 🧒 孩子端统计
@@ -4462,7 +4469,7 @@ async function renderAll(){
     // 1. 今日未完成：今天创建的日常 active + 今天还没完成的长期任务
     const childDailyUnfinish = state.daily.filter(t => {
       if (t.status !== "active") return false;
-      const taskDate = new Date(t.create_at || Date.now()).toDateString();
+      const taskDate = getTodayStr(new Date(t.create_at || Date.now()));
       return taskDate === todayStr;
     }).length;
     const childLongUnfinish = state.long.filter(t =>
