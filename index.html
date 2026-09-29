@@ -1464,13 +1464,9 @@ async function quickReward(targetRole, delta, reason){
   if(!confirm(confirmTip)){
     return; // 点取消，直接退出，不执行任何操作
   }
-  if(targetRole === "child"){
-    state.star += delta;
-  }else{
-    state.parent_star += delta;
-  }
+    await supabase.rpc('adjust_stars', { p_role_type: targetRole, p_amount: delta });
   await addStarLogItem(targetRole, delta, reason);
-  await saveState();
+  await loadAllData();
   renderAll();
   alert(`✅已记录：${reason}，${delta>0?"+":""}${delta}⭐`);
 }
@@ -2358,15 +2354,15 @@ async function buyRes(type){
   if(type==='sun') resName="阳光";
   if(type==='fert') resName="肥料";
   
+   // 数据库原子扣星
+  await supabase.rpc('adjust_stars', { p_role_type: currentRole, p_amount: -6 });
+
+  // 物资本地加，然后保存
   if(currentRole === 'parent'){
-    // 家长用自己的星星，买自己的物资
-    state.parent_star -= 6;
     if(type==='water') state.water++;
     if(type==='sun') state.sun++;
     if(type==='fert') state.fert++;
   } else {
-    // 孩子用自己的星星，买自己的物资
-    state.star -= 6;
     if(type==='water') state.waterChild++;
     if(type==='sun') state.sunChild++;
     if(type==='fert') state.fertChild++;
@@ -2374,8 +2370,8 @@ async function buyRes(type){
   
   await addStarLogItem(currentRole, -6, `商城兑换${resName}`);
   await saveState();
+  await loadAllData();
   renderAll();
-  alert('兑换成功！');
 }
 
 async function saveDailyTask(){
@@ -3453,9 +3449,9 @@ async function parentApprove(idx){
       }
     }
 
-    // 2. 加星星
-    state.star += getStar;
-    state.parent_star += getStar;
+        // 2. 加星星（改用数据库原子操作，防止多设备覆盖）
+    await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  getStar });
+    await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount:  getStar });
     await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
     await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
 
@@ -3464,11 +3460,12 @@ async function parentApprove(idx){
       .update({ status: 'approved' })
       .eq('id', task.id);
       
-    if(error){
+       if(error){
       console.error('审核更新失败', error);
       alert('❌ 审核失败：' + error.message);
-      state.star -= getStar; // 回滚
-      state.parent_star -= getStar;
+      // 回滚：把刚加的星星减回去
+      await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount: -getStar });
+      await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount: -getStar });
       return;
     }
 
@@ -4158,16 +4155,10 @@ async function approveLongTask(idx){
       return;
     }
 
-    // 加星星
+        // 加星星（改用数据库原子操作，防止多设备覆盖）
     const roleType = task.owner_type;
-    if(task.owner_type === 'child'){
-      state.star += task.star;
-    }else{
-      state.parent_star += task.star;
-    }
-    await saveState();
+    await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: task.star });
     await addStarLogItem(roleType, task.star, `长期任务【${task.title}】打卡完成`);
-
     await loadAllData();
     renderAll();
     alert('✅ 确认完成，+'+task.star+'⭐');
