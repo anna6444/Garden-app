@@ -2382,7 +2382,6 @@ async function buyRes(type){
   
   await addStarLogItem(currentRole, -6, `商城兑换${resName}`);
   await saveState();
-  await loadAllData();
   renderAll();
 }
 
