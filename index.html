@@ -1364,11 +1364,11 @@ async function loadAllData(){
 async function saveState(){
   if(!supabase) return;
   try{
-    await supabase.from('app_state').upsert({
-      id:1, star:state.star, parent_star:state.parent_star,
+    // ★ 不再写 star 和 parent_star，交给 adjust_stars 原子操作
+    await supabase.from('app_state').update({
       water:state.water, sun:state.sun, fert:state.fert,
       plant:state.plant, stage:state.stage, plant_done:state.plantDone,
-            plant_child: {
+      plant_child: {
         plant: state.plantChild,
         stage: state.stageChild,
         water: state.waterChild,
@@ -1376,10 +1376,8 @@ async function saveState(){
         fert: state.fertChild,
         plantDone: state.plantDoneChild
       },
-
-
       lastautodeductdate: state.lastAutoDeductDate || ""
-    });
+    }).eq('id', 1);
   }catch(e){
     console.warn("saveState异常",e);
   }
@@ -1464,7 +1462,11 @@ async function quickReward(targetRole, delta, reason){
   if(!confirm(confirmTip)){
     return; // 点取消，直接退出，不执行任何操作
   }
-    await supabase.rpc('adjust_stars', { p_role_type: targetRole, p_amount: delta });
+      const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: targetRole, p_amount: delta });
+  if(rpcErr){
+    alert('❌ 星星操作失败：' + rpcErr.message);
+    return;
+  }
   await addStarLogItem(targetRole, delta, reason);
   await loadAllData();
   renderAll();
@@ -2281,13 +2283,19 @@ async function resetWeek(){
   // ===== 2. 立刻刷新界面（用户秒看到星星归零） =====
   renderAll();
 
-  // ===== 3. 同步星星到服务器（这一步很快，等它完成再提示） =====
+  // ===== 3. 单独把星星写 0 =====
+  await supabase.from('app_state').update({
+    star: 0,
+    parent_star: 0
+  }).eq('id', 1);
+
+  // ===== 4. 保存其他状态 =====
   await saveState();
 
-  // ===== 4. 立刻提示用户，不等清理 =====
+  // ===== 5. 立刻提示用户，不等清理 =====
   alert('✅ 本周已重置！\n星星、植物、物资已清零，云端图片和日志正在后台清理…');
 
-  // ===== 5. 后台异步清理（不阻塞界面） =====
+  // ===== 6. 后台异步清理（不阻塞界面） =====
   (async () => {
     try {
       await Promise.all([
@@ -2354,8 +2362,12 @@ async function buyRes(type){
   if(type==='sun') resName="阳光";
   if(type==='fert') resName="肥料";
   
-   // 数据库原子扣星
-  await supabase.rpc('adjust_stars', { p_role_type: currentRole, p_amount: -6 });
+     // 数据库原子扣星
+  const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: currentRole, p_amount: -6 });
+  if(rpcErr){
+    alert('❌ 扣星失败：' + rpcErr.message);
+    return;
+  }
 
   // 物资本地加，然后保存
   if(currentRole === 'parent'){
@@ -3449,9 +3461,19 @@ async function parentApprove(idx){
       }
     }
 
-        // 2. 加星星（改用数据库原子操作，防止多设备覆盖）
-    await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  getStar });
-    await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount:  getStar });
+            // 2. 加星星（改用数据库原子操作，防止多设备覆盖）
+    const { error: errChild } = await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  getStar });
+    if(errChild){
+      alert('❌ 孩子加星失败：' + errChild.message);
+      return;
+    }
+    const { error: errParent } = await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount:  getStar });
+    if(errParent){
+      // 家长加星失败 → 把孩子刚加的星星回滚掉
+      await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  -getStar });
+      alert('❌ 家长加星失败：' + errParent.message);
+      return;
+    }
     await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
     await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
 
@@ -4142,7 +4164,15 @@ async function approveLongTask(idx){
       }
     }
 
-    // 更新数据库状态
+        // 先加星星（改用数据库原子操作，防止多设备覆盖）
+    const roleType = task.owner_type;
+    const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: task.star });
+    if(rpcErr){
+      alert('❌ 加星失败：' + rpcErr.message);
+      return;
+    }
+
+    // 再更新数据库状态
     const { error } = await supabase.from('long_tasks').update({
       last_date: lastDate,
       submit_status: 'normal', // 状态重置，第二天自动回到“未完成”栏
@@ -4151,13 +4181,12 @@ async function approveLongTask(idx){
     
     if (error) {
       console.error('审核更新失败', error);
+      // 回滚刚加的星星
+      await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: -task.star });
       alert('❌ 审核失败：' + error.message);
       return;
     }
 
-        // 加星星（改用数据库原子操作，防止多设备覆盖）
-    const roleType = task.owner_type;
-    await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: task.star });
     await addStarLogItem(roleType, task.star, `长期任务【${task.title}】打卡完成`);
     await loadAllData();
     renderAll();
@@ -4275,9 +4304,9 @@ async function autoDeductStarTask(){
         taskTitle: task.title,
         dateStr: taskDate
       });
-      if(ok){
+            if(ok){
+        await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: -DEDUCT_STAR_PER_TASK });
         state.star -= DEDUCT_STAR_PER_TASK;
-        await saveState(); 
         changed = true;
       }
     }
@@ -4298,13 +4327,12 @@ async function autoDeductStarTask(){
         taskTitle: task.title,
         dateStr: todayStr
       });
-      if(ok){
-        if(task.owner_type === 'child') state.star -= DEDUCT_STAR_PER_TASK;
+            if(ok){
+        const roleType = task.owner_type;
+        await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: -DEDUCT_STAR_PER_TASK });
+        if(roleType === 'child') state.star -= DEDUCT_STAR_PER_TASK;
         else state.parent_star -= DEDUCT_STAR_PER_TASK;
-        
-        await saveState();
-
-       changed = true;
+        changed = true;
       }
     }
 
