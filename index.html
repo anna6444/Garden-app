@@ -397,32 +397,21 @@ if('serviceWorker' in navigator){
     </div>
   </div>
   <!-- =========新增待处理任务统计卡片========= -->
+  
+
   <div class="task-count-card">
-
-    <div class="count-item">
-
+    <div class="count-item" onclick="openTaskOverview('daily')" style="cursor:pointer;">
       <p class="count-num" id="countPendingDaily">0</p>
-
       <p class="count-label" id="label1">待审核任务</p>
-
     </div>
-
-    <div class="count-item">
-
+    <div class="count-item" onclick="openTaskOverview('long')" style="cursor:pointer;">
       <p class="count-num" id="countPendingLong">0</p>
-
       <p class="count-label" id="label2">待确认长期任务</p>
-
     </div>
-
-    <div class="count-item">
-
+    <div class="count-item" onclick="openTaskOverview('total')" style="cursor:pointer;">
       <p class="count-num" id="countTotal">0</p>
-
       <p class="count-label" id="label3">待处理合计</p>
-
     </div>
-
   </div>
   <div id="tab-garden">
     <div class="card">
@@ -1492,7 +1481,125 @@ async function refreshPage(){
   }
 }
 
+// ========== 点击数字弹窗看任务列表 ==========
+function openTaskOverview(type) {
+  const todayStr = getTodayStr();
+  let title = '';
+  let tasks = []; // 用来存要显示的任务数据 {title, info, onclickJs}
 
+  // 1. 根据角色和点击的类型，收集任务数据
+  if (currentRole === 'child') {
+    // 孩子端
+    if (type === 'daily') {
+      title = '📝 今日未完成 (日常+长期)';
+      state.daily.forEach(t => {
+        if (t.status === 'active' && getTodayStr(new Date(t.create_at || Date.now())) === todayStr) {
+          tasks.push({ title: t.title, info: '日常任务', target: 'daily', idx: state.daily.indexOf(t) });
+        }
+      });
+      state.long.forEach(t => {
+        if (t.owner_type === 'child' && t.submit_status !== 'submitted' && t.last_date !== todayStr) {
+          tasks.push({ title: t.title, info: '长期任务', target: 'long', idx: state.long.indexOf(t) });
+        }
+      });
+    } else if (type === 'long') {
+      title = '⏳ 家长待确认';
+      state.long.forEach(t => {
+        if (t.owner_type === 'parent' && t.submit_status === 'submitted') {
+          tasks.push({ title: t.title, info: '家长任务', target: 'parentLong', idx: state.long.indexOf(t) });
+        }
+      });
+    } else if (type === 'total') {
+      title = '✅ 今日已完成';
+      state.daily.forEach(t => { if (t.status === 'approved') tasks.push({ title: t.title, info: '日常任务', target: 'daily', idx: state.daily.indexOf(t) }); });
+      state.long.forEach(t => { if (t.owner_type === 'child' && t.last_date === todayStr) tasks.push({ title: t.title, info: '长期任务', target: 'long', idx: state.long.indexOf(t) }); });
+    }
+  } else {
+    // 家长端
+    if (type === 'daily') {
+      title = '📝 孩子日常待审核';
+      state.daily.forEach(t => {
+        if (t.status === 'pending_review') tasks.push({ title: t.title, info: '日常任务', target: 'daily', idx: state.daily.indexOf(t) });
+      });
+    } else if (type === 'long') {
+      title = '⏳ 孩子长期待审核';
+      state.long.forEach(t => {
+        if (t.owner_type === 'child' && t.submit_status === 'submitted') tasks.push({ title: t.title, info: '长期任务', target: 'childLong', idx: state.long.indexOf(t) });
+      });
+    } else if (type === 'total') {
+      title = '👨‍👩‍👧 家长自己未完成';
+      state.long.forEach(t => {
+        if (t.owner_type === 'parent' && t.submit_status !== 'submitted' && t.last_date !== todayStr) tasks.push({ title: t.title, info: '家长任务', target: 'parentLong', idx: state.long.indexOf(t) });
+      });
+    }
+  }
+
+  // 2. 如果没任务
+  document.getElementById('overviewModalTitle').innerText = title;
+  const listEl = document.getElementById('overviewModalList');
+  if (tasks.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center;color:#aaa;padding:20px 0;">暂无相关任务</p>';
+  } else {
+    let html = '';
+    tasks.forEach(t => {
+      html += `
+        <div class="task-row" onclick="jumpToTask('${t.target}', ${t.idx})" style="cursor:pointer; padding:12px 0;">
+          <div class="task-info">
+            <div class="task-icon" style="font-size:16px;">📌</div>
+            <div class="task-text">${t.title}
+              <div class="task-meta">${t.info}</div>
+            </div>
+          </div>
+          <div style="color:#ef4444;font-size:14px;font-weight:bold;">去处理 ›</div>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+  }
+  openModal('taskOverviewModal');
+}
+
+// ========== 精准跳转到对应任务 ==========
+function jumpToTask(target, idx) {
+  closeModal('taskOverviewModal'); // 先关弹窗
+
+  // 用 setTimeout 稍微等一下，让弹窗先关掉再跳，防止页面卡顿
+  setTimeout(() => {
+    const task = target === 'daily' ? state.daily[idx] : state.long[idx];
+    if (!task) return;
+
+    // 判断日常任务
+    if (target === 'daily') {
+      switchTab('task'); // 切到任务页
+      selectSubjectTab(task.subject); // 切换到对应科目
+      switchDailySubTab(task.status === 'approved' ? 'approved' : (task.status === 'pending_review' ? 'pending' : 'active'));
+    }
+    // 判断孩子长期任务（任务页）
+    else if (target === 'long') {
+      switchTab('task');
+      selectSubjectTab(task.category || '成长'); // 切到对应类别
+      switchTaskLongSubTab(task.last_date === getTodayStr() ? 'approved' : (task.submit_status === 'submitted' ? 'pending' : 'unfinished'));
+    }
+    // 判断家长长期任务（家长页）
+    else if (target === 'parentLong') {
+      switchTab('long');
+      selectLongTab(task.category || '成长');
+      switchParentLongSubTab(task.last_date === getTodayStr() ? 'approved' : (task.submit_status === 'submitted' ? 'pending' : 'unfinished'));
+    }
+    // 孩子长期任务（家长端看孩子的长期任务，跳转任务页）
+    else if (target === 'childLong') {
+      switchTab('task');
+      selectSubjectTab(task.category || '成长');
+      switchTaskLongSubTab(task.submit_status === 'submitted' ? 'pending' : 'unfinished');
+    }
+
+    // 跳转后，让任务列表滚动到最上面，方便用户看到
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 150);
+
+  }, 100);
+}
 
 function switchTab(name,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
@@ -5187,6 +5294,17 @@ document.addEventListener('visibilitychange', function(){
     <button class="countdown-collapse" onclick="collapseCountdown()">收起倒计时</button>
   </div>
 </div>
+
+
+<!-- 任务总览弹窗 -->
+<div class="modal-mask" id="taskOverviewModal">
+  <div class="modal-box">
+    <h3 id="overviewModalTitle" style="margin-bottom:12px;color:#333;">任务列表</h3>
+    <div id="overviewModalList" style="max-height:60vh;overflow-y:auto;"></div>
+    <button class="btn btn-gray" style="margin-top:12px;" onclick="closeModal('taskOverviewModal')">关闭</button>
+  </div>
+</div>
+
 
 <!-- 收起后的小气泡 -->
 <div id="countdownBubble" class="countdown-bubble" onclick="expandCountdown()">00:00</div>
