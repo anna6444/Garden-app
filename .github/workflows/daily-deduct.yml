@@ -13,7 +13,7 @@ jobs:
       - name: 调用 Supabase 扣星函数
         run: |
           curl -s -X POST \
-            "https://mubucjoyklpxoobgjyva.supabase.co/rest/v1/rpc/deduct_daily_stars" \
+            "https://mubucjoyklpxoobgjyva.supabase.co/rest/v1/rpc/process_daily_deduction" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
