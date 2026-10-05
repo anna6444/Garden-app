@@ -15,7 +15,7 @@ jobs:
           curl -s -X POST \
             "https://mubucjoyklpxoobgjyva.supabase.co/rest/v1/rpc/deduct_daily_stars" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{}' \
             -w "\nHTTP %{http_code}\n"
