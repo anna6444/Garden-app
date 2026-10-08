@@ -1178,8 +1178,7 @@ let state = {
 ,
   daily: [], long: [], wish: [],
 
-  lastAutoDeductDate: "" // 新增：记录上次执行夜间扣星的日期，防止同一天重复扣
-  ,
+  
   plantChild: null, stageChild: 1, waterChild: 0, sunChild: 0, fertChild: 0, plantDoneChild: false
 };
 const STAGE_NAMES = ["种子发芽","长出小苗","长叶片","抽枝长茎","含苞待放","开花啦","结果丰收"];
@@ -1312,9 +1311,7 @@ async function loadAllData(){
     const stateData = stateRes.data;
     if(stateData){
       state = {...state, ...stateData};
-      if(stateData.lastautodeductdate !== undefined){
-        state.lastAutoDeductDate = stateData.lastautodeductdate || "";
-      }
+     
       if(stateData.plant_child){
         const pc = stateData.plant_child;
         state.plantChild = pc.plant || null;
@@ -1340,7 +1337,7 @@ async function loadAllData(){
   // 关键优化：扣星和清理放后台执行，不阻塞页面渲染
 (async () => {
   try {
-    await autoDeductStarTask();     // 两端都跑
+    await checkAndDeductStars();    // 两端都跑
     await cleanApprovedTasks();
     renderAll();
   } catch(e) { console.warn(e); }
@@ -1365,7 +1362,7 @@ async function saveState(){
         fert: state.fertChild,
         plantDone: state.plantDoneChild
       },
-      lastautodeductdate: state.lastAutoDeductDate || ""
+      
     }).eq('id', 1);
   }catch(e){
     console.warn("saveState异常",e);
@@ -2385,7 +2382,7 @@ async function resetWeek(){
   state.star = 0;
   state.parent_star = 0;
   // 关键：标记今天已扣星，防止重置后立刻被 autoDeductStarTask 再扣一次
-  state.lastAutoDeductDate = getTodayStr();
+  
 
   // ===== 2. 立刻刷新界面（用户秒看到星星归零） =====
   renderAll();
@@ -4345,120 +4342,53 @@ function getTodayStr(d = new Date()){
 
 
 
-// ==================== 夜间扣星（重构版） ====================
-const DEDUCT_STAR_PER_TASK = 1;   // 每个未完成任务扣几星
-
-function isPastDeductTime(now = new Date()){
-  const h = now.getHours(), m = now.getMinutes();
-  return h > 21 || (h === 21 && m >= 30);
-}
-
-// 扣一条任务；返回 true 表示这次真的扣了，false 表示之前已扣过/写日志失败
-async function deductOneTaskStar({ ownerType, taskType, taskId, taskTitle, dateStr }){
-  const deductKey = `deduct_${taskType}_${taskId}_${dateStr}`;
-  const reason = `⏰夜间扣星：${taskType === 'daily' ? '日常' : '长期'}任务【${taskTitle}】未完成`;
-
-  const { error } = await supabase.from('star_logs').insert([{
-    role_type: ownerType,
-    change_num: -DEDUCT_STAR_PER_TASK,
-    reason: reason,
-    deduct_key: deductKey,
-    current_star: 0   // 后面统一刷新，这里不纠结
-  }]);
-
-  if(error){
-    // 23505 = 唯一键冲突，说明今天这条已经扣过
-    if(error.code === '23505' || /duplicate|unique/i.test(error.message || '')){
-      return false;
-    }
-    console.warn('扣星日志写入失败', error);
-    return false;   // 写不进去就不扣，宁可漏扣不可错扣
-  }
-  return true;
-}
-
-async function autoDeductStarTask(){
-  if(window.autoDeductRunning) return;
-  window.autoDeductRunning = true;
-
-  try{
+// ==================== 夜间扣星（前端防漏补扣版） ====================
+function getBeijingTodayStr() {
     const now = new Date();
-    const todayStr = getTodayStr(now);
-    const afterTime = isPastDeductTime(now);
+    const beijingTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (8 * 3600000));
+    const yyyy = beijingTime.getFullYear();
+    const mm = String(beijingTime.getMonth() + 1).padStart(2, '0');
+    const dd = String(beijingTime.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
 
+async function checkAndDeductStars() {
+    try {
+        // 1. 获取当前北京时间
+        const now = new Date();
+        const beijingTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (8 * 3600000));
+        const currentHour = beijingTime.getHours();
+        const currentMinute = beijingTime.getMinutes();
+        
+        // 过了 21:30 才触发
+        const isAfterDeductTime = (currentHour > 21) || (currentHour === 21 && currentMinute >= 30);
+        if (!isAfterDeductTime) return; 
 
-// ★ 新增：过了21:30且今天已执行过，直接跳过
-    if(afterTime && state.lastAutoDeductDate === todayStr){
-      console.log('夜间扣星：今天已执行过，跳过');
-      return;
+        // 2. 生成今天的日期字符串 (YYYY-MM-DD)
+        const todayStr = getBeijingTodayStr();
+
+        // 3. 查询 star_logs 表，看看今天有没有自动扣星的记录
+        const { data: logs, error: logError } = await supabase
+            .from('star_logs')
+            .select('id')
+            .like('reason', '%自动扣星%')
+            .gte('created_at', todayStr + 'T00:00:00+08:00')  // 使用东八区时间查询
+            .lte('created_at', todayStr + 'T23:59:59+08:00');
+
+        if (logError) throw logError;
+
+        // 4. 如果今天还没有记录，说明后台（GitHub Actions）可能没扣成功，前端主动补扣
+        if (!logs || logs.length === 0) {
+            console.log("前端检测到今日未扣星，正在尝试补扣...");
+            const { error: rpcError } = await supabase.rpc('process_daily_deduction');
+            if (rpcError) throw rpcError;
+            console.log("补扣星成功！");
+        } else {
+            console.log("今天已经扣过星了，前端跳过。");
+        }
+    } catch (error) {
+        console.error("前端自动扣星检查失败:", error);
     }
-    let changed = false;
-
-    // ============ 1. 日常任务 ============
-    const unfinishDaily = state.daily.filter(t => {
-  if(t.status !== 'active') return false;
-  if(!afterTime) return false;
-  return true;
-});
-
-    for(const task of unfinishDaily){
-      const taskDate = getTodayStr(new Date(task.create_at || Date.now()));
-      const ok = await deductOneTaskStar({
-        ownerType: 'child',
-        taskType: 'daily',
-        taskId: task.id,
-        taskTitle: task.title,
-        dateStr: taskDate
-      });
-            if(ok){
-        await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: -DEDUCT_STAR_PER_TASK });
-        state.star -= DEDUCT_STAR_PER_TASK;
-        changed = true;
-      }
-    }
-
-    // ============ 2. 长期任务 ============
-    const unfinishLong = state.long.filter(t => {
-      if(t.submit_status === 'submitted') return false;   // 待审核不扣
-      if(t.last_date === todayStr) return false;          // 今天完成了不扣
-      if(!afterTime) return false;
-      return true;   // 昨天/更早/从未完成，都扣（用今天日期做去重键）
-    });
-
-    for(const task of unfinishLong){
-      const ok = await deductOneTaskStar({
-        ownerType: task.owner_type,
-        taskType: 'long',
-        taskId: task.id,
-        taskTitle: task.title,
-        dateStr: todayStr
-      });
-            if(ok){
-        const roleType = task.owner_type;
-        await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: -DEDUCT_STAR_PER_TASK });
-        if(roleType === 'child') state.star -= DEDUCT_STAR_PER_TASK;
-        else state.parent_star -= DEDUCT_STAR_PER_TASK;
-        changed = true;
-      }
-    }
-
-    // ============ 3. 有任何变动立刻落库 ============
-    if(changed){
-      await saveState();
-      console.log('夜间扣星：星星已保存');
-    }
-
-    // ============ 4. 标记“今天已跑过夜间扣星” ============
-    // 注意：这个只用于提前退出，真正的去重靠 deduct_key
-    if(afterTime && state.lastAutoDeductDate !== todayStr){
-      state.lastAutoDeductDate = todayStr;
-      await saveState();
-    }
-  } catch(e){
-    console.warn('夜间扣星异常', e);
-  } finally {
-    window.autoDeductRunning = false;
-  }
 }
 
 
@@ -5252,7 +5182,7 @@ function logout(){
 async function runBackgroundCatchUp(){
   try { 
     if(!supabase) return;
-    await autoDeductStarTask();
+    await checkAndDeductStars();
     await cleanApprovedTasks();
     await loadAllData();
     renderAll();
