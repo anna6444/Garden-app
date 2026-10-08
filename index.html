@@ -1301,17 +1301,25 @@ async function loadAllData(){
   let stateLoadedOK = false;
   try{
     // 4张表并行查，速度提升3-4倍
-    const [stateRes, dailyRes, longRes, wishRes] = await Promise.all([
+        const [stateRes, dailyRes, longRes, wishRes, userStarRes] = await Promise.all([
       supabase.from('app_state').select('*').eq('id',1).single(),
       supabase.from('daily_tasks').select('*'),
       supabase.from('long_tasks').select('*'),
-      supabase.from('wishes').select('*')
+      supabase.from('wishes').select('*'),
+      supabase.from('user_star').select('*') // 【新增】去查真正的星星表
     ]);
-
     const stateData = stateRes.data;
     if(stateData){
       state = {...state, ...stateData};
      
+        // 【新增】用 user_star 表里的真实星星数，覆盖前端状态
+        if(userStarRes.data && userStarRes.data.length > 0){
+          userStarRes.data.forEach(u => {
+            if(u.role === 'child') state.star = u.star_count;
+            if(u.role === 'parent') state.parent_star = u.star_count;
+          });
+        }
+
       if(stateData.plant_child){
         const pc = stateData.plant_child;
         state.plantChild = pc.plant || null;
