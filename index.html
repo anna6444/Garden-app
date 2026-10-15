@@ -2465,21 +2465,29 @@ async function clearAllStarLogs(){
 }
 
 async function buyRes(type){
+  // 重新实时拉取一次最新星星数，避免用旧数据做判断
+  await loadAllData(); 
   const myStar = currentRole === 'parent' ? state.parent_star : state.star;
-  if(myStar < 6){ alert('星星不足，需要6颗星'); return; }
-  let resName;
-  if(type==='water') resName="水";
-  if(type==='sun') resName="阳光";
-  if(type==='fert') resName="肥料";
   
-     // 数据库原子扣星
-  const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: currentRole, p_amount: -6 });
+  if(myStar < 6){ 
+    alert(`星星不足！当前只有 ${myStar} 颗星，兑换需要 6 颗星。`); 
+    return; 
+  }
+
+  if(!confirm(`确认消耗 6⭐ 兑换物资吗？`)) return;
+
+  // 调用数据库的安全函数（替换掉原来的 adjust_stars 逻辑）
+  const { error: rpcErr } = await supabase.rpc('buy_shop_item', { 
+    p_role_type: currentRole, 
+    p_item_type: type 
+  });
+  
   if(rpcErr){
-    alert('❌ 扣星失败：' + rpcErr.message);
+    alert('❌ 兑换失败：' + rpcErr.message);
     return;
   }
 
-  // 物资本地加，然后保存
+  // 本地增加物资
   if(currentRole === 'parent'){
     if(type==='water') state.water++;
     if(type==='sun') state.sun++;
@@ -2490,9 +2498,12 @@ async function buyRes(type){
     if(type==='fert') state.fertChild++;
   }
   
-  await addStarLogItem(currentRole, -6, `商城兑换${resName}`);
+  // 保存物资变动，并刷新页面
   await saveState();
+  await loadAllData(); // 重新拉取最新的星星数显示在UI上
+  await loadStarLog();  // 重新拉取日志列表
   renderAll();
+  alert('✅ 兑换成功！');
 }
 
 async function saveDailyTask(){
