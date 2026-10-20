@@ -354,6 +354,14 @@ padding-bottom:20px;}
 }
 
 
+/* 统一的选中高亮样式 */
+.btn-selected {
+  background-color: #eff6ff !important; /* 浅蓝色背景 */
+  border-color: #3b82f6 !important; /* 深蓝色边框 */
+  color: #1d4ed8 !important; /* 深蓝色文字 */
+  font-weight: bold !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); /* 外发光效果 */
+}
 </style>
 
 <link rel="manifest" href="./manifest.json">
@@ -2001,35 +2009,32 @@ function selectTaskType(type){
   const dictationBtn = document.getElementById('typeDictationBtn');
   const hint = document.getElementById('dictationHint');
   const ocrBox = document.getElementById('dictationOcrBox');
+  
+  // 用 classList.toggle 来添加/移除高亮样式
+  normalBtn.classList.toggle('btn-selected', type === 'normal');
+  dictationBtn.classList.toggle('btn-selected', type === 'dictation');
+
   if(type === 'normal'){
-    normalBtn.style.borderWidth = '2px';
-    normalBtn.style.fontWeight = 'bold';
-    dictationBtn.style.borderWidth = '1px';
-    dictationBtn.style.fontWeight = 'normal';
     if(hint) hint.style.display = 'none';
     if(ocrBox) ocrBox.style.display = 'none';
   }else{
-    dictationBtn.style.borderWidth = '2px';
-    dictationBtn.style.fontWeight = 'bold';
-    normalBtn.style.borderWidth = '1px';
-    normalBtn.style.fontWeight = 'normal';
-        if(hint) hint.style.display = 'block';
+    if(hint) hint.style.display = 'block';
     if(ocrBox) ocrBox.style.display = 'block';
   }
 }
 
 // 切换提交方式（新建任务弹窗里用）
+
 function selectSubmitType(type){
   selectedSubmitType = type;
   ['normal','photo','audio'].forEach(t => {
     const btn = document.getElementById('submitType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
     if(!btn) return;
     const isActive = (t === type);
-    btn.style.borderWidth = isActive ? '2px' : '1px';
-    btn.style.fontWeight = isActive ? 'bold' : 'normal';
+    // 用 classList 替换原来的样式修改
+    btn.classList.toggle('btn-selected', isActive);
   });
 }
-
 // 切换提交方式（新建长期任务弹窗里用）
 function selectLongSubmitType(type){
   selectedLongSubmitType = type;
@@ -2037,11 +2042,9 @@ function selectLongSubmitType(type){
     const btn = document.getElementById('longSubmitType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
     if(!btn) return;
     const isActive = (t === type);
-    btn.style.borderWidth = isActive ? '2px' : '1px';
-    btn.style.fontWeight = isActive ? 'bold' : 'normal';
+    btn.classList.toggle('btn-selected', isActive);
   });
 }
-
 // ================== 听写 OCR 功能开始 ==================
 
 // 懒加载 Tesseract.js（只在第一次使用时下载，不拖慢首页）
@@ -2085,10 +2088,26 @@ function prepareImageForOcr(file, maxWidth = 1600){
         canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
+        
+        // 【新增】：灰度化 + 增强对比度处理
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          // 灰度公式
+          let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          // 增加对比度 (阈值调整，让字更黑，背景更白)
+          gray = gray > 140 ? 255 : (gray < 90 ? 0 : gray);
+          data[i] = data[i+1] = data[i+2] = gray;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        
         canvas.toBlob(blob => {
           URL.revokeObjectURL(url);
           blob ? resolve(blob) : reject(new Error('图片处理失败'));
-        }, 'image/jpeg', 0.92);
+        }, 'image/jpeg', 0.95);
       }catch(err){
         URL.revokeObjectURL(url);
         reject(err);
@@ -2220,10 +2239,12 @@ function openBatchModal(){
 // 批量弹窗里选择科目
 function selectBatchSubject(subj){
   selectedSubject = subj;
-  document.querySelectorAll('#batchModal .subject-btn').forEach(b=>b.classList.remove('active'));
+  // 先把所有的按钮高亮去掉
+  document.querySelectorAll('#batchModal .subject-btn').forEach(b => b.classList.remove('btn-selected'));
+  // 给你点选的那个按钮加上高亮
   const map = {chinese:'batchSubjChinese', math:'batchSubjMath', english:'batchSubjEnglish'};
   const el = document.getElementById(map[subj]);
-  if(el) el.classList.add('active');
+  if(el) el.classList.add('btn-selected');
 }
 
 function openPlantPreview(plantId){
@@ -2394,13 +2415,37 @@ async function resetWeek(){
 
   // ===== 2. 立刻刷新界面（用户秒看到星星归零） =====
   renderAll();
-
-// ===== 3. 真正把 user_star 表里的星星写 0 =====
+  
+   // ===== 3. 真正把 user_star 表里的星星写 0 =====
   await supabase.from('user_star').update({ star_count: 0 }).eq('role', 'child');
   await supabase.from('user_star').update({ star_count: 0 }).eq('role', 'parent');
 
-  // ===== 4. 保存其他状态 =====
-  await saveState();
+  // ===== 4. 强制清空 app_state 里的植物状态 =====
+  const { error: resetErr } = await supabase.from('app_state').update({
+    plant: null,
+    stage: 1,
+    water: 0,
+    sun: 0,
+    fert: 0,
+    plant_done: false,
+    plant_child: {
+      plant: null,
+      stage: 1,
+      water: 0,
+      sun: 0,
+      fert: 0,
+      plantDone: false
+    }
+  }).eq('id', 1);
+
+  if(resetErr) {
+      console.error("重置植物失败:", resetErr);
+      alert("⚠️ 重置植物状态失败，请检查数据库权限！");
+  } else {
+      // 强制重新拉取数据并渲染，确保界面立刻变回选种子的状态
+      await loadAllData();
+      renderAll();
+  }
 
   // ===== 5. 立刻提示用户，不等清理 =====
   alert('✅ 本周已重置！\n星星、植物、物资已清零，云端图片和日志正在后台清理…');
@@ -2710,8 +2755,7 @@ function selectEditSubmitType(type){
     const btn = document.getElementById('editSubmitType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
     if(!btn) return;
     const isActive = (t === type);
-    btn.style.borderWidth = isActive ? '2px' : '1px';
-    btn.style.fontWeight = isActive ? 'bold' : 'normal';
+    btn.classList.toggle('btn-selected', isActive);
   });
 }
 
@@ -4128,44 +4172,45 @@ function speakCurrentWord(){
     alert('你的浏览器不支持语音播报，请换用 Chrome 或 Safari');
     return;
   }
-  window.speechSynthesis.cancel(); // 先取消之前可能还在播的
+  window.speechSynthesis.cancel(); 
   const utter = new SpeechSynthesisUtterance(word);
   const subject = dictationTaskRef ? dictationTaskRef.subject : 'english';
   
-  // 获取系统语音列表
   let voices = window.speechSynthesis.getVoices();
   
   if(subject === 'chinese'){
-    // 中文听写：优先选普通话标准语音
     utter.lang = 'zh-CN';
     let bestVoice = null;
+    // 优先寻找高质量的中文发音人
     for(let v of voices){
       if(v.lang === 'zh-CN' || v.lang === 'zh_CN'){
-        // 优先选名字里带“普通话”或“Chinese”的，或者常见中文语音
-        if(v.name.includes('普通话') || v.name.includes('Chinese') || v.name.includes('Yaoyao') || v.name.includes('Huihui') || v.name.includes('Xiaoxiao')){
+        if(v.name.includes('Ting-Ting') || v.name.includes('Xiaoxiao') || v.name.includes('Huihui') || v.name.includes('普通话')){
           bestVoice = v;
           break;
         }
-        if(!bestVoice) bestVoice = v; // 没找到特定的就先用第一个 zh-CN
+        if(!bestVoice) bestVoice = v; 
       }
     }
     if(bestVoice) utter.voice = bestVoice;
   }else{
-    // 英文听写
     utter.lang = 'en-US';
     let bestVoice = null;
     for(let v of voices){
       if(v.lang === 'en-US' || v.lang === 'en_US'){
+        // 英文优先找 Samantha 或 Alex
+        if(v.name.includes('Samantha') || v.name.includes('Alex')) {
+            bestVoice = v;
+            break;
+        }
         bestVoice = v;
-        break;
       }
     }
     if(bestVoice) utter.voice = bestVoice;
   }
   
-  // 给二年级小朋友听，速度放慢，发音清晰
-  utter.rate = 0.5;   // 原来 0.9，现在 0.5 更慢
-  utter.pitch = 1.0;  // 正常音调
+  // 【修改点】：语速降到 0.35，更慢更清晰。音调略微降低，更自然。
+  utter.rate = 0.35;   
+  utter.pitch = 0.9;  
   utter.volume = 1.0;
   
   window.speechSynthesis.speak(utter);
