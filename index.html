@@ -4172,7 +4172,8 @@ function speakCurrentWord(){
     alert('你的浏览器不支持语音播报，请换用 Chrome 或 Safari');
     return;
   }
-  window.speechSynthesis.cancel(); 
+  
+  window.speechSynthesis.cancel(); // 先取消之前可能还在播的
   const utter = new SpeechSynthesisUtterance(word);
   const subject = dictationTaskRef ? dictationTaskRef.subject : 'english';
   
@@ -4181,14 +4182,16 @@ function speakCurrentWord(){
   if(subject === 'chinese'){
     utter.lang = 'zh-CN';
     let bestVoice = null;
-    // 优先寻找高质量的中文发音人
+    // 【核心修改】优先寻找“播音员”级别的语音包
     for(let v of voices){
       if(v.lang === 'zh-CN' || v.lang === 'zh_CN'){
-        if(v.name.includes('Ting-Ting') || v.name.includes('Xiaoxiao') || v.name.includes('Huihui') || v.name.includes('普通话')){
+        // 微软的云希(Yunxi)、云扬(Yunyang)非常像新闻联播；
+        // 晓晓(Xiaoxiao)也很标准；Ting-Ting是苹果设备最常用的标准女声
+        if(v.name.includes('Yunxi') || v.name.includes('Yunyang') || v.name.includes('Xiaoxiao') || v.name.includes('Ting-Ting') || v.name.includes('普通话')){
           bestVoice = v;
           break;
         }
-        if(!bestVoice) bestVoice = v; 
+        if(!bestVoice) bestVoice = v; // 没找到就退而求其次
       }
     }
     if(bestVoice) utter.voice = bestVoice;
@@ -4197,8 +4200,8 @@ function speakCurrentWord(){
     let bestVoice = null;
     for(let v of voices){
       if(v.lang === 'en-US' || v.lang === 'en_US'){
-        // 英文优先找 Samantha 或 Alex
-        if(v.name.includes('Samantha') || v.name.includes('Alex')) {
+        // 英文优先找 Samantha 或 Google US English
+        if(v.name.includes('Samantha') || v.name.includes('Google US English')) {
             bestVoice = v;
             break;
         }
@@ -4208,9 +4211,9 @@ function speakCurrentWord(){
     if(bestVoice) utter.voice = bestVoice;
   }
   
-  // 【修改点】：语速降到 0.35，更慢更清晰。音调略微降低，更自然。
+  // 【核心修改】语速保持适中（0.5），但把音调（pitch）提高到 1.05，声音瞬间清亮、有精神
   utter.rate = 0.35;   
-  utter.pitch = 0.9;  
+  utter.pitch = 1.05;  
   utter.volume = 1.0;
   
   window.speechSynthesis.speak(utter);
