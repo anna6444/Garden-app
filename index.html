@@ -362,6 +362,61 @@ padding-bottom:20px;}
   font-weight: bold !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); /* 外发光效果 */
 }
+
+/* 全局加载遮罩 */
+#globalLoading {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  z-index: 99999;
+  display: none; /* 默认隐藏 */
+  align-items: center; justify-content: center;
+  flex-direction: column;
+  backdrop-filter: blur(2px); /* 毛玻璃效果 */
+}
+#globalLoading.show { display: flex; }
+.loading-spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #f3f3f3; border-top: 4px solid #ef4444;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* 自定义 Toast 提示 */
+#toast-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100000; /* 确保在最顶层 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none; /* 让鼠标点击穿透，不阻挡操作 */
+}
+.toast {
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  max-width: 80vw;
+  text-align: center;
+  word-wrap: break-word;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast.success { background: rgba(34, 197, 94, 0.9); }
+.toast.error { background: rgba(239, 68, 68, 0.9); }
 </style>
 
 <link rel="manifest" href="./manifest.json">
@@ -1144,6 +1199,30 @@ function closeImgPreviewModal(){
 }
 const SUPABASE_URL = "https://mubucjoyklpxoobgjyva.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11YnVjam95a2xweG9vYmdqeXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2Mzc4MDMsImV4cCI6MjEwMzIxMzgwM30.YfnUWqXIcnGY99Qbvz3vDIPnFf9ECC9M0dbM40cCr8k";
+// 自定义 Toast 函数
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerText = message;
+  container.appendChild(toast);
+
+  // 强制重排，让动画生效
+  void toast.offsetWidth;
+  toast.classList.add('show');
+
+  // 2秒后自动消失
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (toast.parentNode) container.removeChild(toast);
+    }, 300); // 等淡出动画播完再移除
+  }, 2000);
+}
+
+function showLoading() { document.getElementById('globalLoading').classList.add('show'); }
+function hideLoading() { document.getElementById('globalLoading').classList.remove('show'); }
+
 let supabase = null;
 let currentRole = "";
 let pendingPlantId = null;
@@ -1470,9 +1549,11 @@ async function quickReward(targetRole, delta, reason){
     return;
   }
   await addStarLogItem(targetRole, delta, reason);
-  await loadAllData();
+  // 【新增】：手动更新本地状态，让界面数字实时跳动
+  if(targetRole === 'child') state.star += delta;
+  if(targetRole === 'parent') state.parent_star += delta;
   renderAll();
-  alert(`✅已记录：${reason}，${delta>0?"+":""}${delta}⭐`);
+  showToast(`✅已记录：${reason}，${delta>0?"+":""}${delta}⭐`, 'success');
 }
 
 // 手动刷新按钮：重新拉取数据
@@ -1485,9 +1566,9 @@ async function refreshPage(){
     await loadAllData();
     await loadStarLog();
     renderAll();
-    alert('✅ 已刷新');
+    showToast('✅ 已刷新', 'success');
   }catch(e){
-    alert('❌ 刷新失败：' + e.message);
+    showToast('❌ 刷新失败：' + e.message, 'error');
   }finally{
     const btns = document.querySelectorAll('.top-star-card button');
     btns.forEach(b => { b.style.opacity = '1'; b.disabled = false; });
@@ -2509,9 +2590,17 @@ async function clearAllStarLogs(){
   console.log(`清空 star_logs：共删除 ${ids.length} 条`);
 }
 
+// 增加一个全局锁变量
+if (typeof window.isBuying === 'undefined') window.isBuying = false;
+
+
 async function buyRes(type){
-  // 重新实时拉取一次最新星星数，避免用旧数据做判断
-  await loadAllData(); 
+  // 1. 如果正在兑换中，直接拦截
+  if(window.isBuying) {
+    alert('正在兑换中，请稍候...不要连点哦！');
+    return;
+  }
+
   const myStar = currentRole === 'parent' ? state.parent_star : state.star;
   
   if(myStar < 6){ 
@@ -2521,34 +2610,50 @@ async function buyRes(type){
 
   if(!confirm(`确认消耗 6⭐ 兑换物资吗？`)) return;
 
-  // 调用数据库的安全函数（替换掉原来的 adjust_stars 逻辑）
-  const { error: rpcErr } = await supabase.rpc('buy_shop_item', { 
-    p_role_type: currentRole, 
-    p_item_type: type 
-  });
-  
-  if(rpcErr){
-    alert('❌ 兑换失败：' + rpcErr.message);
-    return;
-  }
+  // 2. 上锁，并显示加载遮罩
+  window.isBuying = true;
+  showLoading(); // 🌟 拉起幕布，开始转圈
 
-  // 本地增加物资
-  if(currentRole === 'parent'){
-    if(type==='water') state.water++;
-    if(type==='sun') state.sun++;
-    if(type==='fert') state.fert++;
-  } else {
-    if(type==='water') state.waterChild++;
-    if(type==='sun') state.sunChild++;
-    if(type==='fert') state.fertChild++;
+  try {
+    // 调用数据库的安全函数扣星
+    const { error: rpcErr } = await supabase.rpc('buy_shop_item', { 
+      p_role_type: currentRole, 
+      p_item_type: type 
+    });
+    
+    if(rpcErr){
+      alert('❌ 兑换失败：' + rpcErr.message);
+      return;
+    }
+
+    // 本地增加物资
+    if(currentRole === 'parent'){
+      if(type==='water') state.water++;
+      if(type==='sun') state.sun++;
+      if(type==='fert') state.fert++;
+    } else {
+      if(type==='water') state.waterChild++;
+      if(type==='sun') state.sunChild++;
+      if(type==='fert') state.fertChild++;
+    }
+    
+    // 保存物资变动
+    await saveState();
+    
+    // 重新拉取最新数据并刷新UI
+    await loadAllData(); 
+    await loadStarLog();  
+    renderAll();
+    showToast('✅ 兑换成功！', 'success');
+  } catch (err) {
+    console.error(err);
+  } finally {
+    // 🌟 扯下幕布，停止转圈。并且 0.5 秒后解锁
+    hideLoading(); 
+    setTimeout(() => {
+      window.isBuying = false;
+    }, 500);
   }
-  
-  // 保存物资变动，并刷新页面
-  await saveState();
-  await loadAllData(); // 重新拉取最新的星星数显示在UI上
-  await loadStarLog();  // 重新拉取日志列表
-  renderAll();
-  alert('✅ 兑换成功！');
 }
 
 async function saveDailyTask(){
@@ -2994,7 +3099,7 @@ async function doSubmitNormal(idx){
       await saveState();
     }
     closeFullscreenCountdown();
-    alert('✅ 提交成功，等待家长审核！');
+    showToast('✅ 提交成功，等待家长审核！', 'success');
     await loadAllData();
     renderAll();
   }catch(e){
@@ -3193,6 +3298,7 @@ async function handleSubmitImageSelect(e){
 
 //带图片提交：此时才上传压缩后的图片到supabase
 
+
 async function submitTaskWithImg(){
   const task = state.daily[pendingTaskIdx];
   const today = new Date().toISOString();
@@ -3206,6 +3312,7 @@ async function submitTaskWithImg(){
   }
   
   if(btn){ btn.disabled = true; btn.innerText = '图片上传中...'; }
+  showLoading(); // 🌟 开始转圈圈
   
   try{
     const fileExt = "jpg";
@@ -3213,7 +3320,7 @@ async function submitTaskWithImg(){
     const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
     if(upErr) throw upErr;
     
-    const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
+    const { data: urlData } = await supabase.storage.from('task-proof').getPublicUrl(fileName);
     pendingProofImgUrl = urlData.publicUrl;
     
     const { error } = await supabase.from('daily_tasks')
@@ -3242,18 +3349,18 @@ async function submitTaskWithImg(){
     window.pendingSelectingImage = false;
     closeSubmitModal();
     pendingTaskIdx = null;
-    alert("✅ 带图提交成功，等待家长审核！");
+    hideLoading(); // 🌟 上传成功后停止转圈圈
+    showToast("✅ 带图提交成功，等待家长审核！", 'success');
     closeFullscreenCountdown();
     await loadAllData();
     renderAll();
   }catch(e){
     console.error('异常',e);
-    // ⚠️ 关键：上传失败时不清空 pendingCompressedFile，让用户能重试
+    hideLoading(); // 🌟 发生报错也要停止转圈圈
     alert('❌ 图片上传失败：' + e.message + '\n\n请检查网络后再次点"确认提交"，或关闭弹窗重新提交。');
     if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
   }
 }
-
 
 
 
@@ -3600,7 +3707,6 @@ async function parentApprove(idx){
   const imgTip = hasImg ? "" : "\n⚠️本次提交没有上传作业照片";
   const timeTip = task.start_at ? `用时${Math.round(diffMin)}分钟` : '（无计时记录）';
 
-  // 判断是否是今天创建的任务
   const taskDate = getTodayStr(new Date(task.create_at || Date.now()));
   const todayStr = getTodayStr();
   const isTodayTask = (taskDate === todayStr);
@@ -3612,9 +3718,9 @@ async function parentApprove(idx){
   if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐\n\n${archiveTip}`)) return;
 
   approvingTasks[task.id] = true;
+  showLoading(); // 🌟 开始转圈圈
 
   try {
-    // 1. 删除图片
     if(task.proof_image){
       try{
         const urlParts = task.proof_image.split('/');
@@ -3625,7 +3731,6 @@ async function parentApprove(idx){
       }
     }
 
-            // 2. 加星星（改用数据库原子操作，防止多设备覆盖）
     const { error: errChild } = await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  getStar });
     if(errChild){
       alert('❌ 孩子加星失败：' + errChild.message);
@@ -3633,7 +3738,6 @@ async function parentApprove(idx){
     }
     const { error: errParent } = await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount:  getStar });
     if(errParent){
-      // 家长加星失败 → 把孩子刚加的星星回滚掉
       await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  -getStar });
       alert('❌ 家长加星失败：' + errParent.message);
       return;
@@ -3641,23 +3745,17 @@ async function parentApprove(idx){
     await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
     await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
 
-    // 3. 更新数据库状态为 approved
     const { error } = await supabase.from('daily_tasks')
       .update({ status: 'approved' })
       .eq('id', task.id);
       
-       if(error){
-      console.error('审核更新失败', error);
-      alert('❌ 审核失败：' + error.message);
-      // 回滚：把刚加的星星减回去
+    if(error){
       await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount: -getStar });
       await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount: -getStar });
+      alert('❌ 审核失败：' + error.message);
       return;
     }
 
-    // 4. 根据是否是今天任务决定是否立刻删除
-    //    - 今天创建：保留在"已通过"列表，等今晚21:30的 cleanApprovedTasks 统一删除
-    //    - 跨天任务：立刻删除，不污染今天的"已通过"列表
     if(!isTodayTask){
       await supabase.from('daily_tasks').delete().eq('id', task.id);
     }
@@ -3666,14 +3764,15 @@ async function parentApprove(idx){
     await loadAllData();
     renderAll();
     
-    if(isTodayTask){
-      alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐，任务已归档到"已通过"，今晚21:30清理。`);
+        if(isTodayTask){
+      showToast(`✅ 审核通过：孩子+${getStar}⭐，家长+${getStar}⭐`, 'success');
     }else{
-      alert(`✅ 孩子+${getStar}⭐，家长+${getStar}⭐，跨天任务已删除。`);
+      showToast(`✅ 跨天任务已审核并删除。`, 'success');
     }
 
   } finally {
     delete approvingTasks[task.id];
+    hideLoading(); // 🌟 停止转圈圈（无论成败都会执行）
   }
 }
 
@@ -5303,5 +5402,12 @@ document.addEventListener('visibilitychange', function(){
 
 <!-- 收起后的小气泡 -->
 <div id="countdownBubble" class="countdown-bubble" onclick="expandCountdown()">00:00</div>
+
+<!-- 全局加载遮罩 -->
+<div id="globalLoading">
+  <div class="loading-spinner"></div>
+  <div style="color:#ef4444;font-weight:bold;font-size:15px;">处理中，请稍候...</div>
+</div>
+<div id="toast-container"></div>
 </body>
 </html>
