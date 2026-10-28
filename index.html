@@ -2385,7 +2385,7 @@ async function batchDeleteDailyTasks(){
     if(input !== null) alert('取消删除（输入不匹配）');
     return; 
   }
-  
+  showLoading();
   try{
     const { data: allTasks, error: selectErr } = await supabase.from('daily_tasks').select('id');
     if(selectErr) throw selectErr;
@@ -2408,16 +2408,18 @@ async function batchDeleteDailyTasks(){
       }
     }
     
-    if(failCount === 0){
-      alert(`✅ 成功删除 ${successCount} 条日常任务`);
+       if(failCount === 0){
+      showToast(`✅ 成功删除 ${successCount} 条日常任务`, 'success');
     } else {
-      alert(`⚠️ 删除完成，成功 ${successCount} 条，失败 ${failCount} 条。\n\n请检查 Supabase 权限：daily_tasks 表是否允许 DELETE。`);
+      showToast(`⚠️ 成功 ${successCount} 条，失败 ${failCount} 条`, 'error');
     }
     
     await loadAllData();
     renderAll();
   }catch(e){
-    alert('❌ 批量删除失败：' + e.message);
+    showToast('❌ 批量删除失败：' + e.message, 'error');
+  } finally {
+    hideLoading(); // 🌟 确保无论成功失败，转圈圈都会关闭
   }
 }
 
@@ -2435,7 +2437,7 @@ async function batchDeleteLongTasks(){
     if(input !== null) alert('取消删除（输入不匹配）');
     return; 
   }
-  
+  showLoading();
   try{
     // 1. 先查出所有长期任务的 id
     const { data: allTasks, error: selectErr } = await supabase.from('long_tasks').select('id');
@@ -2460,16 +2462,18 @@ async function batchDeleteLongTasks(){
       }
     }
     
-    if(failCount === 0){
-      alert(`✅ 成功删除 ${successCount} 条长期任务`);
+       if(failCount === 0){
+      showToast(`✅ 成功删除 ${successCount} 条长期任务`, 'success');
     } else {
-      alert(`⚠️ 删除完成，成功 ${successCount} 条，失败 ${failCount} 条。\n\n请检查 Supabase 权限：long_tasks 表是否允许 DELETE。`);
+      showToast(`⚠️ 成功 ${successCount} 条，失败 ${failCount} 条`, 'error');
     }
     
     await loadAllData();
     renderAll();
   }catch(e){
-    alert('❌ 批量删除失败：' + e.message);
+    showToast('❌ 批量删除失败：' + e.message, 'error');
+  } finally {
+    hideLoading(); // 🌟 确保无论成功失败，转圈圈都会关闭
   }
 }
 
@@ -3013,6 +3017,9 @@ async function batchCreateDailyTask(){
 
   }
 
+    showLoading(); // 🌟 加上这行，开始转圈圈
+
+
   //循环批量插入数据库，星星默认2，限时0
 
   let successCount = 0;
@@ -3044,8 +3051,9 @@ for(let taskName of taskList){
 
 }
 
+hideLoading(); // 🌟 加上这行，停止转圈圈
+  showToast(`✅成功创建 ${successCount}/${taskList.length} 条任务！`, 'success'); // 🌟 替换原来的 alert
 
-alert(`✅成功创建${successCount}/${taskList.length}条任务！`);
   
 
   document.getElementById('batchTaskText').value = "";
@@ -4264,6 +4272,7 @@ function openDictationModal(idx){
 }
 
 // 播报当前单词（用 speechSynthesis）
+
 function speakCurrentWord(){
   if(!dictationWords.length) return;
   const word = dictationWords[dictationIndex];
@@ -4281,60 +4290,40 @@ function speakCurrentWord(){
   if(subject === 'chinese'){
     utter.lang = 'zh-CN';
     let bestVoice = null;
-    // 【核心修改】优先寻找“播音员”级别的语音包
     for(let v of voices){
       if(v.lang === 'zh-CN' || v.lang === 'zh_CN'){
-        // 微软的云希(Yunxi)、云扬(Yunyang)非常像新闻联播；
-        // 晓晓(Xiaoxiao)也很标准；Ting-Ting是苹果设备最常用的标准女声
-        if(v.name.includes('Yunxi') || v.name.includes('Yunyang') || v.name.includes('Xiaoxiao') || v.name.includes('Ting-Ting') || v.name.includes('普通话')){
+        if(v.name.includes('Yunxi') || v.name.includes('Xiaoxiao') || v.name.includes('Ting-Ting') || v.name.includes('普通话')){
           bestVoice = v;
           break;
         }
-        if(!bestVoice) bestVoice = v; // 没找到就退而求其次
+        if(!bestVoice) bestVoice = v;
       }
     }
     if(bestVoice) utter.voice = bestVoice;
   }else{
     utter.lang = 'en-US';
     let bestVoice = null;
+    // 【优化1】强制优先寻找最清晰的母语级英文发音人
     for(let v of voices){
       if(v.lang === 'en-US' || v.lang === 'en_US'){
-        // 英文优先找 Samantha 或 Google US English
-        if(v.name.includes('Samantha') || v.name.includes('Google US English')) {
-            bestVoice = v;
-            break;
+        // iOS 首选 Samantha；安卓/Windows 首选 Google 或 Microsoft 的语音包
+        if(v.name.includes('Samantha') || v.name.includes('Google US English') || v.name.includes('Zira') || v.name.includes('Aria')){
+          bestVoice = v;
+          break;
         }
-        bestVoice = v;
+        if(!bestVoice) bestVoice = v;
       }
     }
     if(bestVoice) utter.voice = bestVoice;
   }
   
-  // 【核心修改】语速保持适中（0.5），但把音调（pitch）提高到 1.05，声音瞬间清亮、有精神
-  utter.rate = 0.35;   
-  utter.pitch = 1.05;  
+  // 【优化2】回归正常语速！中考听力大概是 0.8 - 0.85 的速度。
+  // 语速太慢（如0.3）会导致声音电音化、模糊。0.85 既清晰又自然。
+  utter.rate = 0.5;   
+  utter.pitch = 1.0;  // 音调设为标准，不再刻意拉高或压低
   utter.volume = 1.0;
   
   window.speechSynthesis.speak(utter);
-}
-
-// 重播当前单词
-function replayCurrentWord(){
-  speakCurrentWord();
-}
-
-// 下一个单词
-function nextDictationWord(){
-  if(dictationIndex < dictationWords.length - 1){
-    dictationIndex++;
-    updateDictationUI();
-    speakCurrentWord();
-  }else{
-    // 已经是最后一个
-    if(confirm('已经是最后一个单词了，是否结束听写？')){
-      closeDictation();
-    }
-  }
 }
 
 // 更新界面上显示的进度
