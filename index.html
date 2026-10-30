@@ -2528,7 +2528,7 @@ async function resetWeek(){
       alert("⚠️ 重置植物状态失败，请检查数据库权限！");
   } else {
       // 强制重新拉取数据并渲染，确保界面立刻变回选种子的状态
-      await loadAllData();
+      
       renderAll();
   }
 
@@ -2645,8 +2645,8 @@ async function buyRes(type){
     await saveState();
     
     // 重新拉取最新数据并刷新UI
-    await loadAllData(); 
-    await loadStarLog();  
+     
+    
     renderAll();
     showToast('✅ 兑换成功！', 'success');
   } catch (err) {
@@ -3080,6 +3080,7 @@ async function startTask(idx){
 
 
 // ============ 普通提交（无图无录音，直接确认） ============
+
 async function doSubmitNormal(idx){
   const task = state.daily[idx];
   if(!task) return;
@@ -3090,6 +3091,7 @@ async function doSubmitNormal(idx){
   if(!confirm(`确认完成任务【${task.title}】？`)) return;
   
   const today = new Date().toISOString();
+  showLoading(); // 加上转圈
   try{
     const { error } = await supabase.from('daily_tasks').update({
       submit_status: 'submitted',
@@ -3102,19 +3104,25 @@ async function doSubmitNormal(idx){
       alert('提交失败：' + error.message);
       return;
     }
+    
+    // 【核心优化】：直接修改本地状态，秒刷新！
+    task.status = 'pending_review';
+    task.submit_date = today;
+
     if(currentRole === "child"){
       state.child_today_done += 1;
       await saveState();
     }
     closeFullscreenCountdown();
     showToast('✅ 提交成功，等待家长审核！', 'success');
-    await loadAllData();
-    renderAll();
+    
+    renderAll(); // 只渲染界面，不去查数据库
   }catch(e){
     alert('提交异常：' + e.message);
+  } finally {
+    hideLoading();
   }
 }
-
 
 
 
@@ -3306,7 +3314,6 @@ async function handleSubmitImageSelect(e){
 
 //带图片提交：此时才上传压缩后的图片到supabase
 
-
 async function submitTaskWithImg(){
   const task = state.daily[pendingTaskIdx];
   const today = new Date().toISOString();
@@ -3320,7 +3327,7 @@ async function submitTaskWithImg(){
   }
   
   if(btn){ btn.disabled = true; btn.innerText = '图片上传中...'; }
-  showLoading(); // 🌟 开始转圈圈
+  showLoading();
   
   try{
     const fileExt = "jpg";
@@ -3340,13 +3347,13 @@ async function submitTaskWithImg(){
       })
       .eq('id', task.id);
     
-    if(error){
-      console.error('更新日常任务失败', error);
-      alert('❌ 提交失败：' + error.message);
-      if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
-      return;
-    }
+    if(error) throw error;
     
+    // 【核心优化】：直接修改本地状态
+    task.status = 'pending_review';
+    task.proof_image = pendingProofImgUrl;
+    task.submit_date = today;
+
     if(currentRole === "child"){
       state.child_today_done += 1;
       await saveState();
@@ -3357,15 +3364,15 @@ async function submitTaskWithImg(){
     window.pendingSelectingImage = false;
     closeSubmitModal();
     pendingTaskIdx = null;
-    hideLoading(); // 🌟 上传成功后停止转圈圈
+    hideLoading(); 
     showToast("✅ 带图提交成功，等待家长审核！", 'success');
     closeFullscreenCountdown();
-    await loadAllData();
-    renderAll();
+    
+    renderAll(); // 秒刷新
   }catch(e){
     console.error('异常',e);
-    hideLoading(); // 🌟 发生报错也要停止转圈圈
-    alert('❌ 图片上传失败：' + e.message + '\n\n请检查网络后再次点"确认提交"，或关闭弹窗重新提交。');
+    hideLoading(); 
+    alert('❌ 图片上传失败：' + e.message + '\n\n请检查网络后再次点"确认提交"。');
     if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
   }
 }
@@ -3726,7 +3733,7 @@ async function parentApprove(idx){
   if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐\n\n${archiveTip}`)) return;
 
   approvingTasks[task.id] = true;
-  showLoading(); // 🌟 开始转圈圈
+  showLoading();
 
   try {
     if(task.proof_image){
@@ -3734,22 +3741,19 @@ async function parentApprove(idx){
         const urlParts = task.proof_image.split('/');
         const fileName = urlParts[urlParts.length - 1];
         await supabase.storage.from('task-proof').remove([fileName]);
-      }catch(err){
-        console.warn("审核通过，删除图片失败", err);
-      }
+      }catch(err){ console.warn("删除图片失败", err); }
     }
 
     const { error: errChild } = await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  getStar });
-    if(errChild){
-      alert('❌ 孩子加星失败：' + errChild.message);
-      return;
-    }
+    if(errChild) { alert('❌ 孩子加星失败：' + errChild.message); return; }
+    
     const { error: errParent } = await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount:  getStar });
     if(errParent){
       await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  -getStar });
       alert('❌ 家长加星失败：' + errParent.message);
       return;
     }
+    
     await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
     await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
 
@@ -3764,15 +3768,20 @@ async function parentApprove(idx){
       return;
     }
 
-    if(!isTodayTask){
-      await supabase.from('daily_tasks').delete().eq('id', task.id);
+    // 【核心优化】：不查全量了，直接改本地内存！
+    state.star += getStar;       // 更新本地星星数
+    state.parent_star += getStar;
+    
+    if(isTodayTask){
+      task.status = 'approved';  // 今日任务：改状态，保留在已通过列表
+    } else {
+      state.daily.splice(idx, 1); // 跨天任务：直接从本地数组删掉
     }
 
     await saveState();
-    await loadAllData();
-    renderAll();
+    renderAll(); // 秒刷新
     
-        if(isTodayTask){
+    if(isTodayTask){
       showToast(`✅ 审核通过：孩子+${getStar}⭐，家长+${getStar}⭐`, 'success');
     }else{
       showToast(`✅ 跨天任务已审核并删除。`, 'success');
@@ -3780,55 +3789,40 @@ async function parentApprove(idx){
 
   } finally {
     delete approvingTasks[task.id];
-    hideLoading(); // 🌟 停止转圈圈（无论成败都会执行）
+    hideLoading();
   }
 }
-
 
 async function parentReject(idx){
-
   const task = state.daily[idx];
+  if(!confirm(`退回【${task.title}】？\n⚠️本次退回不会重置计时。`)) return;
 
-  if(!confirm(`退回【${task.title}】？\n⚠️本次退回不会重置计时，依旧以最初开始任务的时间为准`)) return;
-
-
-
-  //====新增：退回时删除存储桶图片====
-
-  if(task.proof_image){
-
-    try{
- 
-     const urlParts = task.proof_image.split('/');
-
-      const fileName = urlParts[urlParts.length - 1];
-
-      await supabase.storage.from('task-proof').remove([fileName]);
-
-    }catch(err){
-
-      console.warn("退回任务，删除图片失败",err);
-
+  showLoading();
+  try {
+    if(task.proof_image){
+      try{
+        const urlParts = task.proof_image.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        await supabase.storage.from('task-proof').remove([fileName]);
+      }catch(err){ console.warn("删除图片失败",err); }
     }
 
+    await supabase.from('daily_tasks').update({
+      proof_image: null,
+      status: 'active'
+    }).eq('id', task.id);
+
+    // 【核心优化】：直接改本地状态
+    task.status = 'active';
+    task.proof_image = null;
+    
+    renderAll();
+    showToast('✅ 已退回，孩子可重新提交', 'success');
+  } finally {
+    hideLoading();
   }
-
-
-  await supabase.from('daily_tasks').update({
- 
-   proof_image: null,
-
-    status: 'active'
-
-  }).eq('id', task.id);
-
-  await loadAllData();
-
-  renderAll();
-
-  alert('已退回，孩子可重新提交，计时沿用初次开始时间');
-
 }
+
   
 
 async function deleteDailyTask(idx){
@@ -4281,49 +4275,56 @@ function speakCurrentWord(){
     return;
   }
   
-  window.speechSynthesis.cancel(); // 先取消之前可能还在播的
-  const utter = new SpeechSynthesisUtterance(word);
-  const subject = dictationTaskRef ? dictationTaskRef.subject : 'english';
+  // 1. 强制停止当前正在播放的所有声音
+  window.speechSynthesis.cancel(); 
   
-  let voices = window.speechSynthesis.getVoices();
-  
-  if(subject === 'chinese'){
-    utter.lang = 'zh-CN';
-    let bestVoice = null;
-    for(let v of voices){
-      if(v.lang === 'zh-CN' || v.lang === 'zh_CN'){
-        if(v.name.includes('Yunxi') || v.name.includes('Xiaoxiao') || v.name.includes('Ting-Ting') || v.name.includes('普通话')){
-          bestVoice = v;
-          break;
-        }
-        if(!bestVoice) bestVoice = v;
-      }
+  // 2. 核心修复：给浏览器 150 毫秒的缓冲时间，防止音频引擎卡死
+  setTimeout(() => {
+    const utter = new SpeechSynthesisUtterance(word);
+    const subject = dictationTaskRef ? dictationTaskRef.subject : 'english';
+    
+    let voices = window.speechSynthesis.getVoices();
+    
+    // 如果语音包还没加载出来，等 100 毫秒再试一次
+    if (voices.length === 0) {
+      setTimeout(() => { window.speechSynthesis.speak(utter); }, 100);
     }
-    if(bestVoice) utter.voice = bestVoice;
-  }else{
-    utter.lang = 'en-US';
-    let bestVoice = null;
-    // 【优化1】强制优先寻找最清晰的母语级英文发音人
-    for(let v of voices){
-      if(v.lang === 'en-US' || v.lang === 'en_US'){
-        // iOS 首选 Samantha；安卓/Windows 首选 Google 或 Microsoft 的语音包
-        if(v.name.includes('Samantha') || v.name.includes('Google US English') || v.name.includes('Zira') || v.name.includes('Aria')){
-          bestVoice = v;
-          break;
+    
+    if(subject === 'chinese'){
+      utter.lang = 'zh-CN';
+      let bestVoice = null;
+      for(let v of voices){
+        if(v.lang === 'zh-CN' || v.lang === 'zh_CN'){
+          if(v.name.includes('Yunxi') || v.name.includes('Xiaoxiao') || v.name.includes('Ting-Ting') || v.name.includes('普通话')){
+            bestVoice = v;
+            break;
+          }
+          if(!bestVoice) bestVoice = v;
         }
-        if(!bestVoice) bestVoice = v;
       }
+      if(bestVoice) utter.voice = bestVoice;
+    }else{
+      utter.lang = 'en-US';
+      let bestVoice = null;
+      for(let v of voices){
+        if(v.lang === 'en-US' || v.lang === 'en_US'){
+          if(v.name.includes('Samantha') || v.name.includes('Google US English') || v.name.includes('Zira') || v.name.includes('Aria')){
+            bestVoice = v;
+            break;
+          }
+          if(!bestVoice) bestVoice = v;
+        }
+      }
+      if(bestVoice) utter.voice = bestVoice;
     }
-    if(bestVoice) utter.voice = bestVoice;
-  }
-  
-  // 【优化2】回归正常语速！中考听力大概是 0.8 - 0.85 的速度。
-  // 语速太慢（如0.3）会导致声音电音化、模糊。0.85 既清晰又自然。
-  utter.rate = 0.5;   
-  utter.pitch = 1.0;  // 音调设为标准，不再刻意拉高或压低
-  utter.volume = 1.0;
-  
-  window.speechSynthesis.speak(utter);
+    
+    // 语速设为 0.6。如果孩子还是觉得快，可以改为 0.5。但不要低于 0.4，否则会电音模糊
+    utter.rate = 0.6;   
+    utter.pitch = 1.0;  
+    utter.volume = 1.0;
+    
+    window.speechSynthesis.speak(utter);
+  }, 150); // 这就是防卡死的 150 毫秒缓冲
 }
 
 // 更新界面上显示的进度
@@ -4344,112 +4345,90 @@ function closeDictation(){
 }
 // ================== 听写功能结束 ==================
 async function submitLongTask(idx) {
-
   const task = state.long[idx];
-
   const today = getTodayStr();
 
-  if(task.last_date===today)return alert('今日已经完成');
-
+  if(task.last_date===today) return alert('今日已经完成');
   if(task.submit_status === 'submitted') return alert('已经提交，等待对方确认');
 
+  showLoading();
   try {
-
     const {error} = await supabase.from('long_tasks')
-
-      .update({submit_status:'submitted',submit_date:today})
-
+      .update({submit_status:'submitted', submit_date:today})
       .eq('id',task.id);
 
-    if(error){
+    if(error) throw error;
 
-      console.error('更新长期任务失败', error);
-
-      alert('提交失败：' + error.message);
-
-      return;
-
-    }
-
+    // 【核心优化】：修改本地状态
     task.submit_status = 'submitted';
+    task.submit_date = today;
 
     if(currentRole === "child"){
-
-  state.child_today_done += 1;
-
-  await saveState();
-
-}
-    await loadAllData();
-
+      state.child_today_done += 1;
+      await saveState();
+    }
+    
     renderAll();
-
-    alert('✅ 打卡提交成功，等待对方确认！');
-
+    showToast('✅ 打卡提交成功，等待对方确认！', 'success');
   }catch(e){
- 
     console.error('异常',e);
-
     alert('提交发生异常：'+e.message);
-
+  } finally {
+    hideLoading();
   }
-
 }
 
 async function approveLongTask(idx){
   const task=state.long[idx];
   if(!task) return;
   if(task.submit_status !== 'submitted') return;
-
   if(approvingTasks[task.id]) return;
+
   approvingTasks[task.id] = true;
+  showLoading();
 
   try {
-    // 使用提交那天的日期作为最后完成日期，而不是今天
-    // 这样即使第二天才审核，也算作昨天完成的，今天依然可以重新打卡
     const lastDate = task.submit_date || getTodayStr();
 
-    // 删除录音
     if(task.audio_url){
       try {
         const urlParts = task.audio_url.split('/');
         const fileName = urlParts[urlParts.length - 1];
         await supabase.storage.from('task-proof').remove([fileName]);
-      } catch(err){
-        console.warn('删除录音失败', err);
-      }
+      } catch(err){ console.warn('删除录音失败', err); }
     }
 
-        // 先加星星（改用数据库原子操作，防止多设备覆盖）
     const roleType = task.owner_type;
     const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: task.star });
-    if(rpcErr){
-      alert('❌ 加星失败：' + rpcErr.message);
-      return;
-    }
+    if(rpcErr) { alert('❌ 加星失败：' + rpcErr.message); return; }
 
-    // 再更新数据库状态
     const { error } = await supabase.from('long_tasks').update({
       last_date: lastDate,
-      submit_status: 'normal', // 状态重置，第二天自动回到“未完成”栏
+      submit_status: 'normal',
       audio_url: null
     }).eq('id', task.id);
     
     if (error) {
-      console.error('审核更新失败', error);
-      // 回滚刚加的星星
       await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: -task.star });
       alert('❌ 审核失败：' + error.message);
       return;
     }
 
     await addStarLogItem(roleType, task.star, `长期任务【${task.title}】打卡完成`);
-    await loadAllData();
+    
+    // 【核心优化】：直接改本地
+    task.submit_status = 'normal';
+    task.last_date = lastDate;
+    task.audio_url = null;
+    if(roleType === 'child') state.star += task.star;
+    if(roleType === 'parent') state.parent_star += task.star;
+
     renderAll();
-    alert('✅ 确认完成，+'+task.star+'⭐');
+    showToast('✅ 确认完成，+'+task.star+'⭐', 'success');
 
   } finally {
     delete approvingTasks[task.id];
+    hideLoading();
   }
 }
 
