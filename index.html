@@ -775,19 +775,15 @@ if('serviceWorker' in navigator){
   </div>
   <div id="tab-shop" class="hidden">
     <div class="card">
-      <h3 class="task-card-title">🏪 物资商城</h3>
-      <p style="color:#888;font-size:14px;margin-bottom:12px;">6颗星兑换1份物资</p>
-      <button class="btn btn-green" onclick="buyRes('water')">💧 兑换水（6⭐）</button>
-      <button class="btn btn-green" onclick="buyRes('sun')">☀️ 兑换阳光（6⭐）</button>
-      <button class="btn btn-green" onclick="buyRes('fert')">🧪 兑换肥料（6⭐）</button>
-
-      <div style="margin-top:20px; border-top: 1px dashed #eee; padding-top: 15px;"></div>
-
       <h3 class="task-card-title">🎁 每日签到</h3>
       <button id="signInBtn" class="btn btn-blue" onclick="dailySignIn()">📅 点我签到（送1⭐）</button>
-
       <div style="margin-top:20px; border-top: 1px dashed #eee; padding-top: 15px;"></div>
-
+      <h3 class="task-card-title">🏪 物资商城</h3>
+      <p style="color:#888;font-size:14px;margin-bottom:12px;">5颗星兑换1份物资</p>
+      <button class="btn btn-green" onclick="buyRes('water')">💧 兑换水（5⭐）</button>
+      <button class="btn btn-green" onclick="buyRes('sun')">☀️ 兑换阳光（5⭐）</button>
+      <button class="btn btn-green" onclick="buyRes('fert')">🧪 兑换肥料（5⭐）</button>
+      <div style="margin-top:20px; border-top: 1px dashed #eee; padding-top: 15px;"></div>
       <h3 class="task-card-title">🎰 幸运大转盘</h3>
       <p style="color:#888;font-size:14px;margin-bottom:12px;">2颗星抽一次，每天限1次！</p>
       <button id="lotteryBtn" class="btn btn-red" onclick="startLottery()" style="font-size:18px; padding: 15px;">🎲 消耗 2⭐ 抽奖 (每日1次)</button>
@@ -1271,6 +1267,21 @@ function showToast(message, type = 'info') {
   }, 2000);
 }
 
+// ============ 网络波动自动重试神器 ============
+async function retryFetch(fn, maxRetries = 3, delay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const res = await fn();
+      if (res && res.error) throw res.error;
+      return res;
+    } catch (err) {
+      if (i === maxRetries - 1) throw err; // 最后一次还失败就抛出
+      console.warn(`网络波动，${delay}ms后重试第 ${i+1} 次...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 function showLoading() { document.getElementById('globalLoading').classList.add('show'); }
 function hideLoading() { document.getElementById('globalLoading').classList.remove('show'); }
 
@@ -1500,9 +1511,16 @@ async function loadAllData(){
       state.plantNameChild = stateData.plant_name_child || "";
       stateLoadedOK = true;
     }
-    state.daily = dailyRes.data || [];
-    state.long = longRes.data || [];
-    state.wish = wishRes.data || [];
+        // 🛡️ 安全锁：如果网络请求成功且有数据才更新，防止网络波动把页面变空
+    if (dailyRes && dailyRes.data) {
+      state.daily = dailyRes.data;
+    }
+    if (longRes && longRes.data) {
+      state.long = longRes.data;
+    }
+    if (wishRes && wishRes.data) {
+      state.wish = wishRes.data;
+    }
   }catch(e){
     console.warn("加载基础数据异常",e);
   }
@@ -2819,7 +2837,7 @@ async function dailySignIn(){
 async function updateShopDailyLimits() {
   const today = getTodayStr();
   
-  // 1. 更新签到按钮
+  // ===== 1. 更新签到按钮 =====
   const lastSign = localStorage.getItem('garden_last_sign_date');
   const signBtn = document.getElementById('signInBtn');
   if(signBtn){
@@ -2838,7 +2856,7 @@ async function updateShopDailyLimits() {
     }
   }
 
-  // 2. 更新抽奖按钮
+  // ===== 2. 更新抽奖按钮 =====
   const lotteryBtn = document.getElementById('lotteryBtn');
   if(!lotteryBtn) return;
 
@@ -2848,6 +2866,11 @@ async function updateShopDailyLimits() {
     lotteryBtn.style.background = '#d1d5db';
     return;
   }
+
+  // 🌟 核心优化：在去查数据库之前，先把它变成“检查中”的灰色按钮，防止孩子手快误触！
+  lotteryBtn.disabled = true;
+  lotteryBtn.innerText = '⏳ 正在检查抽奖状态...';
+  lotteryBtn.style.background = '#d1d5db';
 
   try {
     // 查数据库，看今天有没有“抽奖消耗”的流水
@@ -2866,10 +2889,14 @@ async function updateShopDailyLimits() {
     } else {
       lotteryBtn.innerText = '🎲 消耗 2⭐ 抽奖 (每日1次)';
       lotteryBtn.disabled = false;
-      lotteryBtn.style.background = '#ef4444';
+      lotteryBtn.style.background = '#ef4444'; // 只有确认没抽过，才变红
     }
   } catch(e) {
     console.warn('检查抽奖状态失败', e);
+    // 如果网络异常导致查不到，为了安全起见，保持不可点击，并提示
+    lotteryBtn.innerText = '⚠️ 网络异常，请刷新页面';
+    lotteryBtn.disabled = true;
+    lotteryBtn.style.background = '#d1d5db';
   }
 }
 
@@ -3006,81 +3033,68 @@ async function buyRes(type){
   }
 
   const myStar = currentRole === 'parent' ? state.parent_star : state.star;
-  if(myStar < 6){ 
-    alert(`星星不足！当前只有 ${myStar} 颗星，兑换需要 6 颗星。`); 
+  if(myStar < 5){ 
+    alert(`星星不足！当前只有 ${myStar} 颗星，兑换需要 5 颗星。`); 
     return; 
   }
 
-  if(!confirm(`确认消耗 6⭐ 兑换物资吗？`)) return;
+  if(!confirm(`确认消耗 5⭐ 兑换物资吗？`)) return;
 
   window.isBuying = true;
   showLoading(); 
 
   try {
-    // 第一步：扣星
-    const { error: rpcErr } = await supabase.rpc('buy_shop_item', { 
-      p_role_type: currentRole, 
-      p_item_type: type 
-    });
+    // 🌟 1. 扣除 5 颗星（使用我们的通用扣星函数，带自动重试）
+    await retryFetch(() => supabase.rpc('adjust_stars', { p_role_type: currentRole, p_amount: -5 }));
     
-    if(rpcErr) throw rpcErr;
+    // 记录星星流水
+    await addStarLogItem(currentRole, -5, `商城兑换物资`);
 
-    // 第二步：去数据库查最新数据
-    let dbState = null;
-    const { data: fetchData, error: fetchErr } = await supabase
-      .from('app_state')
-      .select('water, sun, fert, plant_child')
-      .eq('id', 1)
-      .single();
-      
-    if(fetchErr) {
-      // 如果查询失败，等 1 秒后重试 1 次（应对网络波动）
-      console.warn('查询失败，尝试重试...', fetchErr);
-      await new Promise(r => setTimeout(r, 1000));
-      const { data: retryData, error: retryErr } = await supabase
+    // 🌟 2. 增加物资（带自动重试，防止并发覆盖）
+    await retryFetch(async () => {
+      const { data: dbState, error: fetchErr } = await supabase
         .from('app_state')
         .select('water, sun, fert, plant_child')
         .eq('id', 1)
         .single();
-      if(retryErr) throw new Error('网络连接失败，请检查网络后重试');
-      dbState = retryData;
-    } else {
-      dbState = fetchData;
-    }
+        
+      if(fetchErr) throw fetchErr;
 
-    // 第三步：在最新数据上 +1
+      if(currentRole === 'parent'){
+        let w = dbState.water || 0;
+        let s = dbState.sun || 0;
+        let f = dbState.fert || 0;
+        if(type === 'water') w++;
+        if(type === 'sun') s++;
+        if(type === 'fert') f++;
+        
+        const { error: updateErr } = await supabase.from('app_state').update({ water: w, sun: s, fert: f }).eq('id', 1);
+        if(updateErr) throw updateErr;
+      } else {
+        let pc = dbState.plant_child || { plant: null, stage: 1, water: 0, sun: 0, fert: 0, plantDone: false };
+        if(type === 'water') pc.water = (pc.water || 0) + 1;
+        if(type === 'sun') pc.sun = (pc.sun || 0) + 1;
+        if(type === 'fert') pc.fert = (pc.fert || 0) + 1;
+        
+        const { error: updateErr } = await supabase.from('app_state').update({ plant_child: pc }).eq('id', 1);
+        if(updateErr) throw updateErr;
+      }
+    });
+    
+    // 🌟 3. 更新本地状态并刷新界面
     if(currentRole === 'parent'){
-      let w = dbState.water || 0;
-      let s = dbState.sun || 0;
-      let f = dbState.fert || 0;
-      if(type === 'water') w++;
-      if(type === 'sun') s++;
-      if(type === 'fert') f++;
-      
-      const { error: updateErr } = await supabase.from('app_state').update({ water: w, sun: s, fert: f }).eq('id', 1);
-      if(updateErr) throw updateErr;
+      state.parent_star -= 5;
     } else {
-      let pc = dbState.plant_child || { plant: null, stage: 1, water: 0, sun: 0, fert: 0, plantDone: false };
-      if(type === 'water') pc.water = (pc.water || 0) + 1;
-      if(type === 'sun') pc.sun = (pc.sun || 0) + 1;
-      if(type === 'fert') pc.fert = (pc.fert || 0) + 1;
-      
-      const { error: updateErr } = await supabase.from('app_state').update({ plant_child: pc }).eq('id', 1);
-      if(updateErr) throw updateErr;
+      state.star -= 5;
     }
     
-    // 第四步：重新加载页面数据
     await loadAllData();
     renderAll();
     showToast('✅ 兑换成功！', 'success');
+    
   } catch (err) {
     console.error(err);
-    // 如果是网络问题，给个更友好的提示
-    if(err.message.includes('fetch') || err.message.includes('网络')){
-      alert('❌ 网络连接超时！\n\n这通常是因为国内连接 Supabase 不稳定，或者你的数据库被暂停了。\n请切换一下网络（比如开/关 WiFi，用手机流量）再试一次。');
-    } else {
-      alert('❌ 兑换过程发生错误：' + err.message);
-    }
+    alert('❌ 兑换失败，网络不给力，请稍后再试：' + err.message);
   } finally {
     hideLoading(); 
     setTimeout(() => { window.isBuying = false; }, 500);
@@ -3107,31 +3121,35 @@ async function saveDailyTask(){
   }
   
 
-  const { error: insertErr } = await supabase.from('daily_tasks').insert([{
-    title, star, minute_limit: minuteLimit,
-    subject: selectedSubject,
-    description: desc,
-    is_dictation: isDictation,
-    submit_type: selectedSubmitType,
-    create_at: new Date().toISOString(),
-    start_at: null, proof_image: null, status: 'active'
-  }]);
-  if(insertErr){
-    console.error('新增任务失败', insertErr);
-    alert('❌ 新增任务失败：' + insertErr.message);
-    return;
-  }
-  closeModal('dailyModal');
-      
+    showLoading();
+  try {
+    await retryFetch(() => supabase.from('daily_tasks').insert([{
+      title, star, minute_limit: minuteLimit,
+      subject: selectedSubject,
+      description: desc,
+      is_dictation: isDictation,
+      submit_type: selectedSubmitType,
+      create_at: new Date().toISOString(),
+      start_at: null, proof_image: null, status: 'active'
+    }]));
+    
+    closeModal('dailyModal');
     document.getElementById('dailyTitle').value='';
-  document.getElementById('dailyDesc').value='';
-  document.getElementById('dailyStar').value='2';
-  document.getElementById('dailyMinuteLimit').value='0';
-  selectedTaskType = 'normal';
-  selectedSubmitType = 'normal';
-  await loadAllData();renderAll();
+    document.getElementById('dailyDesc').value='';
+    document.getElementById('dailyStar').value='2';
+    document.getElementById('dailyMinuteLimit').value='0';
+    selectedTaskType = 'normal';
+    selectedSubmitType = 'normal';
+    
+    await loadAllData();
+    renderAll();
+    showToast('✅ 任务新增成功', 'success');
+  } catch (err) {
+    alert('❌ 新增任务失败，网络实在太差了，请稍后再试：' + err.message);
+  } finally {
+    hideLoading();
+  }
 }
-
 function closeSubmitModal(){
   closeModal('taskSubmitModal');
   pendingTaskIdx = null;
@@ -3211,6 +3229,7 @@ async function doSubmitTask(){
 }
 
 // 长期任务带图片提交
+
 async function submitLongTaskWithImg(){
   if(pendingLongImgIdx === null){
     alert('任务信息丢失，请重新打开');
@@ -3226,30 +3245,32 @@ async function submitLongTaskWithImg(){
     return;
   }
   
-  if(btn){ btn.disabled = true; btn.innerText = '图片上传中...'; }
+  if(btn){ btn.disabled = true; btn.innerText = '正在上传，请稍候...'; }
+  showLoading();
+  showToast('📤 正在上传图片，网络慢会自动重试', 'info');
   
   try{
     const fileName = `long_img_${task.id}_${Date.now()}.jpg`;
-    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
-    if(upErr) throw upErr;
+    
+    // 🌟 加入重试机制上传
+    await retryFetch(async () => {
+      const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
+      if (upErr) throw upErr;
+    });
     
     const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
     const imgUrl = urlData.publicUrl;
     
     const today = getTodayStr();
-    const { error } = await supabase.from('long_tasks')
+    
+    // 🌟 加入重试机制更新数据库
+    await retryFetch(() => supabase.from('long_tasks')
       .update({
         submit_status: 'submitted',
         submit_date: today,
         audio_url: imgUrl
       })
-      .eq('id', task.id);
-    
-    if(error){
-      alert('❌ 提交失败：' + error.message);
-      if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
-      return;
-    }
+      .eq('id', task.id));
     
     if(currentRole === "child"){
       state.child_today_done += 1;
@@ -3260,16 +3281,18 @@ async function submitLongTaskWithImg(){
     window.pendingSelectingImage = false;
     pendingLongImgIdx = null;
     closeSubmitModal();
-    alert("✅ 图片打卡已提交，等待对方确认！");
+    hideLoading();
+    showToast("✅ 图片打卡已提交，等待对方确认！", 'success');
+    closeFullscreenCountdown();
     await loadAllData();
     renderAll();
   }catch(e){
     console.error('异常',e);
+    hideLoading();
     alert('❌ 图片上传失败：' + e.message + '\n\n请检查网络后重试。');
     if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
   }
 }
-
 
 let editTaskIdx = null;
  
@@ -3496,61 +3519,71 @@ async function startTask(idx){
   const task = state.daily[idx];
   if(!task || task.start_at) return;
   const startIso = new Date().toISOString();
-  await supabase.from('daily_tasks').update({start_at: startIso}).eq('id', task.id);
-  await loadAllData();
+  
+  // 1. 立即更新本地状态，让按钮马上变成“提交完成”
+  task.start_at = startIso;
   renderAll();
-  // 有限时任务才打开全屏倒计时
+  
+  // 2. 打开全屏倒计时（如果有）
   if(task.minute_limit > 0){
     openFullscreenCountdown({ ...task, start_at: startIso });
   }
-}
 
+  // 3. 后台静默同步到数据库，不影响界面，即使网络卡了任务也不会消失
+  try {
+    await supabase.from('daily_tasks').update({start_at: startIso}).eq('id', task.id);
+  } catch(e) {
+    console.warn("同步开始时间失败", e);
+  }
+}
 
 // ============ 普通提交（无图无录音，直接确认） ============
 
 async function doSubmitNormal(idx){
   const task = state.daily[idx];
   if(!task) return;
-  if(!task.start_at){
-    alert('请先点击【开始任务】，再提交完成！');
-    return;
-  }
+  if(!task.start_at){ alert('请先点击【开始任务】，再提交完成！'); return; }
   if(!confirm(`确认完成任务【${task.title}】？`)) return;
   
   const today = new Date().toISOString();
-  showLoading(); // 加上转圈
-  try{
-    const { error } = await supabase.from('daily_tasks').update({
+  
+  // 1. 先记录原来的状态，方便失败时回滚
+  const oldStatus = task.status;
+  const oldSubmitDate = task.submit_date;
+
+  // 🌟 2. 先修改本地状态，让孩子界面秒变“待审核”
+  task.status = 'pending_review';
+  task.submit_date = today;
+  closeFullscreenCountdown();
+  renderAll(); 
+  showToast('⏳ 正在提交...', 'info');
+
+  // 🌟 3. 后台静默同步数据
+  try {
+    await retryFetch(() => supabase.from('daily_tasks').update({
       submit_status: 'submitted',
       submit_date: today,
       proof_image: null,
       status: 'pending_review'
-    }).eq('id', task.id);
+    }).eq('id', task.id));
     
-    if(error){
-      alert('提交失败：' + error.message);
-      return;
-    }
-    
-    // 【核心优化】：直接修改本地状态，秒刷新！
-    task.status = 'pending_review';
-    task.submit_date = today;
-
     if(currentRole === "child"){
       state.child_today_done += 1;
       await saveState();
     }
-    closeFullscreenCountdown();
     showToast('✅ 提交成功，等待家长审核！', 'success');
+
+  } catch(e) {
+    // ❌ 如果重试3次彻底失败，执行“回滚”
+    console.warn('网络异常', e);
     
-    renderAll(); // 只渲染界面，不去查数据库
-  }catch(e){
-    alert('提交异常：' + e.message);
-  } finally {
-    hideLoading();
+    task.status = oldStatus; // 退回原来的状态
+    task.submit_date = oldSubmitDate;
+    renderAll(); // 任务重新回到“进行中”
+    
+    alert('❌ 网络断开，提交失败！\n任务已退回，请检查网络后重新提交。');
   }
 }
-
 
 
 
@@ -3754,30 +3787,34 @@ async function submitTaskWithImg(){
     return;
   }
   
-  if(btn){ btn.disabled = true; btn.innerText = '图片上传中...'; }
+  if(btn){ btn.disabled = true; btn.innerText = '正在上传，请稍候...'; }
   showLoading();
+  showToast('📤 正在上传图片，网络慢会自动重试', 'info');
   
   try{
     const fileExt = "jpg";
     const fileName = `${task.id}-${Date.now()}.${fileExt}`;
-    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
-    if(upErr) throw upErr;
     
-    const { data: urlData } = await supabase.storage.from('task-proof').getPublicUrl(fileName);
+    // 🌟 加入自动重试的上传
+    await retryFetch(async () => {
+      const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, file);
+      if (upErr) throw upErr;
+    });
+    
+    const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
     pendingProofImgUrl = urlData.publicUrl;
     
-    const { error } = await supabase.from('daily_tasks')
+    // 🌟 加入自动重试的数据库更新
+    await retryFetch(() => supabase.from('daily_tasks')
       .update({
         submit_status: 'submitted',
         submit_date: today,
         proof_image: pendingProofImgUrl,
         status: 'pending_review'
       })
-      .eq('id', task.id);
+      .eq('id', task.id));
     
-    if(error) throw error;
-    
-    // 【核心优化】：直接修改本地状态
+    // 直接修改本地状态
     task.status = 'pending_review';
     task.proof_image = pendingProofImgUrl;
     task.submit_date = today;
@@ -3804,7 +3841,6 @@ async function submitTaskWithImg(){
     if(btn){ btn.disabled = false; btn.innerText = '确认提交'; }
   }
 }
-
 
 
 //直接提交（无图片）
@@ -4163,53 +4199,7 @@ async function parentApprove(idx){
   if(btn) { btn.disabled = false; btn.innerText = '确认奖励'; }
   
   return; // 截断函数，后面的逻辑交给 submitApproveComment 处理
-}
 
-  try {
-    // 🔒 【核心防护】：先带条件更新数据库！只有状态是待审核才更新成功
-    const { data: updateData, error: updateErr } = await supabase.from('daily_tasks')
-      .update({ status: 'approved' })
-      .eq('id', task.id)
-      .eq('status', 'pending_review') 
-      .select();
-
-    if(updateErr) throw updateErr;
-
-    // 如果 updateData 为空，说明这条已经被处理过了，直接拦截！
-    if(!updateData || updateData.length === 0){
-      showToast('该任务已被处理过啦，请勿重复操作！', 'error');
-      return; 
-    }
-
-    // --- 确认状态更新成功后，才发星星 ---
-    if(task.proof_image){
-      try{
-        const urlParts = task.proof_image.split('/');
-        await supabase.storage.from('task-proof').remove([urlParts[urlParts.length - 1]]);
-      }catch(err){ console.warn("删除图片失败", err); }
-    }
-
-    await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: getStar });
-    await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount: getStar });
-    await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
-    await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
-
-    state.star += getStar;       
-    state.parent_star += getStar;
-    if(isTodayTask) task.status = 'approved';
-    else state.daily.splice(idx, 1);
-
-    await saveState();
-    renderAll(); 
-    showToast(`✅ 审核通过：孩子+${getStar}⭐`, 'success');
-
-  } catch(e) {
-    console.error(e);
-    showToast('审核异常，请刷新重试', 'error');
-  } finally {
-    delete approvingTasks[task.id];
-    hideLoading();
-  }
 }
 
 // 处理弹窗里的【确认奖励】按钮点击
@@ -4242,15 +4232,13 @@ async function submitApproveComment(){
   approvingTasks[task.id] = true;
   showLoading();
 
-  try {
-    // 🔒 核心防护
-    const { data: updateData, error: updateErr } = await supabase.from('daily_tasks')
+    try {
+    // 🔒 核心防护（加入自动重试机制）
+    const { data: updateData } = await retryFetch(() => supabase.from('daily_tasks')
       .update({ status: 'approved' })
       .eq('id', task.id)
       .eq('status', 'pending_review') 
-      .select();
-
-    if(updateErr) throw updateErr;
+      .select());
 
     if(!updateData || updateData.length === 0){
       showToast('该任务已被处理过啦，请勿重复操作！', 'error');
@@ -4663,25 +4651,28 @@ async function uploadRecordingAndSubmit(){
 
 // 长期任务录音提交
 async function uploadLongRecording(){
-  if(pendingLongTaskIdx === null){
-    alert('任务信息丢失，请重新打开');
-    return;
-  }
+  if(pendingLongTaskIdx === null){ alert('任务信息丢失，请重新打开'); return; }
   const task = state.long[pendingLongTaskIdx];
   const fileName = `long_audio_${task.id}_${Date.now()}.wav`;
+  showToast('📤 正在上传录音，请稍候...', 'info');
+  
   try {
-    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
-    if(upErr) throw upErr;
+    // 🌟 重试上传
+    await retryFetch(async () => {
+      const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
+      if(upErr) throw upErr;
+    });
+
     const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
     const audioUrl = urlData.publicUrl;
 
     const today = getTodayStr();
-    const { error } = await supabase.from('long_tasks').update({
+    // 🌟 重试更新
+    await retryFetch(() => supabase.from('long_tasks').update({
       submit_status: 'submitted',
       submit_date: today,
       audio_url: audioUrl
-    }).eq('id', task.id);
-    if(error) throw error;
+    }).eq('id', task.id));
 
     cancelRecording();
     await loadAllData();
@@ -4689,32 +4680,35 @@ async function uploadLongRecording(){
     alert('✅ 录音打卡已提交，等待家长确认！');
   } catch(err){
     console.error(err);
-    alert('❌ 提交失败：' + err.message);
+    alert('❌ 提交失败，网络不给力，请稍后重试：' + err.message);
   }
 }
 
 // 日常任务录音提交
 async function uploadDailyRecording(){
-  if(pendingDailyAudioIdx === null){
-    alert('任务信息丢失，请重新打开');
-    return;
-  }
+  if(pendingDailyAudioIdx === null){ alert('任务信息丢失，请重新打开'); return; }
   const task = state.daily[pendingDailyAudioIdx];
   const fileName = `daily_audio_${task.id}_${Date.now()}.wav`;
+  showToast('📤 正在上传录音，请稍候...', 'info');
+  
   try {
-    const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
-    if(upErr) throw upErr;
+    // 🌟 重试上传
+    await retryFetch(async () => {
+      const { error: upErr } = await supabase.storage.from('task-proof').upload(fileName, recordedBlob);
+      if(upErr) throw upErr;
+    });
+
     const { data: urlData } = supabase.storage.from('task-proof').getPublicUrl(fileName);
     const audioUrl = urlData.publicUrl;
 
     const today = new Date().toISOString();
-    const { error } = await supabase.from('daily_tasks').update({
+    // 🌟 重试更新
+    await retryFetch(() => supabase.from('daily_tasks').update({
       submit_status: 'submitted',
       submit_date: today,
-      proof_image: audioUrl,   // 复用 proof_image 字段存录音 URL
+      proof_image: audioUrl,
       status: 'pending_review'
-    }).eq('id', task.id);
-    if(error) throw error;
+    }).eq('id', task.id));
 
     if(currentRole === "child"){
       state.child_today_done += 1;
@@ -4727,7 +4721,7 @@ async function uploadDailyRecording(){
     alert('✅ 录音已提交，等待家长审核！');
   } catch(err){
     console.error(err);
-    alert('❌ 提交失败：' + err.message);
+    alert('❌ 提交失败，网络不给力，请稍后重试：' + err.message);
   }
 }
 
@@ -4855,30 +4849,37 @@ async function submitLongTask(idx) {
   if(task.last_date===today) return alert('今日已经完成');
   if(task.submit_status === 'submitted') return alert('已经提交，等待对方确认');
 
-  showLoading();
+  // 1. 记录旧状态
+  const oldSubmitStatus = task.submit_status;
+  const oldSubmitDate = task.submit_date;
+
+  // 🌟 2. 先变界面，秒刷新
+  task.submit_status = 'submitted';
+  task.submit_date = today;
+  renderAll();
+  showToast('⏳ 正在提交...', 'info');
+
+  // 🌟 3. 后台静默重试同步
   try {
-    const {error} = await supabase.from('long_tasks')
+    await retryFetch(() => supabase.from('long_tasks')
       .update({submit_status:'submitted', submit_date:today})
-      .eq('id',task.id);
-
-    if(error) throw error;
-
-    // 【核心优化】：修改本地状态
-    task.submit_status = 'submitted';
-    task.submit_date = today;
+      .eq('id',task.id));
 
     if(currentRole === "child"){
       state.child_today_done += 1;
       await saveState();
     }
-    
-    renderAll();
     showToast('✅ 打卡提交成功，等待对方确认！', 'success');
-  }catch(e){
+
+  } catch(e){
+    // ❌ 失败回滚
     console.error('异常',e);
-    alert('提交发生异常：'+e.message);
-  } finally {
-    hideLoading();
+    
+    task.submit_status = oldSubmitStatus;
+    task.submit_date = oldSubmitDate;
+    renderAll(); // 任务重新回到“未完成”状态
+    
+    alert('❌ 网络断开，打卡失败！\n任务已退回，请检查网络后重新提交。');
   }
 }
 
