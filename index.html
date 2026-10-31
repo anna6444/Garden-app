@@ -507,7 +507,10 @@ if('serviceWorker' in navigator){
       </div>
       <div id="plantGrow" class="hidden">
         <div class="plant-big" id="plantIcon">🌱</div>
-        <p style="text-align:center;font-size:18px;" id="plantNameText">向日葵</p>
+                <p style="text-align:center;font-size:18px;" id="plantNameText">向日葵</p>
+        <div style="text-align:center; margin-bottom:8px;">
+          <button class="btn btn-blue btn-sm" onclick="renamePlant()" style="padding:4px 8px; font-size:12px; margin:0;">✏️ 给植物起名字</button>
+        </div>
         <p style="text-align:center;color:#666;">阶段 <b id="curStage">1</b> /7</p>
         <p style="text-align:center;color:#888;" id="stageName">种子发芽</p>
         <div class="stage-dots" id="stageDots"></div>
@@ -1275,19 +1278,29 @@ let pendingDailyAudioIdx = null;         // 日常任务录音的索引
 let pendingLongImgIdx = null;            // 长期任务图片提交的索引
 let recordContext = 'long';              // 录音上下文：'long' 长期任务，'daily' 日常任务
 let state = {
-
   star: 0,
-
   parent_star: 0,
-
-  child_today_done:0,
-
-  water:0, sun:0, fert:0, plant:null, stage:1, plantDone:false
-,
-  daily: [], long: [], wish: [],
-
+  child_today_done: 0,
+  water: 0, 
+  sun: 0, 
+  fert: 0, 
+  plant: null, 
+  stage: 1, 
+  plantDone: false,
+  daily: [], 
+  long: [], 
+  wish: [],
   
-  plantChild: null, stageChild: 1, waterChild: 0, sunChild: 0, fertChild: 0, plantDoneChild: false
+  plantChild: null, 
+  stageChild: 1, 
+  waterChild: 0, 
+  sunChild: 0, 
+  fertChild: 0, 
+  plantDoneChild: false,
+
+  // 👇 就是新增了下面这两行
+  plantName: "", 
+  plantNameChild: ""
 };
 const STAGE_NAMES = ["种子发芽","长出小苗","长叶片","抽枝长茎","含苞待放","开花啦","结果丰收"];
 const PLANT = {
@@ -1455,6 +1468,8 @@ async function loadAllData(){
         state.fertChild = pc.fert || 0;
         state.plantDoneChild = pc.plantDone || false;
       }
+      state.plantName = stateData.plant_name || "";
+      state.plantNameChild = stateData.plant_name_child || "";
       stateLoadedOK = true;
     }
     state.daily = dailyRes.data || [];
@@ -1496,6 +1511,8 @@ async function saveState(){
         fert: state.fertChild,
         plantDone: state.plantDoneChild
       },
+      plant_name: state.plantName,
+      plant_name_child: state.plantNameChild
       
     }).eq('id', 1);
   }catch(e){
@@ -2391,8 +2408,10 @@ function openPlantPreview(plantId){
     closeModal('plantPreviewModal');
     if(currentRole === 'parent'){
       state.plant = plantId; state.stage=1; state.water=0; state.sun=0; state.fert=0; state.plantDone=false;
+      state.plantName = ""; // 👈 新增：选新植物时清空旧名字
     } else {
       state.plantChild = plantId; state.stageChild=1; state.waterChild=0; state.sunChild=0; state.fertChild=0; state.plantDoneChild=false;
+      state.plantNameChild = ""; // 👈 新增：选新植物时清空旧名字
     }
     saveState(); renderAll();
   };
@@ -2413,7 +2432,42 @@ function feedPlant(){
     state.waterChild--;state.sunChild--;state.fertChild--;state.stageChild++;
     if(state.stageChild>=7){state.stageChild=7;state.plantDoneChild=true;alert('🎉恭喜！植物培育完成');}
   }
-  saveState();renderAll();
+      // 🎉 新增：植物升级对话
+  const plantTalks = {
+    2: "🌱 哇！我破土而出啦，谢谢你给我浇水！",
+    3: "🌿 我又长高了一点点，外面的阳光真好呀～",
+    4: "🪴 我的叶子越来越强壮了，我会继续努力的！",
+    5: "🌷 快看快看！我长出小花苞啦，期待开花！",
+    6: "🌸 哇哦！我开花了！这是最漂亮的一天！",
+    7: "🏵️ 我结出果实啦！这是我们共同努力的成果，太棒啦！"
+  };
+  const currentStage = currentRole === 'parent' ? state.stage : state.stageChild;
+  if(plantTalks[currentStage]){
+    // 延迟1秒弹出，让画面先刷新
+    setTimeout(() => {
+      showToast(plantTalks[currentStage], 'success');
+    }, 500);
+  }
+
+    saveState();renderAll();
+}
+
+async function renamePlant(){
+  const isParent = currentRole === 'parent';
+  const oldName = isParent ? (state.plantName || PLANT[state.plant].name) : (state.plantNameChild || PLANT[state.plantChild].name);
+  
+  const newName = prompt("给咱们的植物起个专属名字吧：", oldName);
+  
+  if(newName && newName.trim() !== ""){
+    if(isParent) {
+      state.plantName = newName.trim();
+    } else {
+      state.plantNameChild = newName.trim();
+    }
+    await saveState(); // 保存到数据库
+    renderAll();       // 立刻刷新界面
+    showToast("✅ 名字修改成功！", "success");
+  }
 }
 
 // 家长端：批量删除所有日常任务（需要输入"删除"二次确认）
@@ -2538,6 +2592,8 @@ async function resetWeek(){
   state.sunChild = 0;
   state.fertChild = 0;
   state.plantDoneChild = false;
+  state.plantName = "";
+  state.plantNameChild = "";
   state.star = 0;
   state.parent_star = 0;
   // 关键：标记今天已扣星，防止重置后立刻被 autoDeductStarTask 再扣一次
@@ -2565,7 +2621,9 @@ async function resetWeek(){
       sun: 0,
       fert: 0,
       plantDone: false
-    }
+    },
+    plant_name: "",
+    plant_name_child: ""
   }).eq('id', 1);
 
   if(resetErr) {
@@ -4773,7 +4831,9 @@ async function renderAll(){
     plantGrow.classList.remove("hidden");
     const p = PLANT[myPlant];
     document.getElementById("plantIcon").innerHTML = `<img src="${p.stages[myStage-1]}" style="max-width: 160px; height: auto; object-fit: contain;">`;
-    document.getElementById("plantNameText").innerText = p.name;
+        // 如果有自定义名字就显示自定义名字，否则显示默认植物名
+    const displayName = currentRole === 'parent' ? (state.plantName || p.name) : (state.plantNameChild || p.name);
+    document.getElementById("plantNameText").innerText = displayName;
     document.getElementById("curStage").innerText = myStage;
     document.getElementById("stageName").innerText = STAGE_NAMES[myStage-1];
     let dotHtml = "";
