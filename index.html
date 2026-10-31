@@ -417,6 +417,26 @@ padding-bottom:20px;}
 }
 .toast.success { background: rgba(34, 197, 94, 0.9); }
 .toast.error { background: rgba(239, 68, 68, 0.9); }
+
+/* 植物呼吸摇摆动画 */
+@keyframes plant-breathe {
+  0% { 
+    transform: scale(1) rotate(0deg); 
+  }
+  50% { 
+    transform: scale(1.05) rotate(2deg); 
+  }
+  100% { 
+    transform: scale(1) rotate(0deg); 
+  }
+}
+
+#plantIcon img {
+  animation: plant-breathe 3s ease-in-out infinite;
+  transform-origin: bottom center; 
+  transition: all 0.3s;
+}
+
 </style>
 
 <link rel="manifest" href="./manifest.json">
@@ -481,9 +501,9 @@ if('serviceWorker' in navigator){
       <h3 class="task-card-title">🌿 本周植物</h3>
       <div id="plantSelect">
         <p style="color:#888;margin-bottom:12px;">选择本周要培育的植物，选定后本周不可更换</p>
-        <button class="btn btn-green" onclick="openPlantPreview('sunflower')">🌻 选向日葵</button>
-        <button class="btn btn-green" onclick="openPlantPreview('tomato')">🍅 选小番茄</button>
-        <button class="btn btn-green" onclick="openPlantPreview('succulent')">🪴 选小多肉</button>
+                <button class="btn btn-green" onclick="openPlantPreview('lily')">🌸 选百合花</button>
+        <button class="btn btn-green" onclick="openPlantPreview('bellflower')">🪻 选风铃草</button>
+        <button class="btn btn-green" onclick="openPlantPreview('epiphyllum')">🌼 选昙花</button>
       </div>
       <div id="plantGrow" class="hidden">
         <div class="plant-big" id="plantIcon">🌱</div>
@@ -1223,6 +1243,7 @@ function showToast(message, type = 'info') {
 function showLoading() { document.getElementById('globalLoading').classList.add('show'); }
 function hideLoading() { document.getElementById('globalLoading').classList.remove('show'); }
 
+let isQuickRewarding = false;
 let supabase = null;
 let currentRole = "";
 let pendingPlantId = null;
@@ -1270,9 +1291,27 @@ let state = {
 };
 const STAGE_NAMES = ["种子发芽","长出小苗","长叶片","抽枝长茎","含苞待放","开花啦","结果丰收"];
 const PLANT = {
-  sunflower:{name:"向日葵",stages:["🌱","🌾","🌿","🪴","🌻","🌻","🌻"]},
-  tomato:{name:"小番茄",stages:["🌱","🌾","🌿","🪴","🍅","🍅","🍅"]},
-  succulent:{name:"小多肉",stages:["🌱","🌾","🌿","🪴","🪴","🪴","🪴"]}
+  lily: {
+    name: "百合花", 
+    stages: [
+      "./images/lily_1.png", "./images/lily_2.png", "./images/lily_3.png", 
+      "./images/lily_4.png", "./images/lily_5.png", "./images/lily_6.png", "./images/lily_7.png"
+    ] 
+  },
+  bellflower: {
+    name: "风铃草", 
+    stages: [
+      "./images/bell_1.png", "./images/bell_2.png", "./images/bell_3.png", 
+      "./images/bell_4.png", "./images/bell_5.png", "./images/bell_6.png", "./images/bell_7.png"
+    ] 
+  },
+  epiphyllum: {
+    name: "昙花", 
+    stages: [
+      "./images/epi_1.png", "./images/epi_2.png", "./images/epi_3.png", 
+      "./images/epi_4.png", "./images/epi_5.png", "./images/epi_6.png", "./images/epi_7.png"
+    ] 
+  }
 };
 const SUBJECT_MAP = {
   chinese:{name:"语文",cls:"badge-chinese"},
@@ -1535,25 +1574,31 @@ async function deleteStarLog(uuid){
 // =========新增快捷奖惩函数【带确认弹窗】=========
 async function quickReward(targetRole, delta, reason){
   let confirmTip = "";
-  if(delta > 0){
-    confirmTip = `确认记录奖励：${reason}\n是否确定 +1⭐？`;
-  }else{
-    confirmTip = `确认记录惩罚：${reason}\n是否确定 -1⭐？`;
+  if(delta > 0){ confirmTip = `确认记录奖励：${reason}\n是否确定 +1⭐？`; }
+  else{ confirmTip = `确认记录惩罚：${reason}\n是否确定 -1⭐？`; }
+  
+  if(!confirm(confirmTip)) return;
+  
+  if(isQuickRewarding) return; // 🔒 加锁拦截
+  isQuickRewarding = true;
+  showLoading(); 
+
+  try {
+    const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: targetRole, p_amount: delta });
+    if(rpcErr) throw rpcErr;
+    
+    await addStarLogItem(targetRole, delta, reason);
+    if(targetRole === 'child') state.star += delta;
+    if(targetRole === 'parent') state.parent_star += delta;
+    
+    renderAll();
+    showToast(`✅已记录：${reason}`, 'success');
+  } catch(e) {
+    showToast('操作失败', 'error');
+  } finally {
+    isQuickRewarding = false; // 🔓 解锁
+    hideLoading();
   }
-  if(!confirm(confirmTip)){
-    return; // 点取消，直接退出，不执行任何操作
-  }
-      const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: targetRole, p_amount: delta });
-  if(rpcErr){
-    alert('❌ 星星操作失败：' + rpcErr.message);
-    return;
-  }
-  await addStarLogItem(targetRole, delta, reason);
-  // 【新增】：手动更新本地状态，让界面数字实时跳动
-  if(targetRole === 'child') state.star += delta;
-  if(targetRole === 'parent') state.parent_star += delta;
-  renderAll();
-  showToast(`✅已记录：${reason}，${delta>0?"+":""}${delta}⭐`, 'success');
 }
 
 // 手动刷新按钮：重新拉取数据
@@ -2338,7 +2383,7 @@ function openPlantPreview(plantId){
   plant.stages.forEach((emoji,i)=>{
     const card = document.createElement('div');
     card.className = 'stage-preview-card';
-    card.innerHTML = `<div class="stage-preview-img">${emoji}</div><div class="stage-preview-text">第${i+1}阶段<br>${STAGE_NAMES[i]}</div>`;
+    card.innerHTML = `<img src="${emoji}" style="width: 100%; max-height: 60px; object-fit: contain; margin-bottom: 8px;"><div class="stage-preview-text">第${i+1}阶段<br>${STAGE_NAMES[i]}</div>`;
     grid.appendChild(card);
   });
   
@@ -3702,13 +3747,12 @@ async function parentApprove(idx){
   if(!task) return;
 
   if(approvingTasks[task.id]){
-    alert('正在处理中，请稍等…');
+    showToast('正在处理中，请稍等…', 'info');
     return;
   }
 
   let diffMin = 0;
   let over = false;
-
   if(task.start_at){
     const startTime = new Date(task.start_at);
     const now = new Date();
@@ -3726,67 +3770,52 @@ async function parentApprove(idx){
   const todayStr = getTodayStr();
   const isTodayTask = (taskDate === todayStr);
 
-  const archiveTip = isTodayTask
-    ? '✅ 通过后会归档到"已通过"列表，今晚21:30统一清理'
-    : '⚠️ 这是跨天任务，通过后会立刻删除';
-
-  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐\n\n${archiveTip}`)) return;
+  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
 
   approvingTasks[task.id] = true;
   showLoading();
 
   try {
+    // 🔒 【核心防护】：先带条件更新数据库！只有状态是待审核才更新成功
+    const { data: updateData, error: updateErr } = await supabase.from('daily_tasks')
+      .update({ status: 'approved' })
+      .eq('id', task.id)
+      .eq('status', 'pending_review') 
+      .select();
+
+    if(updateErr) throw updateErr;
+
+    // 如果 updateData 为空，说明这条已经被处理过了，直接拦截！
+    if(!updateData || updateData.length === 0){
+      showToast('该任务已被处理过啦，请勿重复操作！', 'error');
+      return; 
+    }
+
+    // --- 确认状态更新成功后，才发星星 ---
     if(task.proof_image){
       try{
         const urlParts = task.proof_image.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        await supabase.storage.from('task-proof').remove([fileName]);
+        await supabase.storage.from('task-proof').remove([urlParts[urlParts.length - 1]]);
       }catch(err){ console.warn("删除图片失败", err); }
     }
 
-    const { error: errChild } = await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  getStar });
-    if(errChild) { alert('❌ 孩子加星失败：' + errChild.message); return; }
-    
-    const { error: errParent } = await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount:  getStar });
-    if(errParent){
-      await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount:  -getStar });
-      alert('❌ 家长加星失败：' + errParent.message);
-      return;
-    }
-    
+    await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: getStar });
+    await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount: getStar });
     await addStarLogItem("child", getStar, `日常任务【${task.title}】完成${tipText}`);
     await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
 
-    const { error } = await supabase.from('daily_tasks')
-      .update({ status: 'approved' })
-      .eq('id', task.id);
-      
-    if(error){
-      await supabase.rpc('adjust_stars', { p_role_type: 'child',  p_amount: -getStar });
-      await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount: -getStar });
-      alert('❌ 审核失败：' + error.message);
-      return;
-    }
-
-    // 【核心优化】：不查全量了，直接改本地内存！
-    state.star += getStar;       // 更新本地星星数
+    state.star += getStar;       
     state.parent_star += getStar;
-    
-    if(isTodayTask){
-      task.status = 'approved';  // 今日任务：改状态，保留在已通过列表
-    } else {
-      state.daily.splice(idx, 1); // 跨天任务：直接从本地数组删掉
-    }
+    if(isTodayTask) task.status = 'approved';
+    else state.daily.splice(idx, 1);
 
     await saveState();
-    renderAll(); // 秒刷新
-    
-    if(isTodayTask){
-      showToast(`✅ 审核通过：孩子+${getStar}⭐，家长+${getStar}⭐`, 'success');
-    }else{
-      showToast(`✅ 跨天任务已审核并删除。`, 'success');
-    }
+    renderAll(); 
+    showToast(`✅ 审核通过：孩子+${getStar}⭐`, 'success');
 
+  } catch(e) {
+    console.error(e);
+    showToast('审核异常，请刷新重试', 'error');
   } finally {
     delete approvingTasks[task.id];
     hideLoading();
@@ -4390,33 +4419,35 @@ async function approveLongTask(idx){
   try {
     const lastDate = task.submit_date || getTodayStr();
 
+    // 🔒 【核心防护】：先带条件更新数据库！只有当状态是 submitted 时才更新成功
+    const { data: updateData, error: updateErr } = await supabase.from('long_tasks').update({
+      last_date: lastDate,
+      submit_status: 'normal',
+      audio_url: null
+    })
+    .eq('id', task.id)
+    .eq('submit_status', 'submitted')
+    .select();
+
+    if(updateErr) throw updateErr;
+
+    if(!updateData || updateData.length === 0){
+      showToast('该任务已被处理过啦，请勿重复操作！', 'error');
+      return;
+    }
+
+    // --- 确认状态更新成功后，才发星星 ---
     if(task.audio_url){
       try {
         const urlParts = task.audio_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        await supabase.storage.from('task-proof').remove([fileName]);
+        await supabase.storage.from('task-proof').remove([urlParts[urlParts.length - 1]]);
       } catch(err){ console.warn('删除录音失败', err); }
     }
 
     const roleType = task.owner_type;
-    const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: task.star });
-    if(rpcErr) { alert('❌ 加星失败：' + rpcErr.message); return; }
-
-    const { error } = await supabase.from('long_tasks').update({
-      last_date: lastDate,
-      submit_status: 'normal',
-      audio_url: null
-    }).eq('id', task.id);
-    
-    if (error) {
-      await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: -task.star });
-      alert('❌ 审核失败：' + error.message);
-      return;
-    }
-
+    await supabase.rpc('adjust_stars', { p_role_type: roleType, p_amount: task.star });
     await addStarLogItem(roleType, task.star, `长期任务【${task.title}】打卡完成`);
     
-    // 【核心优化】：直接改本地
     task.submit_status = 'normal';
     task.last_date = lastDate;
     task.audio_url = null;
@@ -4741,7 +4772,7 @@ async function renderAll(){
     plantSel.classList.add("hidden");
     plantGrow.classList.remove("hidden");
     const p = PLANT[myPlant];
-    document.getElementById("plantIcon").innerText = p.stages[myStage-1];
+    document.getElementById("plantIcon").innerHTML = `<img src="${p.stages[myStage-1]}" style="max-width: 160px; height: auto; object-fit: contain;">`;
     document.getElementById("plantNameText").innerText = p.name;
     document.getElementById("curStage").innerText = myStage;
     document.getElementById("stageName").innerText = STAGE_NAMES[myStage-1];
