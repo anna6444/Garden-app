@@ -1519,10 +1519,55 @@ async function loadAllData(){
     renderAll();
   } catch(e) { console.warn(e); }
 })();
+
+  checkParentComments();
   }
 
 
+// ================= 孩子端：检查新留言 =================
+async function checkParentComments() {
+  if (currentRole !== 'child' || !supabase) return;
+  
+  const today = getTodayStr();
+  
+  try {
+    // 查询今天带有“家长寄语”的日志
+    const { data } = await supabase
+      .from('star_logs')
+      .select('*')
+      .eq('role_type', 'child')
+      .gte('created_at', today + 'T00:00:00+08:00')
+      .lte('created_at', today + 'T23:59:59+08:00')
+      .like('reason', '%家长寄语%');
 
+    if (data && data.length > 0) {
+      // 读取本地已读的留言 ID 记录
+      let readList = JSON.parse(localStorage.getItem('read_comments') || '[]');
+      
+      // 找出还没看过的留言
+      const unread = data.filter(log => !readList.includes(log.id));
+      
+      if (unread.length > 0) {
+        // 如果有好几条，就用换行拼接起来
+        const allMessages = unread.map(log => {
+          // 提取括号里的寄语内容
+          const match = log.reason.match(/家长寄语：(.*?)）/);
+          return match ? `💬 ${match[1]}` : log.reason;
+        }).join('\n\n');
+        
+        // 显示在弹窗里
+        document.getElementById('childCommentContent').innerText = allMessages;
+        document.getElementById('childCommentModal').classList.add('show');
+        
+        // 标记为已读，存到本地
+        unread.forEach(log => readList.push(log.id));
+        localStorage.setItem('read_comments', JSON.stringify(readList));
+      }
+    }
+  } catch (e) {
+    console.warn('检查留言失败', e);
+  }
+}
 
 async function saveState(){
   if(!supabase) return;
@@ -4108,10 +4153,17 @@ async function parentApprove(idx){
   const todayStr = getTodayStr();
   const isTodayTask = (taskDate === todayStr);
 
-  if(!confirm(`审核通过【${task.title}】？\n${timeTip}${tipText}${imgTip}\n孩子 +${getStar}⭐｜家长 +${getStar}⭐`)) return;
-
-  approvingTasks[task.id] = true;
-  showLoading();
+    // 打开留言弹窗，暂存当前要审核的任务索引和文本
+  window.currentApproveIdx = idx;
+  document.getElementById('approveCommentInput').value = ''; // 清空上次输入
+  document.getElementById('approveCommentModal').classList.add('show');
+  
+  // 恢复按钮状态（防止之前卡在禁用状态）
+  const btn = document.querySelector('#approveCommentModal .btn-green');
+  if(btn) { btn.disabled = false; btn.innerText = '确认奖励'; }
+  
+  return; // 截断函数，后面的逻辑交给 submitApproveComment 处理
+}
 
   try {
     // 🔒 【核心防护】：先带条件更新数据库！只有状态是待审核才更新成功
@@ -4157,6 +4209,91 @@ async function parentApprove(idx){
   } finally {
     delete approvingTasks[task.id];
     hideLoading();
+  }
+}
+
+// 处理弹窗里的【确认奖励】按钮点击
+async function submitApproveComment(){
+  const idx = window.currentApproveIdx;
+  if(idx === null || idx === undefined) return;
+  
+  const task = state.daily[idx];
+  if(!task) return;
+
+  const comment = document.getElementById('approveCommentInput').value.trim();
+  
+  // 计算用时和星星逻辑（重新算一遍，保证安全）
+  let diffMin = 0;
+  let over = false;
+  if(task.start_at){
+    const startTime = new Date(task.start_at);
+    const now = new Date();
+    diffMin = (now - startTime) / 1000 / 60;
+    over = task.minute_limit !== 0 && diffMin > task.minute_limit;
+  }
+
+  const getStar = (!over) ? task.star : Math.floor(task.star / 2);
+  const tipText = over ? "（超时减半）" : "";
+  const taskDate = getTodayStr(new Date(task.create_at || Date.now()));
+  const todayStr = getTodayStr();
+  const isTodayTask = (taskDate === todayStr);
+
+  closeModal('approveCommentModal');
+  approvingTasks[task.id] = true;
+  showLoading();
+
+  try {
+    // 🔒 核心防护
+    const { data: updateData, error: updateErr } = await supabase.from('daily_tasks')
+      .update({ status: 'approved' })
+      .eq('id', task.id)
+      .eq('status', 'pending_review') 
+      .select();
+
+    if(updateErr) throw updateErr;
+
+    if(!updateData || updateData.length === 0){
+      showToast('该任务已被处理过啦，请勿重复操作！', 'error');
+      return; 
+    }
+
+    // 删除照片
+    if(task.proof_image){
+      try{
+        const urlParts = task.proof_image.split('/');
+        await supabase.storage.from('task-proof').remove([urlParts[urlParts.length - 1]]);
+      }catch(err){ console.warn("删除图片失败", err); }
+    }
+
+    // 发星星
+    await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: getStar });
+    await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount: getStar });
+    
+    // 🌟 核心修改：如果有留言，拼接到日志的 reason 里
+    let childReason = `日常任务【${task.title}】完成${tipText}`;
+    if(comment) {
+      childReason += `（家长寄语：${comment}）`;
+    }
+    
+    await addStarLogItem("child", getStar, childReason);
+    await addStarLogItem("parent", getStar, `审核任务【${task.title}】${tipText}`);
+
+    state.star += getStar;       
+    state.parent_star += getStar;
+    if(isTodayTask) task.status = 'approved';
+    else state.daily.splice(idx, 1);
+
+    await saveState();
+    renderAll(); 
+    showToast(`✅ 审核通过：孩子+${getStar}⭐`, 'success');
+
+  } catch(e) {
+    console.error(e);
+    showToast('审核异常，请刷新重试', 'error');
+  } finally {
+    delete approvingTasks[task.id];
+    hideLoading();
+    window.currentApproveIdx = null;
   }
 }
 
@@ -5748,6 +5885,30 @@ document.addEventListener('visibilitychange', function(){
   <div style="color:#ef4444;font-weight:bold;font-size:15px;">处理中，请稍候...</div>
 </div>
 <div id="toast-container"></div>
+<!-- ========= 家长审核留言弹窗 ========= -->
+<div class="modal-mask" id="approveCommentModal">
+  <div class="modal-box">
+    <h3 style="margin-bottom:12px; color:#333;">✍️ 审核通过并留言</h3>
+    <p style="color:#888;font-size:14px; margin-bottom:12px;">给孩子的作业写句鼓励的话吧（不填也可以直接过）</p>
+    <textarea id="approveCommentInput" placeholder="例如：字写得真棒！/ 今天很自觉哦～" style="height: 80px; resize: none;"></textarea>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="closeModal('approveCommentModal')">取消</button>
+      <button class="btn btn-green" style="flex:1;" onclick="this.disabled=true; this.innerText='发送中...'; submitApproveComment()">确认奖励</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========= 孩子端接收留言弹窗 ========= -->
+<div class="modal-mask" id="childCommentModal">
+  <div class="modal-box" style="text-align:center; padding: 30px 20px; background:#fffbeb;">
+    <div style="font-size: 50px; margin-bottom: 15px;">💌</div>
+    <h3 style="margin-bottom:16px; color:#92400e;">收到家长的表扬啦！</h3>
+    <div id="childCommentContent" style="font-size: 16px; color: #4b7f23; line-height: 1.8; margin-bottom: 24px; text-align:left; background:#fff; padding:12px; border-radius:12px; border:1px dashed #fde68a;">
+      <!-- 留言内容显示在这里 -->
+    </div>
+    <button class="btn btn-green" style="font-size: 18px; border-radius: 20px;" onclick="closeModal('childCommentModal')">开心收下！</button>
+  </div>
+</div>
 <!-- 植物升级对话弹窗 -->
 <div class="modal-mask" id="plantTalkModal">
   <div class="modal-box" style="text-align:center; padding: 30px 20px;">
