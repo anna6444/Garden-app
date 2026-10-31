@@ -2720,7 +2720,7 @@ async function buyRes(type){
   showLoading(); 
 
   try {
-    // 1. 先调用数据库的 RPC 扣星
+    // 第一步：扣星
     const { error: rpcErr } = await supabase.rpc('buy_shop_item', { 
       p_role_type: currentRole, 
       p_item_type: type 
@@ -2728,11 +2728,30 @@ async function buyRes(type){
     
     if(rpcErr) throw rpcErr;
 
-    // 2. 🔥 关键修复：去数据库读取最新的准确数据
-    const { data: dbState, error: fetchErr } = await supabase.from('app_state').select('water, sun, fert, plant_child').eq('id', 1).single();
-    if(fetchErr) throw fetchErr;
+    // 第二步：去数据库查最新数据
+    let dbState = null;
+    const { data: fetchData, error: fetchErr } = await supabase
+      .from('app_state')
+      .select('water, sun, fert, plant_child')
+      .eq('id', 1)
+      .single();
+      
+    if(fetchErr) {
+      // 如果查询失败，等 1 秒后重试 1 次（应对网络波动）
+      console.warn('查询失败，尝试重试...', fetchErr);
+      await new Promise(r => setTimeout(r, 1000));
+      const { data: retryData, error: retryErr } = await supabase
+        .from('app_state')
+        .select('water, sun, fert, plant_child')
+        .eq('id', 1)
+        .single();
+      if(retryErr) throw new Error('网络连接失败，请检查网络后重试');
+      dbState = retryData;
+    } else {
+      dbState = fetchData;
+    }
 
-    // 3. 在最新数据的基础上 +1，精准写入，不再用整体覆盖
+    // 第三步：在最新数据上 +1
     if(currentRole === 'parent'){
       let w = dbState.water || 0;
       let s = dbState.sun || 0;
@@ -2753,13 +2772,18 @@ async function buyRes(type){
       if(updateErr) throw updateErr;
     }
     
-    // 4. 强制重新从数据库加载最新状态，保证界面显示绝对准确
+    // 第四步：重新加载页面数据
     await loadAllData();
     renderAll();
     showToast('✅ 兑换成功！', 'success');
   } catch (err) {
     console.error(err);
-    alert('❌ 兑换过程发生错误：' + err.message);
+    // 如果是网络问题，给个更友好的提示
+    if(err.message.includes('fetch') || err.message.includes('网络')){
+      alert('❌ 网络连接超时！\n\n这通常是因为国内连接 Supabase 不稳定，或者你的数据库被暂停了。\n请切换一下网络（比如开/关 WiFi，用手机流量）再试一次。');
+    } else {
+      alert('❌ 兑换过程发生错误：' + err.message);
+    }
   } finally {
     hideLoading(); 
     setTimeout(() => { window.isBuying = false; }, 500);
