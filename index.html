@@ -431,6 +431,15 @@ padding-bottom:20px;}
   }
 }
 
+/* 抽奖摇动动画 */
+@keyframes shake {
+  0% { transform: rotate(0); }
+  25% { transform: rotate(15deg) scale(1.1); }
+  50% { transform: rotate(-15deg) scale(1.1); }
+  75% { transform: rotate(15deg) scale(1.1); }
+  100% { transform: rotate(0); }
+}
+
 #plantIcon img {
   animation: plant-breathe 3s ease-in-out infinite;
   transform-origin: bottom center; 
@@ -772,14 +781,33 @@ if('serviceWorker' in navigator){
       <button class="btn btn-green" onclick="buyRes('sun')">☀️ 兑换阳光（6⭐）</button>
       <button class="btn btn-green" onclick="buyRes('fert')">🧪 兑换肥料（6⭐）</button>
 
+      <div style="margin-top:20px; border-top: 1px dashed #eee; padding-top: 15px;"></div>
+
+      <h3 class="task-card-title">🎁 每日签到</h3>
+      <button id="signInBtn" class="btn btn-blue" onclick="dailySignIn()">📅 点我签到（送1⭐）</button>
+
+      <div style="margin-top:20px; border-top: 1px dashed #eee; padding-top: 15px;"></div>
+
+      <h3 class="task-card-title">🎰 幸运大转盘</h3>
+      <p style="color:#888;font-size:14px;margin-bottom:12px;">2颗星抽一次，每天限1次！</p>
+      <button id="lotteryBtn" class="btn btn-red" onclick="startLottery()" style="font-size:18px; padding: 15px;">🎲 消耗 2⭐ 抽奖 (每日1次)</button>
+
       <div style="margin-top:20px;"></div>
 
       <h3 class="task-card-title">💖 心愿清单</h3>
- 
       <button id="addWishBtn" class="btn btn-red btn-sm" onclick="openModal('wishModal')">+ 新增心愿</button>
-
       <div id="wishList"></div>
-</div>
+    </div>
+  </div>
+
+  <!-- 抽奖弹窗（放在 tab-shop 外面或者最后面都可以，放这里最安全） -->
+  <div class="modal-mask" id="lotteryModal">
+    <div class="modal-box" style="text-align:center; padding: 30px 20px;">
+      <h3 style="margin-bottom:20px; color:#333;">🎰 幸运大转盘</h3>
+      <div id="lotteryIcon" style="font-size: 60px; margin: 20px 0; transition: all 0.3s;">❓</div>
+      <div id="lotteryResultText" style="font-size: 20px; font-weight: bold; color: #ef4444; margin-bottom: 20px; min-height: 30px;">正在抽奖...</div>
+      <button id="lotteryCloseBtn" class="btn btn-gray" onclick="closeModal('lotteryModal')" style="display: none;">开心收下</button>
+    </div>
   </div>
   <div id="tab-mine" class="hidden">
     
@@ -1767,6 +1795,10 @@ function switchTab(name,btn){
     // 只在切到"我的"页面时才加载星星日志
     loadStarLog();
   }
+  if(name==="shop"){
+    // 如果切到商城，立刻检查今天的签到和抽奖状态
+    updateShopDailyLimits();
+  }
 }
 
 // 切换日常任务的科目分类
@@ -2703,6 +2735,224 @@ async function clearAllStarLogs(){
 // 增加一个全局锁变量
 if (typeof window.isBuying === 'undefined') window.isBuying = false;
 
+// ================= 每日签到 =================
+async function dailySignIn(){
+  if (currentRole === 'parent') {
+    alert('家长不需要签到哦，去让孩子签吧！');
+    return;
+  }
+  
+  const today = getTodayStr();
+  const lastSign = localStorage.getItem('garden_last_sign_date');
+  
+  if (lastSign === today) {
+    alert('今天已经签到过啦，明天再来吧！');
+    return;
+  }
+
+  showLoading();
+  try {
+    // 加 1 颗星
+    const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: 1 });
+    if(rpcErr) throw rpcErr;
+    
+    await addStarLogItem('child', 1, `每日签到奖励`);
+    state.star += 1;
+    localStorage.setItem('garden_last_sign_date', today);
+    
+    renderAll();
+    updateShopDailyLimits(); // 更新按钮变灰
+    showToast('✅ 签到成功！获得 1 颗星 ⭐', 'success');
+  } catch (e) {
+    alert('签到失败，请重试：' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ================= 每日次数限制检查（控制按钮变灰） =================
+async function updateShopDailyLimits() {
+  const today = getTodayStr();
+  
+  // 1. 更新签到按钮
+  const lastSign = localStorage.getItem('garden_last_sign_date');
+  const signBtn = document.getElementById('signInBtn');
+  if(signBtn){
+    if(currentRole === 'parent') {
+      signBtn.disabled = true;
+      signBtn.innerText = '📅 仅限孩子签到';
+      signBtn.style.background = '#d1d5db';
+    } else if(lastSign === today){
+      signBtn.disabled = true;
+      signBtn.innerText = '✅ 今天已签到';
+      signBtn.style.background = '#d1d5db';
+    } else {
+      signBtn.disabled = false;
+      signBtn.innerText = '📅 点我签到（送1⭐）';
+      signBtn.style.background = '#3b82f6';
+    }
+  }
+
+  // 2. 更新抽奖按钮
+  const lotteryBtn = document.getElementById('lotteryBtn');
+  if(!lotteryBtn) return;
+
+  if(currentRole === 'parent'){
+    lotteryBtn.innerText = '🎲 仅限孩子抽奖';
+    lotteryBtn.disabled = true;
+    lotteryBtn.style.background = '#d1d5db';
+    return;
+  }
+
+  try {
+    // 查数据库，看今天有没有“抽奖消耗”的流水
+    const { data: logs } = await supabase
+      .from('star_logs')
+      .select('id')
+      .eq('role_type', 'child')
+      .like('reason', '%抽奖消耗%')
+      .gte('created_at', today + 'T00:00:00+08:00')
+      .lte('created_at', today + 'T23:59:59+08:00');
+
+    if (logs && logs.length > 0) {
+      lotteryBtn.innerText = '✅ 今天已抽奖，明天再来';
+      lotteryBtn.disabled = true;
+      lotteryBtn.style.background = '#d1d5db';
+    } else {
+      lotteryBtn.innerText = '🎲 消耗 2⭐ 抽奖 (每日1次)';
+      lotteryBtn.disabled = false;
+      lotteryBtn.style.background = '#ef4444';
+    }
+  } catch(e) {
+    console.warn('检查抽奖状态失败', e);
+  }
+}
+
+// ================= 幸运抽奖核心逻辑 =================
+let isLotteryRunning = false;
+
+async function startLottery(){
+  if (currentRole === 'parent') {
+    alert('家长不能抽奖哦，把机会留给孩子吧！');
+    return;
+  }
+  if (isLotteryRunning) return;
+  if (state.star < 2) {
+    alert(`星星不足！抽奖需要 2 颗星，你现在只有 ${state.star} 颗星。`);
+    return;
+  }
+
+  const today = getTodayStr();
+  
+  // 🔒 防刷拦截：查数据库，如果今天有抽奖记录，直接踢出去
+  const { data: logs } = await supabase
+    .from('star_logs')
+    .select('id')
+    .eq('role_type', 'child')
+    .like('reason', '%抽奖消耗%')
+    .gte('created_at', today + 'T00:00:00+08:00')
+    .lte('created_at', today + 'T23:59:59+08:00');
+    
+  if (logs && logs.length > 0) {
+    alert('今天已经抽过奖啦，明天再来试试手气吧！');
+    updateShopDailyLimits();
+    return;
+  }
+
+  if (!confirm('确认消耗 2⭐ 抽一次奖吗？（每日仅限1次）')) return;
+
+  isLotteryRunning = true;
+  
+  // 显示弹窗，开始动画
+  document.getElementById('lotteryModal').classList.add('show');
+  document.getElementById('lotteryResultText').innerText = '正在摇奖...';
+  document.getElementById('lotteryCloseBtn').style.display = 'none';
+  
+  const iconEl = document.getElementById('lotteryIcon');
+  iconEl.innerText = '🎁';
+  iconEl.style.animation = 'shake 0.3s infinite';
+  
+  showLoading(); 
+
+  try {
+    // 1. 扣除 2 颗星
+    const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: -2 });
+    if(rpcErr) throw rpcErr;
+    
+    await addStarLogItem('child', -2, '抽奖消耗');
+    state.star -= 2;
+
+    // 2. 等待 1.5 秒让动画播放
+    await new Promise(r => setTimeout(r, 1500));
+
+    // 3. 决定奖品 (概率分配：50%谢谢惠顾，20%一星，10%四星，20%物资)
+    const rand = Math.random() * 100;
+    let prizeName = '';
+    let prizeType = 'none';
+    let starChange = 0;
+
+    if (rand < 50) {
+      prizeName = '谢谢惠顾，下次一定中！😅';
+    } else if (rand < 70) {
+      prizeName = '恭喜获得 1 颗星！⭐';
+      starChange = 1;
+    } else if (rand < 80) {
+      prizeName = '哇！暴击！获得 4 颗星！🌟';
+      starChange = 4;
+    } else if (rand < 90) {
+      prizeName = '恭喜获得 1 份 💧 水！';
+      prizeType = 'water';
+    } else if (rand < 95) {
+      prizeName = '恭喜获得 1 份 ☀️ 阳光！';
+      prizeType = 'sun';
+    } else {
+      prizeName = '恭喜获得 1 份 🧪 肥料！';
+      prizeType = 'fert';
+    }
+
+    // 4. 发放奖品
+    if (starChange > 0) {
+      await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: starChange });
+      await addStarLogItem('child', starChange, `抽奖获得`);
+      state.star += starChange;
+      iconEl.innerText = '⭐';
+    } else if (prizeType !== 'none') {
+      // 抽中物资，给孩子加上去
+      const { data: dbState } = await supabase.from('app_state').select('plant_child').eq('id', 1).single();
+      let currentPc = dbState.plant_child || { plant: null, stage: 1, water: 0, sun: 0, fert: 0, plantDone: false };
+      
+      currentPc[prizeType] = (currentPc[prizeType] || 0) + 1;
+      await supabase.from('app_state').update({ plant_child: currentPc }).eq('id', 1);
+      
+      state.plantChild = currentPc;
+      state.waterChild = currentPc.water;
+      state.sunChild = currentPc.sun;
+      state.fertChild = currentPc.fert;
+      
+      iconEl.innerText = prizeType === 'water' ? '💧' : (prizeType === 'sun' ? '☀️' : '🧪');
+    } else {
+      iconEl.innerText = '😢';
+    }
+
+    // 5. 停止动画，显示结果
+    iconEl.style.animation = 'none'; 
+    document.getElementById('lotteryResultText').innerText = prizeName;
+    document.getElementById('lotteryCloseBtn').style.display = 'inline-block';
+    
+    await loadAllData();
+    renderAll();
+    updateShopDailyLimits(); // 抽完立刻更新按钮变灰
+
+  } catch (e) {
+    console.error(e);
+    iconEl.style.animation = 'none';
+    document.getElementById('lotteryResultText').innerText = '抽奖失败：' + e.message;
+    document.getElementById('lotteryCloseBtn').style.display = 'inline-block';
+  } finally {
+    hideLoading();
+    isLotteryRunning = false;
+  }
+}
 
 async function buyRes(type){
   if(window.isBuying) {
