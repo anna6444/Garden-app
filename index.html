@@ -866,7 +866,7 @@ if('serviceWorker' in navigator){
         <div id="starLogBox"></div>
       </div>
     </div>
-    <div class="card" id="adminArea" class="hidden">
+    <div class="card hidden" id="adminArea">
       <h3 class="task-card-title">⚙️ 家长管理</h3>
       <button class="btn btn-gray" onclick="resetWeek()">🔄 重置本周植物（清空图片+星星清零）</button>
     </div>
@@ -1499,8 +1499,7 @@ async function loadAllData(){
 async function saveState(){
   if(!supabase) return;
   try{
-    // ★ 不再写 star 和 parent_star，交给 adjust_stars 原子操作
-    await supabase.from('app_state').update({
+    const { error } = await supabase.from('app_state').update({
       water:state.water, sun:state.sun, fert:state.fert,
       plant:state.plant, stage:state.stage, plant_done:state.plantDone,
       plant_child: {
@@ -1513,10 +1512,13 @@ async function saveState(){
       },
       plant_name: state.plantName,
       plant_name_child: state.plantNameChild
-      
     }).eq('id', 1);
+    
+    if (error) throw error; // 🔥 核心：让数据库报错能被抓到，不再静默失败！
+
   }catch(e){
     console.warn("saveState异常",e);
+    alert("⚠️ 数据保存失败！请检查网络，错误信息：" + e.message);
   }
 }
 // =========星星日志模块=========
@@ -3410,7 +3412,7 @@ function triggerSelectImage(){
 
 async function handleSubmitImageSelect(e){
   const file = e.target.files[0];
-  if(!file || pendingTaskIdx === null) return;
+  if(!file || (pendingTaskIdx === null && pendingLongImgIdx === null)) return;
   
   // 标记：用户点了选图，正在处理中
   window.pendingSelectingImage = true;
@@ -3432,12 +3434,13 @@ async function handleSubmitImageSelect(e){
     document.getElementById('submitImgPreviewBox').classList.remove('hidden');
     // 存到全局变量，提交时再上传
     window.pendingCompressedFile = compressedFile;
-  } catch(err){
+    } catch(err){
     console.error(err);
     alert('❌图片压缩预览失败：' + err.message);
     window.pendingCompressedFile = null;
   } finally {
     window.isCompressing = false;
+    window.pendingSelectingImage = false;
   }
 }
 
