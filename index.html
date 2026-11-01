@@ -445,6 +445,78 @@ padding-bottom:20px;}
   transform-origin: bottom center; 
   transition: all 0.3s;
 }
+/* ========== 荣誉奖牌墙样式 ========== */
+.badge-wall {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.badge-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 12px 4px;
+  text-align: center;
+  opacity: 0.8; /* 整体稍微暗一点 */
+  transition: all 0.3s;
+  border: 1px solid #e5e7eb;
+  cursor: pointer; 
+  -webkit-tap-highlight-color: transparent; 
+}
+.badge-item .badge-icon {
+  font-size: 32px;
+  margin-bottom: 6px;
+  filter: grayscale(100%) brightness(0.7); /* 未解锁时图标变灰暗，但能看清形状 */
+  transition: all 0.3s;
+}
+.badge-item .badge-name {
+  font-size: 12px;
+  font-weight: bold;
+  color: #888;
+  line-height: 1.2;
+}
+.badge-item .badge-desc {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+/* 解锁后的状态 */
+.badge-item.unlocked {
+  opacity: 1;
+  background: #fffbeb;
+  border-color: #fde68a;
+  box-shadow: 0 4px 12px rgba(253, 230, 138, 0.4);
+  transform: scale(1.05);
+}
+.badge-item.unlocked .badge-icon {
+  filter: grayscale(0%) brightness(1); /* 图标恢复彩色和亮度 */
+}
+.badge-item.unlocked .badge-name {
+  color: #333;
+}
+.badge-item.unlocked .badge-desc {
+  color: #888;
+}
+.badge-icon {
+  font-size: 32px;
+  margin-bottom: 6px;
+}
+.badge-name {
+  font-size: 12px;
+  font-weight: bold;
+  color: #333;
+  line-height: 1.2;
+}
+.badge-desc {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+
 
 </style>
 
@@ -488,6 +560,19 @@ if('serviceWorker' in navigator){
       <button onclick="refreshPage()" style="background:#fff;border:1px solid #fde68a;border-radius:20px;padding:8px 12px;font-size:16px;cursor:pointer;" title="刷新">🔄</button>
     </div>
   </div>
+  
+  <!-- ========= 全勤宝箱进度卡片 ========= -->
+  <div class="card" id="perfectDayCard" style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:12px 16px; border-radius:16px; margin-bottom:12px; box-shadow:0 2px 8px #00000010;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="font-size:28px;">🎁</div>
+      <div>
+        <div style="font-weight:bold; font-size:15px; color:#333;">今日全勤宝箱</div>
+        <div id="perfectDayDesc" style="font-size:12px; color:#888; margin-top:2px;">完成任务即可开启</div>
+      </div>
+    </div>
+    <div id="perfectDayStatus" style="font-weight:bold; color:#ef4444; font-size:14px;">🎯 进行中</div>
+  </div>
+
   <!-- =========新增待处理任务统计卡片========= -->
   
 
@@ -806,12 +891,32 @@ if('serviceWorker' in navigator){
     </div>
   </div>
   <div id="tab-mine" class="hidden">
+
+
+        <!-- ========= 荣誉奖牌墙 ========= -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleCard('badgeContent', 'badgeToggleIcon')">
+        <h3 class="task-card-title" style="margin-bottom:0;">🏅 荣誉奖牌墙</h3>
+        <span id="badgeToggleIcon" style="font-size:18px; color:#999; transition:transform 0.3s;">▼</span>
+      </div>
+      
+      <div id="badgeContent" style="display:none; margin-top:16px;">
+        <p style="font-size:13px; color:#888; margin-bottom:12px;">不断完成任务，点亮属于你的专属荣誉！</p>
+        <div id="badgeWall" class="badge-wall">
+          <!-- 奖牌将由 JS 动态渲染到这里 -->
+        </div>
+      </div>
+    </div>
     
-    <!-- 新增：快捷奖惩卡片 -->
+        <!-- 新增：快捷奖惩卡片 -->
     <div class="card" id="quickRewardCard">
-      <h3 class="task-card-title">⚖️快捷奖惩记录</h3>
-      <!-- 家长端显示区域 -->
-      <div id="parentRewardPanel">
+      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleCard('rewardContent', 'rewardToggleIcon')">
+        <h3 class="task-card-title" style="margin-bottom:0;">⚖️快捷奖惩记录</h3>
+        <span id="rewardToggleIcon" style="font-size:18px; color:#999; transition:transform 0.3s;">▼</span>
+      </div>
+      <div id="rewardContent" style="display:none; margin-top:16px;">
+        <!-- 家长端显示区域 -->
+        <div id="parentRewardPanel">
         <div class="reward-block">
           <div class="reward-block-title">✨孩子奖励（+1⭐）</div>
           <div class="reward-item">
@@ -868,11 +973,16 @@ if('serviceWorker' in navigator){
           </div>
         </div>
       </div>
+     </div>
     </div>
-    <!-- 星星日志卡片 -->
+        <!-- 星星日志卡片 -->
     <div class="card">
-      <h3 class="task-card-title">⭐星星日志</h3>
-      <div class="log-stat-row">
+      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleCard('starLogContent', 'starLogToggleIcon')">
+        <h3 class="task-card-title" style="margin-bottom:0;">⭐星星日志</h3>
+        <span id="starLogToggleIcon" style="font-size:18px; color:#999; transition:transform 0.3s;">▼</span>
+      </div>
+      <div id="starLogContent" style="display:none; margin-top:16px;">
+        <div class="log-stat-row">
         <div class="log-stat-item stat-add">
           <div>累计获得</div>
           <div id="statAdd">0</div>
@@ -889,6 +999,7 @@ if('serviceWorker' in navigator){
       <div class="star-log-scroll">
         <div id="starLogBox"></div>
       </div>
+     </div>
     </div>
     <div class="card hidden" id="adminArea">
       <h3 class="task-card-title">⚙️ 家长管理</h3>
@@ -1541,6 +1652,44 @@ async function loadAllData(){
   checkParentComments();
   }
 
+// 🌟 终极全家桶：检测孩子全勤 & 家长全勤
+async function checkPerfectDay() {
+  const todayStr = getTodayStr();
+
+  // ==========================================
+  // 1. 判定【孩子】的全勤：日常全过 + 孩子长期全过
+  // ==========================================
+  const childRewardKey = 'perfect_day_child_' + todayStr;
+  if (!localStorage.getItem(childRewardKey)) {
+    const dailyDone = state.daily.length > 0 && state.daily.every(t => t.status === 'approved');
+    const childLongTasks = state.long.filter(t => t.owner_type === 'child');
+    const childLongDone = childLongTasks.length === 0 || childLongTasks.every(t => t.last_date === todayStr);
+
+    if (dailyDone && childLongDone) {
+      localStorage.setItem(childRewardKey, 'true'); // 标记已发
+      await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: 2 });
+      await addStarLogItem("child", 2, `🎉 每日全勤宝箱奖励`);
+      console.log("孩子今日全勤达成！");
+    }
+  }
+
+  // ==========================================
+  // 2. 判定【家长】的全勤：家长的长期任务全过
+  // ==========================================
+  const parentRewardKey = 'perfect_day_parent_' + todayStr;
+  if (!localStorage.getItem(parentRewardKey)) {
+    const parentLongTasks = state.long.filter(t => t.owner_type === 'parent');
+    // 家长必须至少有一条长期任务，且全部在今天完成了
+    if (parentLongTasks.length > 0 && parentLongTasks.every(t => t.last_date === todayStr)) {
+      localStorage.setItem(parentRewardKey, 'true'); // 标记已发
+      await supabase.rpc('adjust_stars', { p_role_type: 'parent', p_amount: 2 });
+      await addStarLogItem("parent", 2, `🎉 家长全勤奖励`);
+      
+      // 因为家长正在操作，直接弹个提示给家长
+      showToast("🎉 恭喜家长完成所有长期任务，获得2颗星！", "success");
+    }
+  }
+}
 
 // ================= 孩子端：检查新留言 =================
 async function checkParentComments() {
@@ -1549,8 +1698,8 @@ async function checkParentComments() {
   const today = getTodayStr();
   
   try {
-    // 查询今天带有“家长寄语”的日志
-    const { data } = await supabase
+    // 1. 查今天的家长寄语
+    const { data: comments } = await supabase
       .from('star_logs')
       .select('*')
       .eq('role_type', 'child')
@@ -1558,32 +1707,43 @@ async function checkParentComments() {
       .lte('created_at', today + 'T23:59:59+08:00')
       .like('reason', '%家长寄语%');
 
-    if (data && data.length > 0) {
-      // 读取本地已读的留言 ID 记录
+    if (comments && comments.length > 0) {
       let readList = JSON.parse(localStorage.getItem('read_comments') || '[]');
-      
-      // 找出还没看过的留言
-      const unread = data.filter(log => !readList.includes(log.id));
+      const unread = comments.filter(log => !readList.includes(log.id));
       
       if (unread.length > 0) {
-        // 如果有好几条，就用换行拼接起来
         const allMessages = unread.map(log => {
-          // 提取括号里的寄语内容
           const match = log.reason.match(/家长寄语：(.*?)）/);
           return match ? `💬 ${match[1]}` : log.reason;
         }).join('\n\n');
         
-        // 显示在弹窗里
         document.getElementById('childCommentContent').innerText = allMessages;
         document.getElementById('childCommentModal').classList.add('show');
         
-        // 标记为已读，存到本地
         unread.forEach(log => readList.push(log.id));
         localStorage.setItem('read_comments', JSON.stringify(readList));
       }
     }
+
+    // 2. 查今天是否发了全勤奖（不依赖本地存储，查数据库流水，绝对准确）
+    const { data: perfectLogs } = await supabase
+      .from('star_logs')
+      .select('id')
+      .eq('role_type', 'child')
+      .gte('created_at', today + 'T00:00:00+08:00')
+      .lte('created_at', today + 'T23:59:59+08:00')
+      .like('reason', '%每日全勤宝箱奖励%');
+
+    if (perfectLogs && perfectLogs.length > 0) {
+      if (!localStorage.getItem('claimed_box_' + today)) {
+        localStorage.setItem('claimed_box_' + today, 'true'); // 仅用来防止今天重复弹窗
+        setTimeout(() => {
+          document.getElementById('perfectDayModal').classList.add('show');
+        }, 1000);
+      }
+    }
   } catch (e) {
-    console.warn('检查留言失败', e);
+    console.warn('检查状态失败', e);
   }
 }
 
@@ -1850,13 +2010,26 @@ function jumpToTask(target, idx) {
   }, 100);
 }
 
+function toggleCard(contentId, iconId) {
+  const content = document.getElementById(contentId);
+  const icon = document.getElementById(iconId);
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    icon.style.transform = 'rotate(180deg)';
+  } else {
+    content.style.display = 'none';
+    icon.style.transform = 'rotate(0deg)';
+  }
+}
+
 function switchTab(name,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
   ['garden','task','long','shop','mine'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden', t!==name));
-  if(name==="mine"){
+    if(name==="mine"){
     // 只在切到"我的"页面时才加载星星日志
     loadStarLog();
+    renderBadges(); // 🌟 新增：每次点开“我的”页面，都重新渲染一遍奖牌
   }
   if(name==="shop"){
     // 如果切到商城，立刻检查今天的签到和抽奖状态
@@ -2522,12 +2695,22 @@ function feedPlant(){
     if(state.water<1||state.sun<1||state.fert<1){alert('物资不足！需要水、阳光、肥料各1份');return;}
     if(state.plantDone){alert('本周植物已经培育完成');return;}
     state.water--;state.sun--;state.fert--;state.stage++;
-    if(state.stage>=7){state.stage=7;state.plantDone=true;alert('🎉恭喜！植物培育完成');}
+        if(state.stage>=7){
+      state.stage=7;state.plantDone=true;
+      alert('🎉恭喜！植物培育完成');
+      // 🌟 记录收集日志
+      checkAndLogPlantCollection(currentRole);
+    }
   } else {
     if(state.waterChild<1||state.sunChild<1||state.fertChild<1){alert('物资不足！需要水、阳光、肥料各1份');return;}
     if(state.plantDoneChild){alert('本周植物已经培育完成');return;}
     state.waterChild--;state.sunChild--;state.fertChild--;state.stageChild++;
-    if(state.stageChild>=7){state.stageChild=7;state.plantDoneChild=true;alert('🎉恭喜！植物培育完成');}
+        if(state.stageChild>=7){
+      state.stageChild=7;state.plantDoneChild=true;
+      alert('🎉恭喜！植物培育完成');
+      // 🌟 记录收集日志
+      checkAndLogPlantCollection(currentRole);
+    }
   }
       // 🎉 新增：植物升级对话
   const plantTalks = {
@@ -2548,6 +2731,33 @@ function feedPlant(){
   }
 
     saveState();renderAll();
+}
+
+// 🌟 检查并记录植物收集（养到7阶才算）
+async function checkAndLogPlantCollection(role) {
+  try {
+    const plantId = role === 'parent' ? state.plant : state.plantChild;
+    if(!plantId) return;
+    
+    // 查一下以前有没有收集过这个植物
+    const { data: logs } = await supabase.from('star_logs')
+      .select('id')
+      .eq('role_type', role)
+      .like('reason', `%收集植物【${plantId}】%`);
+      
+    if(!logs || logs.length === 0) {
+      // 没收集过，记录一条特殊的0分日志
+      await supabase.from('star_logs').insert([{
+        role_type: role,
+        change_num: 0,
+        reason: `收集植物【${plantId}】成功开花`,
+        current_star: role === 'parent' ? state.parent_star : state.star
+      }]);
+      console.log(`记录植物收集成功：${plantId}`);
+    }
+  } catch(e) {
+    console.warn('记录植物收集失败', e);
+  }
 }
 
 async function renamePlant(){
@@ -2700,11 +2910,8 @@ async function resetWeek(){
   // ===== 2. 立刻刷新界面（用户秒看到星星归零） =====
   renderAll();
   
-   // ===== 3. 真正把 user_star 表里的星星写 0 =====
-  await supabase.from('user_star').update({ star_count: 0 }).eq('role', 'child');
-  await supabase.from('user_star').update({ star_count: 0 }).eq('role', 'parent');
-
-  // ===== 4. 强制清空 app_state 里的植物状态 =====
+   
+  // ===== 3. 强制清空 app_state 里的植物状态 =====
   const { error: resetErr } = await supabase.from('app_state').update({
     plant: null,
     stage: 1,
@@ -2733,7 +2940,7 @@ async function resetWeek(){
       renderAll();
   }
 
-  // ===== 5. 立刻提示用户，不等清理 =====
+  // ===== 4. 立刻提示用户，不等清理 =====
   alert('✅ 本周已重置！\n星星、植物、物资已清零，云端图片和日志正在后台清理…');
 
   // ===== 6. 后台异步清理（不阻塞界面） =====
@@ -2800,13 +3007,10 @@ if (typeof window.isBuying === 'undefined') window.isBuying = false;
 
 // ================= 每日签到 =================
 async function dailySignIn(){
-  if (currentRole === 'parent') {
-    alert('家长不需要签到哦，去让孩子签吧！');
-    return;
-  }
-  
   const today = getTodayStr();
-  const lastSign = localStorage.getItem('garden_last_sign_date');
+  // 🌟 根据角色区分本地存储的 key，这样家长和孩子可以各签各的
+  const storageKey = 'garden_last_sign_date_' + currentRole;
+  const lastSign = localStorage.getItem(storageKey);
   
   if (lastSign === today) {
     alert('今天已经签到过啦，明天再来吧！');
@@ -2815,13 +3019,16 @@ async function dailySignIn(){
 
   showLoading();
   try {
-    // 加 1 颗星
-    const { error: rpcErr } = await supabase.rpc('adjust_stars', { p_role_type: 'child', p_amount: 1 });
-    if(rpcErr) throw rpcErr;
+    // 🌟 根据当前角色，给对应的人加 1 颗星
+    await retryFetch(() => supabase.rpc('adjust_stars', { p_role_type: currentRole, p_amount: 1 }));
     
-    await addStarLogItem('child', 1, `每日签到奖励`);
-    state.star += 1;
-    localStorage.setItem('garden_last_sign_date', today);
+    await addStarLogItem(currentRole, 1, `每日签到奖励`);
+    
+    // 本地状态更新
+    if(currentRole === 'child') state.star += 1;
+    else state.parent_star += 1;
+    
+    localStorage.setItem(storageKey, today);
     
     renderAll();
     updateShopDailyLimits(); // 更新按钮变灰
@@ -2837,15 +3044,13 @@ async function dailySignIn(){
 async function updateShopDailyLimits() {
   const today = getTodayStr();
   
-  // ===== 1. 更新签到按钮 =====
-  const lastSign = localStorage.getItem('garden_last_sign_date');
+     // ===== 1. 更新签到按钮 =====
+  // 🌟 同样用区分角色的 storageKey 来判断按钮是否变灰
+  const storageKey = 'garden_last_sign_date_' + currentRole;
+  const lastSign = localStorage.getItem(storageKey);
   const signBtn = document.getElementById('signInBtn');
   if(signBtn){
-    if(currentRole === 'parent') {
-      signBtn.disabled = true;
-      signBtn.innerText = '📅 仅限孩子签到';
-      signBtn.style.background = '#d1d5db';
-    } else if(lastSign === today){
+    if(lastSign === today){
       signBtn.disabled = true;
       signBtn.innerText = '✅ 今天已签到';
       signBtn.style.background = '#d1d5db';
@@ -4282,6 +4487,9 @@ async function submitApproveComment(){
     delete approvingTasks[task.id];
     hideLoading();
     window.currentApproveIdx = null;
+    
+    // 🌟 核心：只留这一行，去调用我们写好的万能检测函数！
+    await checkPerfectDay(); 
   }
 }
 
@@ -4933,8 +5141,12 @@ async function approveLongTask(idx){
     renderAll();
     showToast('✅ 确认完成，+'+task.star+'⭐', 'success');
 
-  } finally {
+    } finally {
     delete approvingTasks[task.id];
+    
+    // 🌟 核心：确认完长期任务，也去检查一下是不是全勤了！
+    await checkPerfectDay();
+    
     hideLoading();
   }
 }
@@ -5147,6 +5359,54 @@ function switchParentLongSubTab(mode){
 
 async function renderAll(){
   // 渲染星星数字
+
+  // 🌟 渲染全勤宝箱进度
+  const perfectCard = document.getElementById('perfectDayCard');
+  if (perfectCard) {
+    if (currentRole === 'child') {
+      const tDaily = state.daily.length;
+      const dDaily = state.daily.filter(t => t.status === 'approved').length;
+      const tLong = state.long.filter(t => t.owner_type === 'child').length;
+      const dLong = state.long.filter(t => t.owner_type === 'child' && t.last_date === todayStr).length;
+      
+      const total = tDaily + tLong;
+      const done = dDaily + dLong;
+      
+      perfectCard.style.display = 'flex';
+      if (total === 0) {
+        document.getElementById('perfectDayDesc').innerText = "今日暂无任务";
+        document.getElementById('perfectDayStatus').innerText = "休息日";
+        document.getElementById('perfectDayStatus').style.color = "#999";
+      } else if (done === total) {
+        document.getElementById('perfectDayDesc').innerText = "今日任务全部搞定！";
+        document.getElementById('perfectDayStatus').innerText = "🏆 已达成";
+        document.getElementById('perfectDayStatus').style.color = "#22c55e";
+      } else {
+        document.getElementById('perfectDayDesc').innerText = `还差 ${total - done} 个任务即可领取`;
+        document.getElementById('perfectDayStatus').innerText = "🎯 加油";
+        document.getElementById('perfectDayStatus').style.color = "#ef4444";
+      }
+    } else {
+      // 家长视角：只看家长的长期任务
+      const tLong = state.long.filter(t => t.owner_type === 'parent').length;
+      const dLong = state.long.filter(t => t.owner_type === 'parent' && t.last_date === todayStr).length;
+      
+      if (tLong === 0) {
+        perfectCard.style.display = 'none'; // 家长没任务就不显示
+      } else {
+        perfectCard.style.display = 'flex';
+        if (dLong === tLong) {
+          document.getElementById('perfectDayDesc').innerText = "家长任务已全部完成！";
+          document.getElementById('perfectDayStatus').innerText = "🏆 已达成";
+          document.getElementById('perfectDayStatus').style.color = "#22c55e";
+        } else {
+          document.getElementById('perfectDayDesc').innerText = `还差 ${tLong - dLong} 个长期任务`;
+          document.getElementById('perfectDayStatus').innerText = "🎯 加油";
+          document.getElementById('perfectDayStatus').style.color = "#ef4444";
+        }
+      }
+    }
+  }
 
   document.getElementById('starNum').innerText = currentRole === "parent" ? state.parent_star : state.star;
   document.getElementById('starRoleTip').innerText = currentRole === "parent" ? "家长星星" : "孩子星星";
@@ -5664,6 +5924,180 @@ state.wish.forEach((wish,idx)=>{
   if(!window.cleanTimer){
     window.cleanTimer = setInterval(cleanApprovedTasks, 60000);
   }
+ // 🌟 召唤奖牌系统渲染
+    renderBadges();
+  }
+
+
+// ================= 奖牌成就系统 =================
+// 🌟 预先定义好 16 个奖牌的基础数据（全灰状态）
+window.allBadges = window.allBadges || [];
+window.allBadges = [
+  { id: 'b1', icon: '🌱', name: '破土新芽', desc: '累计签到3天', current: 0, target: 3 },
+  { id: 'b2', icon: '🌿', name: '绿意盎然', desc: '累计签到7天', current: 0, target: 7 },
+  { id: 'b3', icon: '🌳', name: '苍天大树', desc: '累计签到30天', current: 0, target: 30 },
+  { id: 'b4', icon: '🌲', name: '坚韧不拔', desc: '累计签到90天', current: 0, target: 90 },
+  
+  { id: 'b5', icon: '🌟', name: '初见曙光', desc: '获得1次全勤', current: 0, target: 1 },
+  { id: 'b6', icon: '🏆', name: '周冠军', desc: '获得7次全勤', current: 0, target: 7 },
+  { id: 'b7', icon: '👑', name: '习惯王者', desc: '获得21次全勤', current: 0, target: 21 },
+  { id: 'b8', icon: '🔥', name: '全勤达人', desc: '获得60次全勤', current: 0, target: 60 },
+  
+  { id: 'b9', icon: '⚔️', name: '初出茅庐', desc: '完成10个任务', current: 0, target: 10 },
+  { id: 'b10', icon: '🚀', name: '百战百胜', desc: '完成100个任务', current: 0, target: 100 },
+  { id: 'b11', icon: '🏅', name: '任务大师', desc: '完成300个任务', current: 0, target: 300 },
+  { id: 'b12', icon: '🥇', name: '肝帝降临', desc: '完成900个任务', current: 0, target: 900 },
+  
+  { id: 'b13', icon: '🪴', name: '辛勤园丁', desc: '养开1种花', current: 0, target: 1 },
+  { id: 'b14', icon: '🌸', name: '花开满园', desc: '养开4种花', current: 0, target: 4 },
+  { id: 'b15', icon: '🌺', name: '园艺大师', desc: '养开8种花', current: 0, target: 8 },
+  { id: 'b16', icon: '💐', name: '植物学家', desc: '养开12种花', current: 0, target: 12 },
+];
+
+// 渲染奖牌墙的独立函数
+function drawBadgeWall(badges) {
+  const wall = document.getElementById('badgeWall');
+  if(!wall || !badges || !Array.isArray(badges)) return;
+
+  let html = '';
+    badges.forEach(b => {
+    const unlocked = b.current >= b.target;
+    html += `
+      <div class="badge-item ${unlocked ? 'unlocked' : ''}" onclick="openBadgeDetail('${b.id}')">
+        <div class="badge-icon">${b.icon}</div>
+        <div class="badge-name">${b.name}</div>
+        <div class="badge-desc">${unlocked ? '已达成' : b.current + '/' + b.target}</div>
+      </div>
+    `;
+  });
+  wall.innerHTML = html;
+}
+
+// 核心计算函数
+async function renderBadges() {
+  if(!supabase) return;
+
+  // 🌟 1. 先立刻把 16 个灰色的锁头画上去，保证绝对不空白！
+  drawBadgeWall(window.allBadges || []);
+
+  const role = currentRole;
+  
+  try {
+    // 2. 去数据库拉数据
+    const [logsRes, dailyRes] = await Promise.all([
+      supabase.from('star_logs').select('*').eq('role_type', role),
+      supabase.from('daily_tasks').select('status')
+    ]);
+
+    const logs = logsRes.data || [];
+    const allDaily = dailyRes.data || [];
+    
+    // ===== 核心指标统计（加了防错机制） =====
+    const totalSigns = logs.filter(l => l.reason && l.reason.includes('每日签到奖励')).length;
+    const totalPerfect = logs.filter(l => l.reason && (l.reason.includes('全勤宝箱奖励') || l.reason.includes('家长全勤奖励'))).length;
+    const approvedDaily = allDaily.filter(t => t.status === 'approved').length;
+    const longDoneLogs = logs.filter(l => l.reason && l.reason.includes('长期任务') && l.change_num > 0).length;
+    const totalTasksDone = approvedDaily + longDoneLogs;
+    
+    const plantLogs = logs.filter(l => l.reason && l.reason.includes('收集植物【'));
+    const collectedPlants = [...new Set(plantLogs.map(l => {
+      const match = l.reason.match(/收集植物【(.*?)】/);
+      return match ? match[1] : null;
+    }).filter(Boolean))];
+    const totalPlants = collectedPlants.length;
+
+    // ===== 更新数据 =====
+    window.allBadges[0].current = totalSigns;
+    window.allBadges[1].current = totalSigns;
+    window.allBadges[2].current = totalSigns;
+    window.allBadges[3].current = totalSigns;
+
+    window.allBadges[4].current = totalPerfect;
+    window.allBadges[5].current = totalPerfect;
+    window.allBadges[6].current = totalPerfect;
+    window.allBadges[7].current = totalPerfect;
+
+    window.allBadges[8].current = totalTasksDone;
+    window.allBadges[9].current = totalTasksDone;
+    window.allBadges[10].current = totalTasksDone;
+    window.allBadges[11].current = totalTasksDone;
+
+    window.allBadges[12].current = totalPlants;
+    window.allBadges[13].current = totalPlants;
+    window.allBadges[14].current = totalPlants;
+    window.allBadges[15].current = totalPlants;
+
+    // 🌟 3. 数据拉回来之后，重新画一次，把达标的点亮
+    drawBadgeWall(window.allBadges);
+
+    // ===== 4. 计算阶梯奖励（发星星） =====
+    let unlockedCount = window.allBadges.filter(b => b.current >= b.target).length;
+    const rewards = [
+      { count: 4, star: 2 },
+      { count: 8, star: 4 },
+      { count: 12, star: 6 },
+      { count: 16, star: 10 }
+    ];
+
+    for(const r of rewards) {
+      if(unlockedCount >= r.count) {
+        const rewardKey = `badge_reward_${role}_${r.count}`;
+        if(!localStorage.getItem(rewardKey)) {
+          const { data: checkLog } = await supabase.from('star_logs')
+            .select('id').eq('role_type', role).like('reason', `%点亮${r.count}个奖牌奖励%`);
+            
+          if(!checkLog || checkLog.length === 0) {
+            localStorage.setItem(rewardKey, 'true');
+            await supabase.rpc('adjust_stars', { p_role_type: role, p_amount: r.star });
+            await supabase.from('star_logs').insert([{
+              role_type: role, change_num: r.star, reason: `🏅 点亮${r.count}个奖牌奖励`, current_star: (role==='parent'?state.parent_star:state.star)+r.star
+            }]);
+            
+            if(role === 'parent') state.parent_star += r.star;
+            else state.star += r.star;
+
+            setTimeout(() => {
+              showToast(`🎉 恭喜点亮${r.count}个奖牌，获得${r.star}颗星！`, 'success');
+            }, 1000);
+          } else {
+            localStorage.setItem(rewardKey, 'true'); 
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('奖牌数据同步失败，已显示默认状态', e);
+    // 即使报错，由于第一步已经画了灰色的，所以不会空白
+  }
+}
+
+// ================= 点击奖牌查看详情 =================
+function openBadgeDetail(id) {
+  const badge = window.allBadges.find(b => b.id === id);
+  if(!badge) return;
+
+  const isUnlocked = badge.current >= badge.target;
+  const displayCurrent = Math.min(badge.current, badge.target); 
+  const percent = Math.round((displayCurrent / badge.target) * 100);
+
+  document.getElementById('detailBadgeIcon').innerText = badge.icon;
+  document.getElementById('detailBadgeName').innerText = badge.name;
+  document.getElementById('detailBadgeDesc').innerText = badge.desc;
+  document.getElementById('detailBadgeProgressText').innerText = `${displayCurrent} / ${badge.target}`;
+  document.getElementById('detailBadgeProgressBar').style.width = `${percent}%`;
+  
+  const statusEl = document.getElementById('detailBadgeStatus');
+  if(isUnlocked) {
+    statusEl.innerText = '🎉 已达成！';
+    statusEl.style.color = '#22c55e';
+    document.getElementById('detailBadgeProgressBar').style.background = '#22c55e';
+  } else {
+    statusEl.innerText = `还差 ${badge.target - displayCurrent} 个进度即可点亮`;
+    statusEl.style.color = '#f59e0b';
+    document.getElementById('detailBadgeProgressBar').style.background = '#f59e0b';
+  }
+
+  openModal('badgeDetailModal');
 }
 
 // 只更新倒计时文字，不重建页面
@@ -5899,6 +6333,27 @@ document.addEventListener('visibilitychange', function(){
   </div>
 </div>
 
+<!-- ========= 奖牌详情弹窗 ========= -->
+<div class="modal-mask" id="badgeDetailModal">
+  <div class="modal-box" style="text-align:center; padding: 30px 20px;">
+    <div id="detailBadgeIcon" style="font-size: 60px; margin-bottom: 10px;">🏅</div>
+    <h3 id="detailBadgeName" style="margin-bottom: 8px; color:#333; font-size: 22px;">奖牌名称</h3>
+    <p id="detailBadgeDesc" style="color:#888; font-size: 14px; margin-bottom: 20px;">奖牌描述</p>
+    
+    <div style="background:#f8f9fa; border-radius:12px; padding:16px; margin-bottom:20px; text-align:left;">
+      <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; margin-bottom:8px; color:#333;">
+        <span>当前进度</span>
+        <span id="detailBadgeProgressText" style="color:#ef4444;">0 / 0</span>
+      </div>
+      <div style="height:12px; background:#e5e7eb; border-radius:6px; overflow:hidden;">
+        <div id="detailBadgeProgressBar" style="width:0%; height:100%; background:#34d399; transition:width 0.4s;"></div>
+      </div>
+      <p id="detailBadgeStatus" style="font-size:13px; color:#f59e0b; margin-top:10px; font-weight:bold;">继续加油！</p>
+    </div>
+
+    <button class="btn btn-green" style="font-size: 18px; border-radius: 20px;" onclick="closeModal('badgeDetailModal')">关闭</button>
+  </div>
+</div>
 <!-- ========= 孩子端接收留言弹窗 ========= -->
 <div class="modal-mask" id="childCommentModal">
   <div class="modal-box" style="text-align:center; padding: 30px 20px; background:#fffbeb;">
