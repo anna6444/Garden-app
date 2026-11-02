@@ -5358,6 +5358,9 @@ function switchParentLongSubTab(mode){
 
 
 async function renderAll(){
+  // 🌟 核心修复：把 todayStr 的定义提到最前面，防止未初始化报错
+  const todayStr = getTodayStr();
+
   // 渲染星星数字
 
   // 🌟 渲染全勤宝箱进度
@@ -5415,7 +5418,7 @@ async function renderAll(){
   // ==========【新版：严格按“今天”统计，防止跨天任务污染数据】==========
   let num1, num2, num3;
   let text1, text2, text3;
-  const todayStr = getTodayStr();
+  
 
   if(currentRole === "child"){
     // 🧒 孩子端统计
