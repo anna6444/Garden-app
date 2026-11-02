@@ -517,6 +517,50 @@ padding-bottom:20px;}
   margin-top: 4px;
 }
 
+/* ========== 我的花园花圃样式 ========== */
+.garden-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+.garden-plot {
+  background: #f0fdf4;
+  border: 2px dashed #86efac;
+  border-radius: 16px;
+  aspect-ratio: 1 / 1; /* 正方形格子 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 8px;
+  transition: all 0.3s;
+}
+.garden-plot.planted {
+  background: #fffbeb;
+  border-style: solid;
+  border-color: #fde68a;
+  box-shadow: 0 4px 12px rgba(253, 230, 138, 0.3);
+}
+.garden-plant-img {
+  width: 100%;
+  max-width: 60px;
+  height: auto;
+  object-fit: contain;
+  animation: plant-breathe 3s ease-in-out infinite;
+}
+.garden-plant-name {
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+  margin-top: 6px;
+}
+.garden-empty-icon {
+  font-size: 36px;
+  opacity: 0.3;
+  filter: grayscale(100%);
+}
 
 </style>
 
@@ -590,7 +634,7 @@ if('serviceWorker' in navigator){
       <p class="count-label" id="label3">待处理合计</p>
     </div>
   </div>
-  <div id="tab-garden">
+    <div id="tab-garden">
     <div class="card">
       <h3 class="task-card-title">🌿 本周植物</h3>
       <div id="plantSelect">
@@ -615,20 +659,29 @@ if('serviceWorker' in navigator){
         </div>
         <button class="btn btn-red" id="feedBtn" onclick="feedPlant()">提交培育物资</button>
         <p id="doneTip" class="hidden" style="color:#22c55e;text-align:center;margin-top:8px;">✅ 本周植物培育完成！</p>
+      </div>
+    </div>
 
-        <!-- 对方植物对比卡片 -->
-                    <!-- 对方植物对比卡片（只显示进度） -->
-        <div id="plantOtherCard" class="hidden" style="margin-top:20px;padding-top:16px;border-top:1px dashed #eee;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <p style="font-size:14px;color:#999;margin:0;" id="otherPlantTitle">🌱 对方植物</p>
-            <p style="font-size:14px;color:#666;margin:0;">阶段 <b id="curStageOther" style="color:#34d399;">1</b>/7</p>
-          </div>
-          <div class="stage-dots" id="stageDotsOther" style="margin:10px 0 0 0;"></div>
-        </div>
+    <!-- 🌟 修复：对方植物卡片独立出来，自己没种也能看到对方进度 -->
+    <div class="card hidden" id="plantOtherCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <p style="font-size:15px;font-weight:bold;color:#333;margin:0;" id="otherPlantTitle">🧒 孩子的植物</p>
+        <p style="font-size:14px;color:#666;margin:0;">阶段 <b id="curStageOther" style="color:#34d399;">1</b>/7</p>
+      </div>
+      <div class="stage-dots" id="stageDotsOther" style="margin:10px 0 0 0;"></div>
+    </div>
+    
+    <!-- 🌟 新增：我的花园花圃 -->
+    <div class="card" id="myGardenCard">
+      <h3 class="task-card-title">🌻 我的花园</h3>
+      <p style="color:#888;font-size:14px;margin-bottom:12px;">将植物培育到7级开花后，它就会永远留在你的花园里哦！</p>
+      <div class="garden-grid" id="gardenGrid">
+        <!-- 花圃格子将由 JS 动态生成 -->
       </div>
     </div>
   </div>
-    <div id="tab-task" class="hidden">
+
+  <div id="tab-task" class="hidden">
     <div class="category-layout"> <!-- 包裹层开始：包含左侧和右侧 -->
       
       <!-- 左侧分类栏 -->
@@ -5503,7 +5556,7 @@ async function renderAll(){
   document.getElementById('label3').innerText = text3;
   
 
-  // ========== 植物渲染（各自独立：我的 + 对方的） ==========
+   // ========== 植物渲染（各自独立：我的 + 对方的） ==========
   const plantSel = document.getElementById("plantSelect");
   const plantGrow = document.getElementById("plantGrow");
   const plantOtherCard = document.getElementById("plantOtherCard");
@@ -5519,8 +5572,8 @@ async function renderAll(){
   // 对方的植物数据
   const otherPlant = currentRole === 'parent' ? state.plantChild : state.plant;
   const otherStage = currentRole === 'parent' ? state.stageChild : state.stage;
-  const otherDone  = currentRole === 'parent' ? state.plantDoneChild : state.plantDone;
 
+  // 1. 渲染自己的植物
   if(!myPlant){
     plantSel.classList.remove("hidden");
     plantGrow.classList.add("hidden");
@@ -5529,7 +5582,6 @@ async function renderAll(){
     plantGrow.classList.remove("hidden");
     const p = PLANT[myPlant];
     document.getElementById("plantIcon").innerHTML = `<img src="${p.stages[myStage-1]}" style="max-width: 160px; height: auto; object-fit: contain;">`;
-        // 如果有自定义名字就显示自定义名字，否则显示默认植物名
     const displayName = currentRole === 'parent' ? (state.plantName || p.name) : (state.plantNameChild || p.name);
     document.getElementById("plantNameText").innerText = displayName;
     document.getElementById("curStage").innerText = myStage;
@@ -5543,27 +5595,26 @@ async function renderAll(){
     document.getElementById("resSun").innerText = mySun;
     document.getElementById("resFert").innerText = myFert;
     document.getElementById("doneTip").classList.toggle("hidden", !myDone);
+  }
 
-    // 渲染对方植物卡片
-        if(plantOtherCard){
-      if(otherPlant){
-        plantOtherCard.classList.remove("hidden");
-        const titleEl = document.getElementById("otherPlantTitle");
-        if(titleEl){
-          const otherName = PLANT[otherPlant].name;
-          titleEl.innerText = (currentRole === 'parent' ? '🧒 孩子：' : '👨‍👩‍👧 家长：') + otherName;
-        }
-        const stageEl = document.getElementById("curStageOther");
-        if(stageEl) stageEl.innerText = otherStage;
-        let dotHtmlOther = "";
-        for(let i=1;i<=7;i++){
-          dotHtmlOther += `<div class="stage-dot ${i <= otherStage ? 'done' : ''}"></div>`;
-        }
-        document.getElementById("stageDotsOther").innerHTML = dotHtmlOther;
-      }else{
-        plantOtherCard.classList.add("hidden");
-    
+  // 2. 🌟 修复：不管自己有没有种植物，都要独立渲染对方植物卡片！
+  if(plantOtherCard){
+    if(otherPlant){
+      plantOtherCard.classList.remove("hidden");
+      const titleEl = document.getElementById("otherPlantTitle");
+      if(titleEl){
+        const otherName = PLANT[otherPlant].name;
+        titleEl.innerText = (currentRole === 'parent' ? '🧒 孩子：' : '👨‍👩‍👧 家长：') + otherName;
       }
+      const stageEl = document.getElementById("curStageOther");
+      if(stageEl) stageEl.innerText = otherStage;
+      let dotHtmlOther = "";
+      for(let i=1;i<=7;i++){
+        dotHtmlOther += `<div class="stage-dot ${i <= otherStage ? 'done' : ''}"></div>`;
+      }
+      document.getElementById("stageDotsOther").innerHTML = dotHtmlOther;
+    }else{
+      plantOtherCard.classList.add("hidden");
     }
   }
  
@@ -5944,8 +5995,13 @@ state.wish.forEach((wish,idx)=>{
   if(!window.cleanTimer){
     window.cleanTimer = setInterval(cleanApprovedTasks, 60000);
   }
- // 🌟 召唤奖牌系统渲染
+   // 🌟 召唤奖牌系统渲染
     renderBadges();
+    
+  // 🌟 渲染我的花园
+    if(currentRole) {
+      renderMyGarden();
+    }
   }
 
 
@@ -6301,6 +6357,69 @@ window.addEventListener('focus', runBackgroundCatchUp);
 document.addEventListener('visibilitychange', function(){
   if(!document.hidden) runBackgroundCatchUp();
 });
+
+// ================= 我的花园渲染 =================
+async function renderMyGarden() {
+  const grid = document.getElementById('gardenGrid');
+  if(!grid || !supabase) return;
+
+  try {
+    // 1. 查询当前角色收集过的植物记录
+    const { data: logs } = await supabase
+      .from('star_logs')
+      .select('reason')
+      .eq('role_type', currentRole)
+      .like('reason', '%收集植物【%');
+
+    // 2. 提取已经收集过的植物 ID
+    const collectedPlants = [...new Set((logs || []).map(l => {
+      const match = l.reason.match(/收集植物【(.*?)】/);
+      return match ? match[1] : null;
+    }).filter(Boolean))];
+
+    // 3. 准备所有可展示的植物列表（目前3种）
+    const allPlantIds = ['lily', 'bellflower', 'epiphyllum'];
+    const totalPlots = 6; // 补齐到 6 个格子
+    
+    let html = '';
+    for(let i = 0; i < totalPlots; i++) {
+      if(i < allPlantIds.length) {
+        const plantId = allPlantIds[i];
+        const plantInfo = PLANT[plantId];
+        const isCollected = collectedPlants.includes(plantId);
+
+        if(isCollected) {
+          // 已收集，展示开花的最终形态（第7阶段）
+          html += `
+            <div class="garden-plot planted">
+              <img src="${plantInfo.stages[6]}" class="garden-plant-img">
+              <div class="garden-plant-name">${plantInfo.name}</div>
+            </div>
+          `;
+        } else {
+          // 未收集，展示空花盆
+          html += `
+            <div class="garden-plot">
+              <div class="garden-empty-icon">🪴</div>
+              <div class="garden-plant-name" style="color:#aaa;">待收集</div>
+            </div>
+          `;
+        }
+      } else {
+        // 预留的扩展空位
+        html += `
+          <div class="garden-plot" style="opacity: 0.5; background: transparent; border-color: #ddd;">
+            <div class="garden-empty-icon" style="opacity: 0.1;">🌱</div>
+            <div class="garden-plant-name" style="color:#ccc;">敬请期待</div>
+          </div>
+        `;
+      }
+    }
+    grid.innerHTML = html;
+  } catch(e) {
+    console.warn('渲染花园失败', e);
+  }
+}
 
 </script>
 
