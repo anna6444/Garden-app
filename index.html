@@ -3162,8 +3162,16 @@ async function startLottery(){
     // 2. 等待 1.5 秒让动画播放
     await new Promise(r => setTimeout(r, 1500));
 
-    // 3. 决定奖品 (概率分配：50%谢谢惠顾，20%一星，10%四星，20%物资)
-    const rand = Math.random() * 100;
+        // 3. 决定奖品 (新增保底机制：连续2天没中，第3天必中)
+    let lossStreak = parseInt(localStorage.getItem('lottery_loss_streak') || '0');
+    let rand = Math.random() * 100;
+    
+    // 🌟 保底触发：如果之前已经连续2次没中，强制把随机数拉到中奖区间(50-100)
+    if (lossStreak >= 2) {
+      rand = 50 + Math.random() * 50; 
+      showToast('🎁 触发保底机制：本次必中！', 'success');
+    }
+
     let prizeName = '';
     let prizeType = 'none';
     let starChange = 0;
@@ -3207,8 +3215,17 @@ async function startLottery(){
       state.fertChild = currentPc.fert;
       
       iconEl.innerText = prizeType === 'water' ? '💧' : (prizeType === 'sun' ? '☀️' : '🧪');
-    } else {
+        } else {
       iconEl.innerText = '😢';
+    }
+
+    // 🌟 记录保底状态
+    if (prizeName === '谢谢惠顾，下次一定中！😅') {
+      lossStreak++;
+      localStorage.setItem('lottery_loss_streak', lossStreak);
+    } else {
+      // 如果中了（不管是一星还是物资），重置连败记录
+      localStorage.setItem('lottery_loss_streak', '0');
     }
 
     // 5. 停止动画，显示结果
