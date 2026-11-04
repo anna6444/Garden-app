@@ -2990,7 +2990,7 @@ async function resetWeek(){
   // ===== 4. 立刻提示用户，不等清理 =====
   alert('✅ 本周已重置！\n星星、植物、物资已清零，云端图片和日志正在后台清理…');
 
-  // ===== 6. 后台异步清理（不阻塞界面） =====
+    // ===== 6. 后台异步清理（不阻塞界面） =====
   (async () => {
     try {
       await Promise.all([
@@ -2998,6 +2998,10 @@ async function resetWeek(){
         clearAllStarLogs()
       ]);
       console.log('✅ 后台清理完成');
+      
+      // 🌟 新增：清理完毕后，强制重新拉取星星日志并重绘页面
+      await loadStarLog();
+      await loadAllData();
     } catch(e){
       console.warn('后台清理出错', e);
     }
