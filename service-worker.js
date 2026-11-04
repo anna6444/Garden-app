@@ -1,4 +1,4 @@
-const CACHE_NAME = "garden-v12";
+const CACHE_NAME = "garden-v13";
 // 需要离线缓存的本地静态文件
 const PRECACHE_ASSETS = [
   "./",
