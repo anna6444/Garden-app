@@ -1780,11 +1780,11 @@ async function checkParentComments() {
       .gte('created_at', today + 'T00:00:00+08:00')
       .lte('created_at', today + 'T23:59:59+08:00')
       .like('reason', '%每日全勤宝箱奖励%');
-
     if (perfectLogs && perfectLogs.length > 0) {
       if (!localStorage.getItem('claimed_box_' + today)) {
         localStorage.setItem('claimed_box_' + today, 'true'); // 仅用来防止今天重复弹窗
         setTimeout(() => {
+          // 打开全勤宝箱弹窗
           document.getElementById('perfectDayModal').classList.add('show');
         }, 1000);
       }
@@ -2781,27 +2781,21 @@ function feedPlant(){
 }
 
 // 🌟 检查并记录植物收集（养到7阶才算）
+// 🌟 检查并记录植物收集（每次养到7阶都算1分）
 async function checkAndLogPlantCollection(role) {
   try {
     const plantId = role === 'parent' ? state.plant : state.plantChild;
     if(!plantId) return;
     
-    // 查一下以前有没有收集过这个植物
-    const { data: logs } = await supabase.from('star_logs')
-      .select('id')
-      .eq('role_type', role)
-      .like('reason', `%收集植物【${plantId}】%`);
-      
-    if(!logs || logs.length === 0) {
-      // 没收集过，记录一条特殊的0分日志
-      await supabase.from('star_logs').insert([{
-        role_type: role,
-        change_num: 0,
-        reason: `收集植物【${plantId}】成功开花`,
-        current_star: role === 'parent' ? state.parent_star : state.star
-      }]);
-      console.log(`记录植物收集成功：${plantId}`);
-    }
+    // 🌟 取消了查重限制，只要开花就记录一条！重复种也会累加。
+    await supabase.from('star_logs').insert([{
+      role_type: role,
+      change_num: 0,
+      reason: `收集植物【${plantId}】成功开花`,
+      current_star: role === 'parent' ? state.parent_star : state.star
+    }]);
+    console.log(`记录植物收集成功：${plantId}`);
+    
   } catch(e) {
     console.warn('记录植物收集失败', e);
   }
@@ -2951,6 +2945,7 @@ async function resetWeek(){
   state.plantNameChild = "";
   state.star = 0;
   state.parent_star = 0;
+  state.child_today_done = 0;
   // 关键：标记今天已扣星，防止重置后立刻被 autoDeductStarTask 再扣一次
   
 
@@ -2993,13 +2988,41 @@ async function resetWeek(){
     // ===== 6. 后台异步清理（不阻塞界面） =====
   (async () => {
     try {
-      await Promise.all([
-        clearAllStorageFiles(),
-        clearAllStarLogs()
+      // 🌟 核心：清理前，先把数据存进数据库的永久统计表
+      const { data: stateData } = await supabase.from('app_state').select('badge_stats').eq('id', 1).single();
+      let stats = stateData && stateData.badge_stats ? stateData.badge_stats : { signs: 0, perfect: 0, tasks: 0, plants: 0 };
+
+      // 查一下当前的流水，把要累加的数字算出来
+      const [logsRes, dailyRes] = await Promise.all([
+        supabase.from('star_logs').select('*'),
+        supabase.from('daily_tasks').select('status')
       ]);
-      console.log('✅ 后台清理完成');
+      const logs = logsRes.data || [];
+      const allDaily = dailyRes.data || [];
       
-      // 🌟 新增：清理完毕后，强制重新拉取星星日志并重绘页面
+      const addSigns = logs.filter(l => l.reason && l.reason.includes('每日签到奖励')).length;
+      const addPerfect = logs.filter(l => l.reason && (l.reason.includes('全勤宝箱奖励') || l.reason.includes('家长全勤奖励'))).length;
+      const addTasks = allDaily.filter(t => t.status === 'approved').length + logs.filter(l => l.reason && l.reason.includes('长期任务') && l.change_num > 0).length;
+      const currentPlants = [...new Set(logs.filter(l => l.reason && l.reason.includes('收集植物【')).map(l => {
+          const m = l.reason.match(/收集植物【(.*?)】/); return m ? m[1] : null;
+      }).filter(Boolean))];
+
+      // 累加
+      stats.signs = (stats.signs || 0) + addSigns;
+      stats.perfect = (stats.perfect || 0) + addPerfect;
+      stats.tasks = (stats.tasks || 0) + addTasks;
+      const oldPlantsNum = typeof stats.plants === 'number' ? stats.plants : 0;
+      stats.plants = oldPlantsNum + currentPlants.length;
+
+      // 写回数据库永久保存
+      await supabase.from('app_state').update({ badge_stats: stats }).eq('id', 1);
+
+      // 现在可以放心删图片和流水了
+      await clearAllStorageFiles();
+      await clearAllStarLogs(); 
+      
+      console.log('✅ 后台清理完成，荣誉数据已永久归档');
+
       await loadStarLog();
       await loadAllData();
     } catch(e){
@@ -3504,6 +3527,7 @@ async function doSubmitTask(){
 // 长期任务带图片提交
 
 async function submitLongTaskWithImg(){
+  if(isAfter2130()){ alert('已经过了晚上9:30，今天不能再提交啦！'); return; }
   if(pendingLongImgIdx === null){
     alert('任务信息丢失，请重新打开');
     return;
@@ -3814,6 +3838,7 @@ async function startTask(idx){
 
 async function doSubmitNormal(idx){
   const task = state.daily[idx];
+  if(isAfter2130()){ alert('已经过了晚上9:30，今天不能再提交啦！'); return; }
   if(!task) return;
   if(!task.start_at){ alert('请先点击【开始任务】，再提交完成！'); return; }
   if(!confirm(`确认完成任务【${task.title}】？`)) return;
@@ -4050,6 +4075,7 @@ async function handleSubmitImageSelect(e){
 
 async function submitTaskWithImg(){
   const task = state.daily[pendingTaskIdx];
+  if(!task){ alert('任务信息丢失，请重新打开'); return; }
   const today = new Date().toISOString();
   const file = window.pendingCompressedFile;
   const btn = document.getElementById('taskSubmitConfirmBtn');
@@ -4121,6 +4147,7 @@ async function submitTaskWithImg(){
 async function submitTaskDirect(){
 
   const task = state.daily[pendingTaskIdx];
+  if(!task){ alert('任务信息丢失，请重新打开'); return; }
 
   const today = new Date().toISOString();
 
@@ -4556,8 +4583,19 @@ async function submitApproveComment(){
     hideLoading();
     window.currentApproveIdx = null;
     
-    // 🌟 核心：只留这一行，去调用我们写好的万能检测函数！
+    // 🌟 核心：去调用我们写好的万能检测函数！
     await checkPerfectDay(); 
+    
+    // 🌟 审核完立刻检查：如果今天宝箱还没弹过，且任务全做完了，立刻弹窗！
+    const today = getTodayStr();
+    if (!localStorage.getItem('claimed_box_' + today)) {
+      const allDailyDone = state.daily.length > 0 && state.daily.every(t => t.status === 'approved');
+      const allChildLongDone = state.long.filter(t => t.owner_type === 'child').every(t => t.last_date === today);
+      if (allDailyDone && allChildLongDone) {
+        localStorage.setItem('claimed_box_' + today, 'true'); // 标记为已弹过
+        document.getElementById('perfectDayModal').classList.add('show');
+      }
+    }
   }
 }
 
@@ -4927,6 +4965,7 @@ async function uploadRecordingAndSubmit(){
 
 // 长期任务录音提交
 async function uploadLongRecording(){
+  if(isAfter2130()){ alert('已经过了晚上9:30，今天不能再提交啦！'); return; }
   if(pendingLongTaskIdx === null){ alert('任务信息丢失，请重新打开'); return; }
   const task = state.long[pendingLongTaskIdx];
   const fileName = `long_audio_${task.id}_${Date.now()}.wav`;
@@ -4962,6 +5001,7 @@ async function uploadLongRecording(){
 
 // 日常任务录音提交
 async function uploadDailyRecording(){
+  if(isAfter2130()){ alert('已经过了晚上9:30，今天不能再提交啦！'); return; }
   if(pendingDailyAudioIdx === null){ alert('任务信息丢失，请重新打开'); return; }
   const task = state.daily[pendingDailyAudioIdx];
   const fileName = `daily_audio_${task.id}_${Date.now()}.wav`;
@@ -5044,61 +5084,32 @@ function openDictationModal(idx){
 function speakCurrentWord(){
   if(!dictationWords.length) return;
   const word = dictationWords[dictationIndex];
-  if(!('speechSynthesis' in window)){
-    alert('你的浏览器不支持语音播报，请换用 Chrome 或 Safari');
-    return;
+  
+  // 停止之前可能还在播放的语音
+  if(window.currentAudio) {
+    window.currentAudio.pause();
+    window.currentAudio = null;
   }
+
+  // 使用有道词典的免费发音接口 (type=1 英音, type=2 美音)
+  const audioUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=2`;
   
-  // 1. 强制停止当前正在播放的所有声音
-  window.speechSynthesis.cancel(); 
-  
-  // 2. 核心修复：给浏览器 150 毫秒的缓冲时间，防止音频引擎卡死
-  setTimeout(() => {
-    const utter = new SpeechSynthesisUtterance(word);
-    const subject = dictationTaskRef ? dictationTaskRef.subject : 'english';
-    
-    let voices = window.speechSynthesis.getVoices();
-    
-    // 如果语音包还没加载出来，等 100 毫秒再试一次
-    if (voices.length === 0) {
-      setTimeout(() => { window.speechSynthesis.speak(utter); }, 100);
-    }
-    
-    if(subject === 'chinese'){
-      utter.lang = 'zh-CN';
-      let bestVoice = null;
-      for(let v of voices){
-        if(v.lang === 'zh-CN' || v.lang === 'zh_CN'){
-          if(v.name.includes('Yunxi') || v.name.includes('Xiaoxiao') || v.name.includes('Ting-Ting') || v.name.includes('普通话')){
-            bestVoice = v;
-            break;
-          }
-          if(!bestVoice) bestVoice = v;
-        }
-      }
-      if(bestVoice) utter.voice = bestVoice;
-    }else{
-      utter.lang = 'en-US';
-      let bestVoice = null;
-      for(let v of voices){
-        if(v.lang === 'en-US' || v.lang === 'en_US'){
-          if(v.name.includes('Samantha') || v.name.includes('Google US English') || v.name.includes('Zira') || v.name.includes('Aria')){
-            bestVoice = v;
-            break;
-          }
-          if(!bestVoice) bestVoice = v;
-        }
-      }
-      if(bestVoice) utter.voice = bestVoice;
-    }
-    
-    // 语速设为 0.6。如果孩子还是觉得快，可以改为 0.5。但不要低于 0.4，否则会电音模糊
-    utter.rate = 0.6;   
-    utter.pitch = 1.0;  
-    utter.volume = 1.0;
-    
-    window.speechSynthesis.speak(utter);
-  }, 150); // 这就是防卡死的 150 毫秒缓冲
+  window.currentAudio = new Audio(audioUrl);
+  window.currentAudio.play().catch(err => {
+    console.error("播放失败，可能是网络或浏览器限制", err);
+    // 如果播放失败，回退到原来的系统语音方案（避免完全没声音）
+    fallbackSpeak(word);
+  });
+}
+
+// 备用方案（如果网络不好，至少系统语音还能响）
+function fallbackSpeak(word) {
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(word);
+  utter.lang = 'en-US';
+  utter.rate = 0.8;
+  window.speechSynthesis.speak(utter);
 }
 
 // 更新界面上显示的进度
@@ -5117,9 +5128,28 @@ function closeDictation(){
   dictationTaskRef = null;
   closeModal('dictationModal');
 }
+
+// 播报下一个单词
+function nextDictationWord(){
+  if(!dictationWords.length) return;
+  // 已经是最后一个，再点就结束听写
+  if(dictationIndex >= dictationWords.length - 1){
+    closeDictation();
+    return;
+  }
+  dictationIndex++;
+  updateDictationUI();
+  speakCurrentWord();
+}
+
+// 重播当前单词
+function replayCurrentWord(){
+  speakCurrentWord();
+}
 // ================== 听写功能结束 ==================
 async function submitLongTask(idx) {
   const task = state.long[idx];
+  if(isAfter2130()){ alert('已经过了晚上9:30，今天不能再提交啦！'); return; }
   const today = getTodayStr();
 
   if(task.last_date===today) return alert('今日已经完成');
@@ -5272,44 +5302,9 @@ function getBeijingTodayStr() {
 }
 
 async function checkAndDeductStars() {
-    try {
-        // 1. 获取当前北京时间
-        const now = new Date();
-        const beijingTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (8 * 3600000));
-        const currentHour = beijingTime.getHours();
-        const currentMinute = beijingTime.getMinutes();
-        
-        // 过了 21:30 才触发
-        const isAfterDeductTime = (currentHour > 21) || (currentHour === 21 && currentMinute >= 30);
-        if (!isAfterDeductTime) return; 
-
-        // 2. 生成今天的日期字符串 (YYYY-MM-DD)
-        const todayStr = getBeijingTodayStr();
-
-        // 3. 查询 star_logs 表，看看今天有没有自动扣星的记录
-        const { data: logs, error: logError } = await supabase
-            .from('star_logs')
-            .select('id')
-            .like('reason', '%自动扣星%')
-            .gte('created_at', todayStr + 'T00:00:00+08:00')  // 使用东八区时间查询
-            .lte('created_at', todayStr + 'T23:59:59+08:00');
-
-        if (logError) throw logError;
-
-        // 4. 如果今天还没有记录，说明后台（GitHub Actions）可能没扣成功，前端主动补扣
-        if (!logs || logs.length === 0) {
-            console.log("前端检测到今日未扣星，正在尝试补扣...");
-            const { error: rpcError } = await supabase.rpc('process_daily_deduction');
-            if (rpcError) throw rpcError;
-            console.log("补扣星成功！");
-        } else {
-            console.log("今天已经扣过星了，前端跳过。");
-        }
-    } catch (error) {
-        console.error("前端自动扣星检查失败:", error);
-    }
+  // 已取消自动扣星，保留空函数防止报错
+  return;
 }
-
 
 // 清理日常任务：支持跨天补删，保留待审核任务
 async function cleanApprovedTasks(){
@@ -6071,19 +6066,29 @@ async function renderBadges() {
     const logs = logsRes.data || [];
     const allDaily = dailyRes.data || [];
     
-    // ===== 核心指标统计（加了防错机制） =====
-    const totalSigns = logs.filter(l => l.reason && l.reason.includes('每日签到奖励')).length;
-    const totalPerfect = logs.filter(l => l.reason && (l.reason.includes('全勤宝箱奖励') || l.reason.includes('家长全勤奖励'))).length;
+    // 🌟 核心改造：从 app_state 表里的 badge_stats 字段读取永久累积的数据
+    const { data: stateData } = await supabase.from('app_state').select('badge_stats').eq('id', 1).single();
+    let stats = stateData && stateData.badge_stats ? stateData.badge_stats : { signs: 0, perfect: 0, tasks: 0, plants: 0 };
+
+    // 提取当前未结算的临时流水
+    const newSigns = logs.filter(l => l.reason && l.reason.includes('每日签到奖励')).length;
+    const newPerfect = logs.filter(l => l.reason && (l.reason.includes('全勤宝箱奖励') || l.reason.includes('家长全勤奖励'))).length;
     const approvedDaily = allDaily.filter(t => t.status === 'approved').length;
     const longDoneLogs = logs.filter(l => l.reason && l.reason.includes('长期任务') && l.change_num > 0).length;
-    const totalTasksDone = approvedDaily + longDoneLogs;
+    const newTasks = approvedDaily + longDoneLogs;
     
+    // 🌟 直接计算流水里有几条植物记录，不去重！
     const plantLogs = logs.filter(l => l.reason && l.reason.includes('收集植物【'));
-    const collectedPlants = [...new Set(plantLogs.map(l => {
-      const match = l.reason.match(/收集植物【(.*?)】/);
-      return match ? match[1] : null;
-    }).filter(Boolean))];
-    const totalPlants = collectedPlants.length;
+    const newPlantCount = plantLogs.length; 
+
+    // 🌟 合并数据：数据库历史总数 + 临时流水
+    const totalSigns = (stats.signs || 0) + newSigns;
+    const totalPerfect = (stats.perfect || 0) + newPerfect;
+    const totalTasksDone = (stats.tasks || 0) + newTasks;
+    
+    // 🌟 植物统计改为数字累加（历史数字 + 刚刚流水有几条）
+    const oldPlantsNum = typeof stats.plants === 'number' ? stats.plants : 0;
+    const totalPlants = oldPlantsNum + newPlantCount;
 
     // ===== 更新数据 =====
     window.allBadges[0].current = totalSigns;
@@ -6520,6 +6525,17 @@ document.addEventListener('visibilitychange', function(){
       <!-- 文字会自动填入这里 -->
     </div>
     <button class="btn btn-green" style="font-size: 18px; border-radius: 20px;" onclick="closeModal('plantTalkModal')">我知道啦，继续努力！</button>
+  </div>
+</div>
+<!-- ========= 全勤宝箱开启弹窗 ========= -->
+<div class="modal-mask" id="perfectDayModal">
+  <div class="modal-box" style="text-align:center; padding: 30px 20px; background:#fffbeb;">
+    <div style="font-size: 60px; margin-bottom: 15px;">🎁</div>
+    <h3 style="margin-bottom:16px; color:#92400e; font-size: 22px;">太棒啦！全勤宝箱已开启</h3>
+    <div style="font-size: 16px; color: #4b7f23; line-height: 1.8; margin-bottom: 24px; background:#fff; padding:16px; border-radius:12px; border:1px dashed #fde68a;">
+      今天的所有任务都圆满完成！<br>系统已为你发放 <b>2 颗星星 ⭐</b> 奖励！<br>明天也要继续加油哦～
+    </div>
+    <button class="btn btn-green" style="font-size: 18px; border-radius: 20px;" onclick="closeModal('perfectDayModal')">开心收下！</button>
   </div>
 </div>
 <!-- 🌟 全屏花圃弹窗 -->
