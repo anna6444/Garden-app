@@ -109,10 +109,10 @@ padding-bottom:20px;}
 .log-time{font-size:12px;color:#999;margin-top:3px;}
 .log-plus{color:#16a34a;font-weight:bold;}
 .log-minus{color:#dc2626;font-weight:bold;}
-/* 🌟 新增：压缩“我的”页面折叠卡片的上下留白 */
-#tab-mine .card:has(.task-card-title) {
-  padding-top: 12px !important;
-  padding-bottom: 12px !important;
+/* 🌟 新增：强行压扁所有标题的上下留白 */
+.task-card-title {
+  margin-top: -5px !important;    /* 把文字往上拔 */
+  margin-bottom: -5px !important; /* 把下方空白抽走 */
 }
 /* 奖惩卡片新增样式 */
 .reward-block{margin-bottom:14px;}
@@ -1242,17 +1242,23 @@ if('serviceWorker' in navigator){
 
 <!-- 听写弹窗 -->
 <div class="modal-mask" id="dictationModal">
-  <div class="modal-box">
-    <h3 style="margin-bottom:12px;">🔊 听写练习</h3>
-    <p id="dictationTaskTitle" style="color:#444;margin-bottom:12px;font-weight:bold;"></p>
+  <div class="modal-box" style="position: relative; padding-top: 40px;">
+    <!-- 🌟 把退出按钮移到右上角 -->
+    <button onclick="closeDictation()" style="position: absolute; top: 15px; right: 15px; background: transparent; border: none; font-size: 24px; color: #999; cursor: pointer; padding: 5px;">✕</button>
+    
+    <h3 style="margin-bottom:12px; text-align: center;">🔊 听写练习</h3>
+    <p id="dictationTaskTitle" style="color:#444;margin-bottom:12px;font-weight:bold; text-align: center;"></p>
+    
     <div style="text-align:center;padding:16px 0;">
       <div style="color:#888;font-size:14px;margin-bottom:8px;">第 <span id="dictationProgress">1</span> / <span id="dictationTotal">1</span> 个</div>
       <div id="dictationWordDisplay" style="font-size:24px;font-weight:bold;color:#3b82f6;margin:12px 0;min-height:32px;">—</div>
       <button class="btn btn-blue" id="replayBtn" onclick="replayCurrentWord()" style="width:auto;padding:12px 24px;margin-top:8px;">🔁 重播当前单词</button>
     </div>
+    
+    <!-- 🌟 底部改为三个按钮：上一个、下一个，各占一半 -->
     <div style="display:flex;gap:10px;margin-top:16px;">
-      <button class="btn btn-gray" style="flex:1;" onclick="closeDictation()">退出</button>
-      <button class="btn btn-green" style="flex:1;" id="nextWordBtn" onclick="nextDictationWord()">▶ 下一个</button>
+      <button class="btn btn-gray" style="flex:1;" id="prevWordBtn" onclick="prevDictationWord()">◀ 上一个</button>
+      <button class="btn btn-green" style="flex:1;" id="nextWordBtn" onclick="nextDictationWord()">下一个 ▶</button>
     </div>
   </div>
 </div>
@@ -5080,31 +5086,52 @@ function openDictationModal(idx){
   document.getElementById('dictationTotal').innerText = words.length;
   updateDictationUI();
   openModal('dictationModal');
-  // 稍等一下再播报，让弹窗先渲染出来
-  setTimeout(speakCurrentWord, 400);
-}
+  // 🌟 预加载所有单词的音频，防止点击时卡顿
+  window.dictationAudioCache = {};
+  words.forEach((w) => {
+    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(w)}&type=2`;
+    const audio = new Audio();
+    audio.preload = 'auto'; // 告诉浏览器：提前下载
+    audio.src = url;
+    window.dictationAudioCache[w] = audio;
+  });
 
-// 播报当前单词（用 speechSynthesis）
+  // 预加载第一词后，稍等一下再播放
+  setTimeout(() => {
+    if(window.dictationAudioCache[words[0]]) {
+      window.dictationAudioCache[words[0]].play().catch(() => fallbackSpeak(words[0]));
+    }
+  }, 400);
+  
+}
 
 function speakCurrentWord(){
   if(!dictationWords.length) return;
   const word = dictationWords[dictationIndex];
-  
-  // 停止之前可能还在播放的语音
+
+  // 停掉之前的
   if(window.currentAudio) {
     window.currentAudio.pause();
     window.currentAudio = null;
   }
 
-  // 使用有道词典的免费发音接口 (type=1 英音, type=2 美音)
-  const audioUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=2`;
-  
-  window.currentAudio = new Audio(audioUrl);
-  window.currentAudio.play().catch(err => {
-    console.error("播放失败，可能是网络或浏览器限制", err);
-    // 如果播放失败，回退到原来的系统语音方案（避免完全没声音）
-    fallbackSpeak(word);
-  });
+  // 🌟 优先使用预加载好的音频
+  if(window.dictationAudioCache && window.dictationAudioCache[word]) {
+    window.currentAudio = window.dictationAudioCache[word];
+    window.currentAudio.currentTime = 0; // 回到开头
+    window.currentAudio.play().catch(err => {
+      console.error("播放失败", err);
+      fallbackSpeak(word);
+    });
+  } else {
+    // 兜底：如果缓存没有，还是走老路
+    const audioUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=2`;
+    window.currentAudio = new Audio(audioUrl);
+    window.currentAudio.play().catch(err => {
+      console.error("播放失败", err);
+      fallbackSpeak(word);
+    });
+  }
 }
 
 // 备用方案（如果网络不好，至少系统语音还能响）
@@ -5117,21 +5144,67 @@ function fallbackSpeak(word) {
   window.speechSynthesis.speak(utter);
 }
 
-// 更新界面上显示的进度
 function updateDictationUI(){
   document.getElementById('dictationProgress').innerText = (dictationIndex + 1);
   document.getElementById('dictationWordDisplay').innerText = '—';
+
+  // 🌟 新增：控制按钮的变灰状态
+  const prevBtn = document.getElementById('prevWordBtn');
+  const nextBtn = document.getElementById('nextWordBtn');
+  
+  if (prevBtn) {
+    if (dictationIndex === 0) {
+      prevBtn.disabled = true; // 第一个词，禁用“上一个”
+      prevBtn.style.opacity = '0.5';
+    } else {
+      prevBtn.disabled = false;
+      prevBtn.style.opacity = '1';
+    }
+  }
+
+  if (nextBtn) {
+    // 如果是最后一个词，改变文字提示
+    if (dictationIndex === dictationWords.length - 1) {
+      nextBtn.innerText = '完成听写';
+      nextBtn.style.background = '#3b82f6'; // 最后一个变成蓝色
+    } else {
+      nextBtn.innerText = '下一个 ▶';
+      nextBtn.style.background = '#34d399'; // 平时保持绿色
+    }
+  }
 }
 
-// 关闭听写弹窗
 function closeDictation(){
   if(window.speechSynthesis){
     window.speechSynthesis.cancel();
   }
+  
+  // 🌟 新增：关闭听写时，强制清空预加载的音频缓存
+  if(window.dictationAudioCache) {
+    Object.values(window.dictationAudioCache).forEach(audio => {
+      audio.pause();
+      audio.src = ""; // 清空音频源，瞬间释放内存
+    });
+    window.dictationAudioCache = null; // 彻底扔掉
+  }
+
   dictationWords = [];
   dictationIndex = 0;
   dictationTaskRef = null;
   closeModal('dictationModal');
+}
+
+// 播报上一个单词
+function prevDictationWord(){
+  if(!dictationWords.length) return;
+  // 已经是第一个了，就不动了
+  if(dictationIndex <= 0){
+    speakCurrentWord(); // 如果已经在第一个，就再读一遍
+    return;
+  }
+  dictationIndex--;
+  updateDictationUI();
+  speakCurrentWord();
 }
 
 // 播报下一个单词
@@ -5311,7 +5384,7 @@ async function checkAndDeductStars() {
   return;
 }
 
-// 清理日常任务：支持跨天补删，保留待审核任务
+// 清理日常任务：带缓冲期（保留最近3天或7天），保留待审核任务
 async function cleanApprovedTasks(){
   const now = new Date();
   const todayStr = getTodayStr(now);
@@ -5333,27 +5406,40 @@ async function cleanApprovedTasks(){
       return;
     }
 
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-    const isAfter2130 = (hour > 21) || (hour === 21 && minute >= 30);
+    // 🌟 核心参数：设置任务保留几天。（周五布置的周末作业，如果想保留到周一，这里填 3 或 4）
+    const KEEP_DAYS = 3; 
+    
+    // 计算“清理分界线”的时间（比如今天是周三，分界线就是周日的这个时候）
+    const cutoffTime = new Date();
+    cutoffTime.setDate(now.getDate() - KEEP_DAYS);
 
     const tasksToDelete = [];
+    // 🌟 新增：在删除历史任务前，把已通过的任务永久结算到 badge_stats 里！
+    const approvedTasksToDelete = allTasks.filter(item => {
+      const taskDate = new Date(item.create_at || Date.now());
+      return item.status === 'approved' && taskDate <= cutoffTime;
+    });
+
+    if (approvedTasksToDelete.length > 0) {
+      const { data: stateData } = await supabase.from('app_state').select('badge_stats').eq('id', 1).single();
+      let stats = stateData && stateData.badge_stats ? stateData.badge_stats : { signs: 0, perfect: 0, tasks: 0, plants: 0 };
+      
+      // 把要删掉的已通过任务数，永久加到历史总任务数里
+      stats.tasks = (stats.tasks || 0) + approvedTasksToDelete.length;
+      await supabase.from('app_state').update({ badge_stats: stats }).eq('id', 1);
+    }
 
     for(const item of allTasks){
-      const taskDate = getTodayStr(new Date(item.create_at || Date.now()));
-      const isToday = (taskDate === todayStr);
+      const taskDate = new Date(item.create_at || Date.now());
 
       // 逻辑A：待审核的任务，永远不删（保留给家长审核）
       if(item.status === 'pending_review') continue;
 
-      // 逻辑B：如果是今天创建的任务，且还没到21:30，不删
-      if(isToday && !isAfter2130) continue;
+      // 逻辑B：还没到分界线（在保留期内），统统不删！
+      if(taskDate > cutoffTime) continue;
 
-      // 逻辑C：如果是今天的任务，且已经过了21:30，状态是 active 或 approved，删
-      // 逻辑D：如果是昨天或更早的任务（不管是 active 还是 approved），跨天补删
-      if(isAfter2130 || !isToday){
-        tasksToDelete.push(item);
-      }
+      // 逻辑C：过了保留期，不管是 active 还是 approved，统统删掉
+      tasksToDelete.push(item);
     }
 
     if(tasksToDelete.length === 0){
@@ -5361,26 +5447,17 @@ async function cleanApprovedTasks(){
       return;
     }
 
-    console.log(`清理任务：准备删除 ${tasksToDelete.length} 条任务`);
-
-    const failedList = [];
+    console.log(`清理任务：准备删除 ${tasksToDelete.length} 条过期任务`);
+    
+    // 删除操作
     for(const item of tasksToDelete){
-      const { error: delErr } = await supabase.from('daily_tasks').delete().eq('id', item.id);
-      if(delErr){
-        console.error('删除失败：', item, delErr);
-        failedList.push(item);
-      }
+      await supabase.from('daily_tasks').delete().eq('id', item.id);
     }
 
     await loadAllData();
     renderAll();
-
-    if(failedList.length === 0){
-      window.lastCleanDate = todayStr;
-      console.log('清理任务：全部成功 ✅');
-    } else {
-      console.warn('清理任务：有失败，稍后会重试', failedList);
-    }
+    window.lastCleanDate = todayStr;
+    console.log('清理任务：全部成功 ✅');
 
   } catch(e){
     console.warn("清理任务异常", e);
